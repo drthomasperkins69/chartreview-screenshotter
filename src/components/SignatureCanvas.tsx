@@ -35,9 +35,8 @@ export const SignatureCanvas = ({ onSave, onCancel }: SignatureCanvasProps) => {
     canvas.width = 400;
     canvas.height = 200;
 
-    // Set canvas background
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Set drawing styles
     ctx.lineCap = "round";
@@ -84,8 +83,7 @@ export const SignatureCanvas = ({ onSave, onCancel }: SignatureCanvasProps) => {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
 
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
   const saveSignature = useCallback(() => {

@@ -132,10 +132,10 @@ export const PDFViewer = ({
           img.onload = () => {
             context.drawImage(
               img,
-              placedSig.x * scale,
-              placedSig.y * scale,
-              placedSig.width * scale,
-              placedSig.height * scale
+              placedSig.x,
+              placedSig.y,
+              placedSig.width,
+              placedSig.height
             );
           };
           img.src = signature.dataURL;
@@ -154,10 +154,10 @@ export const PDFViewer = ({
             img.onload = () => {
               context.drawImage(
                 img,
-                field.x * scale,
-                field.y * scale,
-                field.width * scale,
-                field.height * scale
+                field.x,
+                field.y,
+                field.width,
+                field.height
               );
             };
             img.src = signature.dataURL;
@@ -168,10 +168,10 @@ export const PDFViewer = ({
           context.lineWidth = 2;
           context.setLineDash([5, 5]);
           context.strokeRect(
-            field.x * scale,
-            field.y * scale,
-            field.width * scale,
-            field.height * scale
+            field.x,
+            field.y,
+            field.width,
+            field.height
           );
           context.setLineDash([]);
           
@@ -181,8 +181,8 @@ export const PDFViewer = ({
           context.textAlign = "center";
           context.fillText(
             "Sign Here",
-            (field.x + field.width / 2) * scale,
-            (field.y + field.height / 2) * scale + 4
+            (field.x + field.width / 2),
+            (field.y + field.height / 2) + 4
           );
         }
       }
