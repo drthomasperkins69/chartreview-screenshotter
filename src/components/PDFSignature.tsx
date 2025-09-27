@@ -141,18 +141,23 @@ export const PDFSignature = () => {
   }, []);
 
   const handleAutoFillAll = useCallback(() => {
-    setAutoFillFields(prev => 
-      prev.map(field => ({
+    console.log('Auto-filling fields:', autoFillFields.length);
+    console.log('User details:', userDetails);
+    
+    setAutoFillFields(prev => {
+      const updated = prev.map(field => ({
         ...field,
         filled: true,
         value: field.type === 'name' ? userDetails.name :
                field.type === 'date' ? userDetails.date :
                field.type === 'qualifications' ? userDetails.qualifications :
                field.type === 'sign' ? 'SIGNATURE' : ''
-      }))
-    );
+      }));
+      console.log('Updated auto-fill fields:', updated);
+      return updated;
+    });
     toast("All fields auto-filled!");
-  }, [userDetails]);
+  }, [userDetails, autoFillFields]);
 
   const handleDownload = useCallback(async () => {
     if (!pdfFile || placedSignatures.length === 0) {

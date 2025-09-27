@@ -122,13 +122,17 @@ export const PDFViewer = ({
   }, [file]);
 
   const extractTableFields = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
+    console.log('Starting table field extraction...');
     const detectedFields: AutoFillField[] = [];
     
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      console.log(`Extracting text from page ${pageNum}`);
       try {
         const page = await pdfDoc.getPage(pageNum);
         const textContent = await page.getTextContent();
         const viewport = page.getViewport({ scale: 1.0 });
+        
+        console.log(`Page ${pageNum} text items:`, textContent.items.length);
         
         // Group text items by their y-coordinate (rows)
         const textByRow: { [key: number]: any[] } = {};
@@ -147,6 +151,8 @@ export const PDFViewer = ({
           }
         });
         
+        console.log(`Page ${pageNum} text rows:`, Object.keys(textByRow).length);
+        
         // Sort rows by Y position
         const sortedRows = Object.keys(textByRow)
           .map(y => parseInt(y))
@@ -156,9 +162,11 @@ export const PDFViewer = ({
           const rowItems = textByRow[rowY].sort((a, b) => a.x - b.x);
           const rowText = rowItems.map(item => item.text).join(' ');
           
+          console.log(`Page ${pageNum}, Row ${rowY}:`, rowText);
+          
           // Check for table pattern 1: "Sign:", "Name:", "Date:"
           if (rowText.includes('sign:') && rowText.includes('name:') && rowText.includes('date:')) {
-            console.log('Found 3-column table at row', rowY);
+            console.log('Found 3-column table at row', rowY, 'with text:', rowText);
             
             // Create fields for each column
             rowItems.forEach((item, index) => {
@@ -202,7 +210,7 @@ export const PDFViewer = ({
           // Check for table pattern 2: "Sign:", "Name:", "Qualifications:", "Date:"
           if (rowText.includes('sign:') && rowText.includes('name:') && 
               rowText.includes('qualifications') && rowText.includes('date:')) {
-            console.log('Found 4-column table at row', rowY);
+            console.log('Found 4-column table at row', rowY, 'with text:', rowText);
             
             rowItems.forEach((item) => {
               if (item.text.includes('sign:')) {
@@ -360,15 +368,19 @@ export const PDFViewer = ({
 
       // Render auto-fill fields for current page
       const currentPageAutoFields = autoFillFields.filter(af => af.page === currentPage);
+      console.log(`Rendering auto-fill fields for page ${currentPage}:`, currentPageAutoFields.length);
       
       for (const field of currentPageAutoFields) {
+        console.log('Rendering auto-fill field:', field);
         if (field.filled && field.value) {
+          console.log('Field is filled with value:', field.value);
           // Render filled field with text
           context.fillStyle = "#000000";
           context.font = `${14 * scale}px Arial`;
           context.textAlign = "left";
           
           if (field.type === 'sign' && selectedSignature) {
+            console.log('Rendering signature for sign field');
             // Render signature for sign fields
             const signature = signatures.find(s => s.id === selectedSignature);
             if (signature) {
@@ -385,6 +397,7 @@ export const PDFViewer = ({
               img.src = signature.dataURL;
             }
           } else {
+            console.log('Rendering text for field:', field.type, field.value);
             // Render text for other fields
             context.fillText(
               field.value,
@@ -393,6 +406,7 @@ export const PDFViewer = ({
             );
           }
         } else {
+          console.log('Field is empty, rendering placeholder');
           // Render empty field placeholder
           context.strokeStyle = "#22c55e";
           context.lineWidth = 2;
