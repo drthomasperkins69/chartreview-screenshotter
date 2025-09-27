@@ -23,22 +23,37 @@ interface PlacedSignature {
   page: number;
 }
 
+interface SignatureField {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  page: number;
+  filled: boolean;
+  signatureId?: string;
+}
+
 interface PDFViewerProps {
   file: File;
   placedSignatures: PlacedSignature[];
+  signatureFields: SignatureField[];
   signatures: Signature[];
-  mode: "view" | "sign" | "create";
+  mode: "view" | "sign" | "create" | "field";
   selectedSignature: string | null;
   onSignaturePlace: (x: number, y: number, page: number) => void;
+  onFieldFill: (fieldId: string, signatureId: string) => void;
 }
 
 export const PDFViewer = ({
   file,
   placedSignatures,
+  signatureFields,
   signatures,
   mode,
   selectedSignature,
   onSignaturePlace,
+  onFieldFill,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,10 +127,55 @@ export const PDFViewer = ({
           img.src = signature.dataURL;
         }
       }
+
+      // Render signature fields for current page
+      const currentPageFields = signatureFields.filter(sf => sf.page === currentPage);
+      
+      for (const field of currentPageFields) {
+        if (field.filled && field.signatureId) {
+          // Render filled field with signature
+          const signature = signatures.find(s => s.id === field.signatureId);
+          if (signature) {
+            const img = new Image();
+            img.onload = () => {
+              context.drawImage(
+                img,
+                field.x * scale,
+                field.y * scale,
+                field.width * scale,
+                field.height * scale
+              );
+            };
+            img.src = signature.dataURL;
+          }
+        } else {
+          // Render empty field placeholder
+          context.strokeStyle = "#3b82f6";
+          context.lineWidth = 2;
+          context.setLineDash([5, 5]);
+          context.strokeRect(
+            field.x * scale,
+            field.y * scale,
+            field.width * scale,
+            field.height * scale
+          );
+          context.setLineDash([]);
+          
+          // Add "Sign Here" text
+          context.fillStyle = "#3b82f6";
+          context.font = `${12 * scale}px Arial`;
+          context.textAlign = "center";
+          context.fillText(
+            "Sign Here",
+            (field.x + field.width / 2) * scale,
+            (field.y + field.height / 2) * scale + 4
+          );
+        }
+      }
     } catch (error) {
       console.error("Error rendering page:", error);
     }
-  }, [pdf, currentPage, scale, rotation, placedSignatures, signatures]);
+  }, [pdf, currentPage, scale, rotation, placedSignatures, signatureFields, signatures]);
 
   useEffect(() => {
     renderPage();
@@ -123,16 +183,35 @@ export const PDFViewer = ({
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (mode !== "sign" || !selectedSignature || !canvasRef.current) return;
+      if (!canvasRef.current) return;
 
       const canvas = canvasRef.current;
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) / scale;
       const y = (e.clientY - rect.top) / scale;
 
-      onSignaturePlace(x, y, currentPage);
+      if (mode === "field") {
+        onSignaturePlace(x, y, currentPage);
+        return;
+      }
+
+      if (mode === "sign" && selectedSignature) {
+        // Check if clicking on an empty signature field
+        const clickedField = signatureFields.find(field => 
+          field.page === currentPage &&
+          !field.filled &&
+          x >= field.x && x <= field.x + field.width &&
+          y >= field.y && y <= field.y + field.height
+        );
+
+        if (clickedField) {
+          onFieldFill(clickedField.id, selectedSignature);
+        } else {
+          onSignaturePlace(x, y, currentPage);
+        }
+      }
     },
-    [mode, selectedSignature, scale, currentPage, onSignaturePlace]
+    [mode, selectedSignature, scale, currentPage, signatureFields, onSignaturePlace, onFieldFill]
   );
 
   const nextPage = () => {
@@ -217,7 +296,7 @@ export const PDFViewer = ({
           ref={canvasRef}
           onClick={handleCanvasClick}
           className={`shadow-medium border ${
-            mode === "sign" && selectedSignature
+            (mode === "sign" && selectedSignature) || mode === "field"
               ? "cursor-crosshair"
               : "cursor-default"
           }`}
@@ -229,9 +308,15 @@ export const PDFViewer = ({
       </div>
 
       {/* Mode indicator */}
+      {mode === "field" && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
+          Click to add signature fields
+        </div>
+      )}
+      
       {mode === "sign" && selectedSignature && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
-          Click where you want to place your signature
+          Click fields or anywhere to place your signature
         </div>
       )}
     </div>

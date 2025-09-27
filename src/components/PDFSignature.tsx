@@ -25,12 +25,24 @@ interface PlacedSignature {
   page: number;
 }
 
+interface SignatureField {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  page: number;
+  filled: boolean;
+  signatureId?: string;
+}
+
 export const PDFSignature = () => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [placedSignatures, setPlacedSignatures] = useState<PlacedSignature[]>([]);
+  const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
-  const [mode, setMode] = useState<"view" | "sign" | "create">("view");
+  const [mode, setMode] = useState<"view" | "sign" | "create" | "field">("view");
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +70,21 @@ export const PDFSignature = () => {
   }, []);
 
   const handleSignaturePlace = useCallback((x: number, y: number, page: number) => {
+    if (mode === "field") {
+      const signatureField: SignatureField = {
+        id: Date.now().toString(),
+        x,
+        y,
+        width: 200,
+        height: 80,
+        page,
+        filled: false,
+      };
+      setSignatureFields(prev => [...prev, signatureField]);
+      toast("Signature field added!");
+      return;
+    }
+    
     if (!selectedSignature) return;
     
     const placedSignature: PlacedSignature = {
@@ -71,7 +98,18 @@ export const PDFSignature = () => {
     };
     setPlacedSignatures(prev => [...prev, placedSignature]);
     toast("Signature placed!");
-  }, [selectedSignature]);
+  }, [selectedSignature, mode]);
+
+  const handleFieldFill = useCallback((fieldId: string, signatureId: string) => {
+    setSignatureFields(prev => 
+      prev.map(field => 
+        field.id === fieldId 
+          ? { ...field, filled: true, signatureId }
+          : field
+      )
+    );
+    toast("Signature field filled!");
+  }, []);
 
   const handleDownload = useCallback(async () => {
     if (!pdfFile || placedSignatures.length === 0) {
@@ -170,10 +208,12 @@ export const PDFSignature = () => {
                 <PDFViewer
                   file={pdfFile}
                   placedSignatures={placedSignatures}
+                  signatureFields={signatureFields}
                   signatures={signatures}
                   mode={mode}
                   selectedSignature={selectedSignature}
                   onSignaturePlace={handleSignaturePlace}
+                  onFieldFill={handleFieldFill}
                 />
               </Card>
             </div>

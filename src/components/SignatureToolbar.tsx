@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PenTool, MousePointer, Plus, Trash2 } from "lucide-react";
+import { PenTool, MousePointer, Plus, Trash2, Square } from "lucide-react";
 
 interface Signature {
   id: string;
@@ -13,8 +13,8 @@ interface ToolbarProps {
   signatures: Signature[];
   selectedSignature: string | null;
   onSignatureSelect: (id: string | null) => void;
-  mode: "view" | "sign" | "create";
-  onModeChange: (mode: "view" | "sign" | "create") => void;
+  mode: "view" | "sign" | "create" | "field";
+  onModeChange: (mode: "view" | "sign" | "create" | "field") => void;
   onCreateSignature: () => void;
 }
 
@@ -39,6 +39,16 @@ export const Toolbar = ({
           >
             <MousePointer className="w-4 h-4" />
             View Mode
+          </Button>
+          
+          <Button
+            variant={mode === "field" ? "default" : "secondary"}
+            size="sm"
+            onClick={() => onModeChange("field")}
+            className="w-full justify-start gap-2"
+          >
+            <Square className="w-4 h-4" />
+            Add Fields
           </Button>
           
           <Button
@@ -113,6 +123,14 @@ export const Toolbar = ({
               </Card>
             ))}
           </div>
+        )}
+
+        {mode === "field" && (
+          <Card className="mt-3 p-3 bg-secondary-subtle border-secondary/20">
+            <p className="text-xs text-secondary font-medium">
+              📝 Click on the PDF to add signature fields
+            </p>
+          </Card>
         )}
 
         {mode === "sign" && selectedSignature && (
