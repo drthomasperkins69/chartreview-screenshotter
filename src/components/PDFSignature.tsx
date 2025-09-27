@@ -121,6 +121,15 @@ export const PDFSignature = () => {
     toast("Downloading signed PDF...");
   }, [pdfFile, placedSignatures]);
 
+  const handleRemovePdf = useCallback(() => {
+    setPdfFile(null);
+    setPlacedSignatures([]);
+    setSignatureFields([]);
+    setSelectedSignature(null);
+    setMode("view");
+    toast("PDF removed");
+  }, []);
+
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
   };
@@ -148,6 +157,13 @@ export const PDFSignature = () => {
                 </Button>
               ) : (
                 <>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleRemovePdf}
+                    className="gap-2"
+                  >
+                    Remove PDF
+                  </Button>
                   <Button 
                     variant="secondary" 
                     onClick={() => setShowSignatureCanvas(true)}
