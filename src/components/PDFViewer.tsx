@@ -164,100 +164,105 @@ export const PDFViewer = ({
           
           console.log(`Page ${pageNum}, Row ${rowY}:`, rowText);
           
-          // Check for table pattern 1: "Sign:", "Name:", "Date:"
-          if (rowText.includes('sign:') && rowText.includes('name:') && rowText.includes('date:')) {
-            console.log('Found 3-column table at row', rowY, 'with text:', rowText);
+          // More flexible pattern matching for tables
+          const hasSign = rowText.includes('sign') || rowText.includes('signature');
+          const hasName = rowText.includes('name');
+          const hasDate = rowText.includes('date');
+          const hasQual = rowText.includes('qualification') || rowText.includes('qual');
+          
+          // Check for 3-column table pattern: Sign, Name, Date
+          if (hasSign && hasName && hasDate && !hasQual) {
+            console.log('Found potential 3-column table at row', rowY, 'with text:', rowText);
             
-            // Create fields for each column
-            rowItems.forEach((item, index) => {
-              if (item.text.includes('sign:')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-sign`,
-                  x: item.x,
-                  y: item.y + 20, // Position below the header
-                  width: 150,
-                  height: 40,
-                  page: pageNum,
-                  type: 'sign',
-                  filled: false
-                });
-              } else if (item.text.includes('name:')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-name`,
-                  x: item.x,
-                  y: item.y + 20,
-                  width: 150,
-                  height: 40,
-                  page: pageNum,
-                  type: 'name',
-                  filled: false
-                });
-              } else if (item.text.includes('date:')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-date`,
-                  x: item.x,
-                  y: item.y + 20,
-                  width: 150,
-                  height: 40,
-                  page: pageNum,
-                  type: 'date',
-                  filled: false
-                });
-              }
+            // Create auto-fill fields in table-like positions
+            const viewport = page.getViewport({ scale: 1.0 });
+            const columnWidth = viewport.width / 3;
+            const baseY = viewport.height - rowY - 60; // Position below header
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-sign`,
+              x: 30,
+              y: baseY,
+              width: columnWidth - 60,
+              height: 35,
+              page: pageNum,
+              type: 'sign',
+              filled: false
+            });
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-name`,
+              x: columnWidth + 30,
+              y: baseY,
+              width: columnWidth - 60,
+              height: 35,
+              page: pageNum,
+              type: 'name',
+              filled: false
+            });
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-date`,
+              x: columnWidth * 2 + 30,
+              y: baseY,
+              width: columnWidth - 60,
+              height: 35,
+              page: pageNum,
+              type: 'date',
+              filled: false
             });
           }
           
-          // Check for table pattern 2: "Sign:", "Name:", "Qualifications:", "Date:"
-          if (rowText.includes('sign:') && rowText.includes('name:') && 
-              rowText.includes('qualifications') && rowText.includes('date:')) {
-            console.log('Found 4-column table at row', rowY, 'with text:', rowText);
+          // Check for 4-column table pattern: Sign, Name, Qualifications, Date
+          if (hasSign && hasName && hasDate && hasQual) {
+            console.log('Found potential 4-column table at row', rowY, 'with text:', rowText);
             
-            rowItems.forEach((item) => {
-              if (item.text.includes('sign:')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-sign-4col`,
-                  x: item.x,
-                  y: item.y + 20,
-                  width: 120,
-                  height: 40,
-                  page: pageNum,
-                  type: 'sign',
-                  filled: false
-                });
-              } else if (item.text.includes('name:')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-name-4col`,
-                  x: item.x,
-                  y: item.y + 20,
-                  width: 120,
-                  height: 40,
-                  page: pageNum,
-                  type: 'name',
-                  filled: false
-                });
-              } else if (item.text.includes('qualifications')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-qual-4col`,
-                  x: item.x,
-                  y: item.y + 20,
-                  width: 120,
-                  height: 40,
-                  page: pageNum,
-                  type: 'qualifications',
-                  filled: false
-                });
-              } else if (item.text.includes('date:')) {
-                detectedFields.push({
-                  id: `autofill-${pageNum}-${rowY}-date-4col`,
-                  x: item.x,
-                  y: item.y + 20,
-                  width: 120,
-                  height: 40,
-                  page: pageNum,
-                  type: 'date',
-                  filled: false
-                });
-              }
+            const viewport = page.getViewport({ scale: 1.0 });
+            const columnWidth = viewport.width / 4;
+            const baseY = viewport.height - rowY - 60;
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-sign-4col`,
+              x: 30,
+              y: baseY,
+              width: columnWidth - 50,
+              height: 35,
+              page: pageNum,
+              type: 'sign',
+              filled: false
+            });
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-name-4col`,
+              x: columnWidth + 30,
+              y: baseY,
+              width: columnWidth - 50,
+              height: 35,
+              page: pageNum,
+              type: 'name',
+              filled: false
+            });
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-qual-4col`,
+              x: columnWidth * 2 + 30,
+              y: baseY,
+              width: columnWidth - 50,
+              height: 35,
+              page: pageNum,
+              type: 'qualifications',
+              filled: false
+            });
+            
+            detectedFields.push({
+              id: `autofill-${pageNum}-${rowY}-date-4col`,
+              x: columnWidth * 3 + 30,
+              y: baseY,
+              width: columnWidth - 50,
+              height: 35,
+              page: pageNum,
+              type: 'date',
+              filled: false
             });
           }
         }
