@@ -2,9 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Use Vite worker for pdf.js to avoid CORS/version issues
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - Vite ?worker returns a Worker constructor
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - assign worker instance to workerPort
+pdfjsLib.GlobalWorkerOptions.workerPort = new pdfjsWorker();
 
 interface Signature {
   id: string;
@@ -71,7 +75,7 @@ export const PDFViewer = ({
         setLoading(true);
         const arrayBuffer = await file.arrayBuffer();
         console.log("PDF arrayBuffer created, size:", arrayBuffer.byteLength);
-        const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
         console.log("PDF document loaded, pages:", pdfDoc.numPages);
         setPdf(pdfDoc);
         setNumPages(pdfDoc.numPages);
