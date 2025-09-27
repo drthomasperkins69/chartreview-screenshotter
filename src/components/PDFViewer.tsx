@@ -4,7 +4,7 @@ import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight } from "lucide-rea
 import * as pdfjsLib from "pdfjs-dist";
 
 // Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface Signature {
   id: string;
@@ -67,12 +67,16 @@ export const PDFViewer = ({
   useEffect(() => {
     const loadPdf = async () => {
       try {
+        console.log("Starting PDF load...");
         setLoading(true);
         const arrayBuffer = await file.arrayBuffer();
+        console.log("PDF arrayBuffer created, size:", arrayBuffer.byteLength);
         const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+        console.log("PDF document loaded, pages:", pdfDoc.numPages);
         setPdf(pdfDoc);
         setNumPages(pdfDoc.numPages);
         setLoading(false);
+        console.log("PDF load complete");
       } catch (error) {
         console.error("Error loading PDF:", error);
         setLoading(false);
@@ -85,28 +89,34 @@ export const PDFViewer = ({
   }, [file]);
 
   const renderPage = useCallback(async () => {
+    console.log("renderPage called, pdf:", !!pdf, "canvas:", !!canvasRef.current);
     if (!pdf || !canvasRef.current) return;
 
     try {
+      console.log("Getting page", currentPage);
       const page = await pdf.getPage(currentPage);
       const canvas = canvasRef.current;
       const context = canvas.getContext("2d");
       
+      console.log("Canvas context:", !!context);
       if (!context) return;
 
       const viewport = page.getViewport({ scale, rotation });
+      console.log("Viewport:", viewport.width, "x", viewport.height);
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
       // Clear canvas
       context.clearRect(0, 0, canvas.width, canvas.height);
 
+      console.log("Starting page render...");
       // Render PDF page
       await page.render({
         canvasContext: context,
         viewport: viewport,
         canvas: canvas,
       }).promise;
+      console.log("Page render complete");
 
       // Render placed signatures for current page
       const currentPageSignatures = placedSignatures.filter(ps => ps.page === currentPage);
