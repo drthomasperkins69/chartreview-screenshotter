@@ -124,6 +124,16 @@ export const PDFSignature = () => {
     toast("Signature placed!");
   }, [selectedSignature, mode]);
 
+  const handleSignatureUpdate = useCallback((signatureId: string, x: number, y: number) => {
+    setPlacedSignatures(prev => 
+      prev.map(sig => 
+        sig.id === signatureId 
+          ? { ...sig, x, y }
+          : sig
+      )
+    );
+  }, []);
+
   const handleFieldFill = useCallback((fieldId: string, signatureId: string) => {
     setSignatureFields(prev => 
       prev.map(field => 
@@ -285,6 +295,7 @@ export const PDFSignature = () => {
                   onSignaturePlace={handleSignaturePlace}
                   onFieldFill={handleFieldFill}
                   onAutoFillDetected={handleAutoFillDetected}
+                  onSignatureUpdate={handleSignatureUpdate}
                 />
               </Card>
             </div>

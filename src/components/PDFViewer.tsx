@@ -68,6 +68,7 @@ interface PDFViewerProps {
   onSignaturePlace: (x: number, y: number, page: number) => void;
   onFieldFill: (fieldId: string, signatureId: string) => void;
   onAutoFillDetected: (fields: AutoFillField[]) => void;
+  onSignatureUpdate?: (signatureId: string, x: number, y: number) => void;
 }
 
 export const PDFViewer = ({
@@ -82,6 +83,7 @@ export const PDFViewer = ({
   onSignaturePlace,
   onFieldFill,
   onAutoFillDetected,
+  onSignatureUpdate,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +94,8 @@ export const PDFViewer = ({
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
   const [extractedFields, setExtractedFields] = useState<AutoFillField[]>([]);
+  const [draggedSignature, setDraggedSignature] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -479,6 +483,53 @@ export const PDFViewer = ({
     [mode, selectedSignature, scale, currentPage, signatureFields, onSignaturePlace, onFieldFill]
   );
 
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!canvasRef.current || mode !== "view") return;
+
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
+
+      // Check if clicking on a placed signature
+      const clickedSignature = placedSignatures.find(sig => 
+        sig.page === currentPage &&
+        x >= sig.x && x <= sig.x + sig.width &&
+        y >= sig.y && y <= sig.y + sig.height
+      );
+
+      if (clickedSignature) {
+        setDraggedSignature(clickedSignature.id);
+        setDragOffset({
+          x: x - clickedSignature.x,
+          y: y - clickedSignature.y
+        });
+        e.preventDefault();
+      }
+    },
+    [mode, scale, currentPage, placedSignatures]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!canvasRef.current || !draggedSignature || !onSignatureUpdate) return;
+
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / scale - dragOffset.x;
+      const y = (e.clientY - rect.top) / scale - dragOffset.y;
+
+      onSignatureUpdate(draggedSignature, x, y);
+    },
+    [draggedSignature, scale, dragOffset, onSignatureUpdate]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setDraggedSignature(null);
+    setDragOffset({ x: 0, y: 0 });
+  }, []);
+
   const nextPage = () => {
     setCurrentPage(prev => Math.min(prev + 1, numPages));
   };
@@ -560,9 +611,14 @@ export const PDFViewer = ({
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
           className={`shadow-medium border ${
             (mode === "sign" && selectedSignature) || mode === "field"
               ? "cursor-crosshair"
+              : draggedSignature
+              ? "cursor-grabbing"
               : "cursor-default"
           }`}
           style={{
@@ -573,6 +629,12 @@ export const PDFViewer = ({
       </div>
 
       {/* Mode indicator */}
+      {mode === "view" && placedSignatures.length > 0 && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-muted text-muted-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
+          Click and drag signatures to move them
+        </div>
+      )}
+      
       {mode === "field" && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
           Click to add signature fields
