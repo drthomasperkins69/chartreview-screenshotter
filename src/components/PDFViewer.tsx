@@ -38,26 +38,50 @@ interface SignatureField {
   signatureId?: string;
 }
 
+interface AutoFillField {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  page: number;
+  type: 'name' | 'date' | 'sign' | 'qualifications';
+  filled: boolean;
+  value?: string;
+}
+
+interface UserDetails {
+  name: string;
+  qualifications: string;
+  date: string;
+}
+
 interface PDFViewerProps {
   file: File;
   placedSignatures: PlacedSignature[];
   signatureFields: SignatureField[];
+  autoFillFields: AutoFillField[];
   signatures: Signature[];
   mode: "view" | "sign" | "create" | "field";
   selectedSignature: string | null;
+  userDetails: UserDetails;
   onSignaturePlace: (x: number, y: number, page: number) => void;
   onFieldFill: (fieldId: string, signatureId: string) => void;
+  onAutoFillDetected: (fields: AutoFillField[]) => void;
 }
 
 export const PDFViewer = ({
   file,
   placedSignatures,
   signatureFields,
+  autoFillFields,
   signatures,
   mode,
   selectedSignature,
+  userDetails,
   onSignaturePlace,
   onFieldFill,
+  onAutoFillDetected,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -67,6 +91,7 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [extractedFields, setExtractedFields] = useState<AutoFillField[]>([]);
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -79,6 +104,10 @@ export const PDFViewer = ({
         console.log("PDF document loaded, pages:", pdfDoc.numPages);
         setPdf(pdfDoc);
         setNumPages(pdfDoc.numPages);
+        
+        // Extract text and detect table fields
+        await extractTableFields(pdfDoc);
+        
         setLoading(false);
         console.log("PDF load complete");
       } catch (error) {
@@ -91,6 +120,148 @@ export const PDFViewer = ({
       loadPdf();
     }
   }, [file]);
+
+  const extractTableFields = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
+    const detectedFields: AutoFillField[] = [];
+    
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const viewport = page.getViewport({ scale: 1.0 });
+        
+        // Group text items by their y-coordinate (rows)
+        const textByRow: { [key: number]: any[] } = {};
+        
+        textContent.items.forEach((item: any) => {
+          if (item.str && item.str.trim()) {
+            const y = Math.round(viewport.height - item.transform[5]); // Flip Y coordinate
+            if (!textByRow[y]) textByRow[y] = [];
+            textByRow[y].push({
+              text: item.str.toLowerCase().trim(),
+              x: item.transform[4],
+              y: y,
+              width: item.width,
+              height: item.height
+            });
+          }
+        });
+        
+        // Sort rows by Y position
+        const sortedRows = Object.keys(textByRow)
+          .map(y => parseInt(y))
+          .sort((a, b) => a - b);
+        
+        for (const rowY of sortedRows) {
+          const rowItems = textByRow[rowY].sort((a, b) => a.x - b.x);
+          const rowText = rowItems.map(item => item.text).join(' ');
+          
+          // Check for table pattern 1: "Sign:", "Name:", "Date:"
+          if (rowText.includes('sign:') && rowText.includes('name:') && rowText.includes('date:')) {
+            console.log('Found 3-column table at row', rowY);
+            
+            // Create fields for each column
+            rowItems.forEach((item, index) => {
+              if (item.text.includes('sign:')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-sign`,
+                  x: item.x,
+                  y: item.y + 20, // Position below the header
+                  width: 150,
+                  height: 40,
+                  page: pageNum,
+                  type: 'sign',
+                  filled: false
+                });
+              } else if (item.text.includes('name:')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-name`,
+                  x: item.x,
+                  y: item.y + 20,
+                  width: 150,
+                  height: 40,
+                  page: pageNum,
+                  type: 'name',
+                  filled: false
+                });
+              } else if (item.text.includes('date:')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-date`,
+                  x: item.x,
+                  y: item.y + 20,
+                  width: 150,
+                  height: 40,
+                  page: pageNum,
+                  type: 'date',
+                  filled: false
+                });
+              }
+            });
+          }
+          
+          // Check for table pattern 2: "Sign:", "Name:", "Qualifications:", "Date:"
+          if (rowText.includes('sign:') && rowText.includes('name:') && 
+              rowText.includes('qualifications') && rowText.includes('date:')) {
+            console.log('Found 4-column table at row', rowY);
+            
+            rowItems.forEach((item) => {
+              if (item.text.includes('sign:')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-sign-4col`,
+                  x: item.x,
+                  y: item.y + 20,
+                  width: 120,
+                  height: 40,
+                  page: pageNum,
+                  type: 'sign',
+                  filled: false
+                });
+              } else if (item.text.includes('name:')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-name-4col`,
+                  x: item.x,
+                  y: item.y + 20,
+                  width: 120,
+                  height: 40,
+                  page: pageNum,
+                  type: 'name',
+                  filled: false
+                });
+              } else if (item.text.includes('qualifications')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-qual-4col`,
+                  x: item.x,
+                  y: item.y + 20,
+                  width: 120,
+                  height: 40,
+                  page: pageNum,
+                  type: 'qualifications',
+                  filled: false
+                });
+              } else if (item.text.includes('date:')) {
+                detectedFields.push({
+                  id: `autofill-${pageNum}-${rowY}-date-4col`,
+                  x: item.x,
+                  y: item.y + 20,
+                  width: 120,
+                  height: 40,
+                  page: pageNum,
+                  type: 'date',
+                  filled: false
+                });
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error extracting text from page ${pageNum}:`, error);
+      }
+    }
+    
+    console.log('Detected auto-fill fields:', detectedFields);
+    setExtractedFields(detectedFields);
+    onAutoFillDetected(detectedFields);
+  }, [onAutoFillDetected]);
 
   const renderPage = useCallback(async () => {
     console.log("renderPage called, pdf:", !!pdf, "canvas:", !!canvasRef.current);
@@ -186,10 +357,71 @@ export const PDFViewer = ({
           );
         }
       }
+
+      // Render auto-fill fields for current page
+      const currentPageAutoFields = autoFillFields.filter(af => af.page === currentPage);
+      
+      for (const field of currentPageAutoFields) {
+        if (field.filled && field.value) {
+          // Render filled field with text
+          context.fillStyle = "#000000";
+          context.font = `${14 * scale}px Arial`;
+          context.textAlign = "left";
+          
+          if (field.type === 'sign' && selectedSignature) {
+            // Render signature for sign fields
+            const signature = signatures.find(s => s.id === selectedSignature);
+            if (signature) {
+              const img = new Image();
+              img.onload = () => {
+                context.drawImage(
+                  img,
+                  field.x,
+                  field.y,
+                  field.width,
+                  field.height
+                );
+              };
+              img.src = signature.dataURL;
+            }
+          } else {
+            // Render text for other fields
+            context.fillText(
+              field.value,
+              field.x + 5,
+              field.y + field.height / 2 + 5
+            );
+          }
+        } else {
+          // Render empty field placeholder
+          context.strokeStyle = "#22c55e";
+          context.lineWidth = 2;
+          context.setLineDash([3, 3]);
+          context.strokeRect(
+            field.x,
+            field.y,
+            field.width,
+            field.height
+          );
+          context.setLineDash([]);
+          
+          // Add field type label
+          context.fillStyle = "#22c55e";
+          context.font = `${10 * scale}px Arial`;
+          context.textAlign = "center";
+          let label = field.type.charAt(0).toUpperCase() + field.type.slice(1);
+          if (field.type === 'qualifications') label = 'Qual.';
+          context.fillText(
+            label,
+            field.x + field.width / 2,
+            field.y + field.height / 2 + 3
+          );
+        }
+      }
     } catch (error) {
       console.error("Error rendering page:", error);
     }
-  }, [pdf, currentPage, scale, rotation, placedSignatures, signatureFields, signatures]);
+  }, [pdf, currentPage, scale, rotation, placedSignatures, signatureFields, signatures, autoFillFields, selectedSignature]);
 
   useEffect(() => {
     renderPage();
