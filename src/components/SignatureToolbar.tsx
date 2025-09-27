@@ -11,22 +11,12 @@ interface Signature {
   height: number;
 }
 
-interface AutoFillField {
+interface SignLocation {
   id: string;
+  text: string;
   x: number;
   y: number;
-  width: number;
-  height: number;
   page: number;
-  type: 'name' | 'date' | 'sign' | 'qualifications';
-  filled: boolean;
-  value?: string;
-}
-
-interface UserDetails {
-  name: string;
-  qualifications: string;
-  date: string;
 }
 
 interface ToolbarProps {
@@ -36,10 +26,7 @@ interface ToolbarProps {
   mode: "view" | "sign" | "create" | "field";
   onModeChange: (mode: "view" | "sign" | "create" | "field") => void;
   onCreateSignature: () => void;
-  autoFillFields: AutoFillField[];
-  userDetails: UserDetails;
-  onUserDetailsChange: (details: UserDetails) => void;
-  onAutoFillAll: () => void;
+  signLocations: SignLocation[];
 }
 
 export const Toolbar = ({
@@ -49,10 +36,7 @@ export const Toolbar = ({
   mode,
   onModeChange,
   onCreateSignature,
-  autoFillFields,
-  userDetails,
-  onUserDetailsChange,
-  onAutoFillAll,
+  signLocations,
 }: ToolbarProps) => {
   return (
     <div className="space-y-4">
@@ -170,57 +154,27 @@ export const Toolbar = ({
         )}
       </div>
 
-      {/* Auto-Fill Section */}
-      {autoFillFields.length > 0 && (
+      {/* Sign Locations Section */}
+      {signLocations.length > 0 && (
         <div>
-          <h3 className="font-semibold text-foreground mb-3">Auto-Fill Details</h3>
-          <Card className="p-4 space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">Name</Label>
-              <Input
-                id="name"
-                value={userDetails.name}
-                onChange={(e) => onUserDetailsChange({ ...userDetails, name: e.target.value })}
-                placeholder="Enter your full name"
-                className="text-sm"
-              />
+          <h3 className="font-semibold text-foreground mb-3">Sign Locations</h3>
+          <Card className="p-3 space-y-2">
+            <div className="text-xs text-muted-foreground mb-2">
+              Found {signLocations.length} "Sign" text{signLocations.length !== 1 ? 's' : ''} in document
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="qualifications" className="text-sm font-medium">Qualifications</Label>
-              <Input
-                id="qualifications"
-                value={userDetails.qualifications}
-                onChange={(e) => onUserDetailsChange({ ...userDetails, qualifications: e.target.value })}
-                placeholder="Enter qualifications"
-                className="text-sm"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="date" className="text-sm font-medium">Date</Label>
-              <Input
-                id="date"
-                value={userDetails.date}
-                onChange={(e) => onUserDetailsChange({ ...userDetails, date: e.target.value })}
-                placeholder="Enter date"
-                className="text-sm"
-              />
-            </div>
-            
-            <Button 
-              onClick={onAutoFillAll}
-              size="sm"
-              className="w-full gap-2"
-              disabled={!userDetails.name.trim()}
-            >
-              <FileCheck className="w-4 h-4" />
-              Fill All Fields
-            </Button>
-            
-            <div className="text-xs text-muted-foreground">
-              Found {autoFillFields.length} auto-fill field{autoFillFields.length !== 1 ? 's' : ''}
-            </div>
+            {signLocations.slice(0, 5).map((location) => (
+              <div key={location.id} className="text-xs p-2 bg-muted rounded border">
+                <div className="font-medium text-foreground">"{location.text}"</div>
+                <div className="text-muted-foreground">
+                  Page {location.page} • Position ({Math.round(location.x)}, {Math.round(location.y)})
+                </div>
+              </div>
+            ))}
+            {signLocations.length > 5 && (
+              <div className="text-xs text-muted-foreground text-center pt-1">
+                ... and {signLocations.length - 5} more
+              </div>
+            )}
           </Card>
         </div>
       )}

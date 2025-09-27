@@ -36,22 +36,12 @@ interface SignatureField {
   signatureId?: string;
 }
 
-interface AutoFillField {
+interface SignLocation {
   id: string;
+  text: string;
   x: number;
   y: number;
-  width: number;
-  height: number;
   page: number;
-  type: 'name' | 'date' | 'sign' | 'qualifications';
-  filled: boolean;
-  value?: string;
-}
-
-interface UserDetails {
-  name: string;
-  qualifications: string;
-  date: string;
 }
 
 export const PDFSignature = () => {
@@ -59,12 +49,7 @@ export const PDFSignature = () => {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [placedSignatures, setPlacedSignatures] = useState<PlacedSignature[]>([]);
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
-  const [autoFillFields, setAutoFillFields] = useState<AutoFillField[]>([]);
-  const [userDetails, setUserDetails] = useState<UserDetails>({
-    name: '',
-    qualifications: '',
-    date: new Date().toLocaleDateString()
-  });
+  const [signLocations, setSignLocations] = useState<SignLocation[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
   const [mode, setMode] = useState<"view" | "sign" | "create" | "field">("view");
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
@@ -145,29 +130,10 @@ export const PDFSignature = () => {
     toast("Signature field filled!");
   }, []);
 
-  const handleAutoFillDetected = useCallback((fields: AutoFillField[]) => {
-    setAutoFillFields(fields);
-    toast(`Found ${fields.length} auto-fill fields!`);
+  const handleSignLocationsDetected = useCallback((locations: SignLocation[]) => {
+    setSignLocations(locations);
+    toast(`Found ${locations.length} "Sign" locations!`);
   }, []);
-
-  const handleAutoFillAll = useCallback(() => {
-    console.log('Auto-filling fields:', autoFillFields.length);
-    console.log('User details:', userDetails);
-    
-    setAutoFillFields(prev => {
-      const updated = prev.map(field => ({
-        ...field,
-        filled: true,
-        value: field.type === 'name' ? userDetails.name :
-               field.type === 'date' ? userDetails.date :
-               field.type === 'qualifications' ? userDetails.qualifications :
-               field.type === 'sign' ? 'SIGNATURE' : ''
-      }));
-      console.log('Updated auto-fill fields:', updated);
-      return updated;
-    });
-    toast("All fields auto-filled!");
-  }, [userDetails, autoFillFields]);
 
   const handleDownload = useCallback(async () => {
     if (!pdfFile || placedSignatures.length === 0) {
@@ -272,10 +238,7 @@ export const PDFSignature = () => {
                   mode={mode}
                   onModeChange={setMode}
                   onCreateSignature={() => setShowSignatureCanvas(true)}
-                  autoFillFields={autoFillFields}
-                  userDetails={userDetails}
-                  onUserDetailsChange={setUserDetails}
-                  onAutoFillAll={handleAutoFillAll}
+                  signLocations={signLocations}
                 />
               </Card>
             </div>
@@ -287,14 +250,13 @@ export const PDFSignature = () => {
                   file={pdfFile}
                   placedSignatures={placedSignatures}
                   signatureFields={signatureFields}
-                  autoFillFields={autoFillFields}
                   signatures={signatures}
                   mode={mode}
                   selectedSignature={selectedSignature}
-                  userDetails={userDetails}
+                  signLocations={signLocations}
                   onSignaturePlace={handleSignaturePlace}
                   onFieldFill={handleFieldFill}
-                  onAutoFillDetected={handleAutoFillDetected}
+                  onSignLocationsDetected={handleSignLocationsDetected}
                   onSignatureUpdate={handleSignatureUpdate}
                 />
               </Card>
