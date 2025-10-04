@@ -1,0 +1,4 @@
+project_id = "hpclzzykgxolszduecqa"
+
+[functions.pdf-search-assistant]
+verify_jwt = false

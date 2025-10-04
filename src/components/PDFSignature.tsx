@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
+import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 
@@ -18,6 +19,7 @@ interface KeywordMatch {
 export const PDFSignature = () => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [keywords, setKeywords] = useState<string>("");
+  const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -98,8 +100,18 @@ export const PDFSignature = () => {
     setMatchingPages(new Set());
     setKeywordMatches([]);
     setKeywords("");
+    setSuggestedKeywords("");
     toast("PDF removed");
   }, []);
+
+  const handleKeywordSuggest = useCallback((suggested: string) => {
+    setSuggestedKeywords(suggested);
+  }, []);
+
+  const useSuggestedKeywords = useCallback(() => {
+    setKeywords(suggestedKeywords);
+    toast("Keywords applied - click Search to find matches!");
+  }, [suggestedKeywords]);
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
@@ -166,8 +178,15 @@ export const PDFSignature = () => {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Sidebar */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* AI Assistant Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="h-[600px]">
+                <AISearchAssistant onKeywordSuggest={handleKeywordSuggest} />
+              </div>
+            </div>
+
+            {/* Search Controls */}
             <div className="lg:col-span-1">
               <Card className="p-4 shadow-medium space-y-4">
                 <div>
@@ -182,6 +201,18 @@ export const PDFSignature = () => {
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     className="mb-2"
                   />
+                  
+                  {suggestedKeywords && (
+                    <Button 
+                      onClick={useSuggestedKeywords}
+                      variant="outline"
+                      className="w-full gap-2 mb-2"
+                      size="sm"
+                    >
+                      Use Keywords
+                    </Button>
+                  )}
+                  
                   <Button 
                     onClick={handleSearch} 
                     className="w-full gap-2"
