@@ -1,58 +1,26 @@
 import { useState, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
-import { SignatureCanvas } from "./SignatureCanvas";
-import { Toolbar } from "./SignatureToolbar";
-import { FileText, PenTool, Download, Upload } from "lucide-react";
+import { FileText, Download, Upload, Search } from "lucide-react";
+import { PDFDocument } from "pdf-lib";
 
-interface Signature {
-  id: string;
-  dataURL: string;
-  width: number;
-  height: number;
-}
-
-interface PlacedSignature {
-  id: string;
-  signatureId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+interface KeywordMatch {
   page: number;
-}
-
-interface SignatureField {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  page: number;
-  filled: boolean;
-  signatureId?: string;
-}
-
-interface SignLocation {
-  id: string;
-  text: string;
-  x: number;
-  y: number;
-  page: number;
+  keyword: string;
+  count: number;
 }
 
 export const PDFSignature = () => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [signatures, setSignatures] = useState<Signature[]>([]);
-  const [placedSignatures, setPlacedSignatures] = useState<PlacedSignature[]>([]);
-  const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
-  const [signLocations, setSignLocations] = useState<SignLocation[]>([]);
-  const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
-  const [mode, setMode] = useState<"view" | "sign" | "create" | "field">("view");
-  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [keywords, setKeywords] = useState<string>("");
+  const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
+  const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,95 +30,74 @@ export const PDFSignature = () => {
       return;
     }
     setPdfFile(file);
-    setMode("view");
+    setMatchingPages(new Set());
+    setKeywordMatches([]);
     toast("PDF loaded successfully!");
   }, []);
 
-  const handleSignatureCreate = useCallback((dataURL: string) => {
-    const signature: Signature = {
-      id: Date.now().toString(),
-      dataURL,
-      width: 200,
-      height: 80,
-    };
-    setSignatures(prev => [...prev, signature]);
-    setShowSignatureCanvas(false);
-    toast("Signature created!");
+  const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
+    setKeywordMatches(matches);
+    const pages = new Set(matches.map(m => m.page));
+    setMatchingPages(pages);
+    
+    if (matches.length > 0) {
+      toast(`Found keywords on ${pages.size} page(s)!`);
+    } else {
+      toast("No matching keywords found");
+    }
+    setIsSearching(false);
   }, []);
 
-  const handleSignaturePlace = useCallback((x: number, y: number, page: number) => {
-    if (mode === "field") {
-      const signatureField: SignatureField = {
-        id: Date.now().toString(),
-        x,
-        y,
-        width: 200,
-        height: 80,
-        page,
-        filled: false,
-      };
-      setSignatureFields(prev => [...prev, signatureField]);
-      toast("Signature field added!");
+  const handleSearch = useCallback(() => {
+    if (!keywords.trim()) {
+      toast("Please enter keywords to search");
       return;
     }
-    
-    if (!selectedSignature) return;
-    
-    const placedSignature: PlacedSignature = {
-      id: Date.now().toString(),
-      signatureId: selectedSignature,
-      x,
-      y,
-      width: 200,
-      height: 80,
-      page,
-    };
-    setPlacedSignatures(prev => [...prev, placedSignature]);
-    toast("Signature placed!");
-  }, [selectedSignature, mode]);
-
-  const handleSignatureUpdate = useCallback((signatureId: string, x: number, y: number) => {
-    setPlacedSignatures(prev => 
-      prev.map(sig => 
-        sig.id === signatureId 
-          ? { ...sig, x, y }
-          : sig
-      )
-    );
-  }, []);
-
-  const handleFieldFill = useCallback((fieldId: string, signatureId: string) => {
-    setSignatureFields(prev => 
-      prev.map(field => 
-        field.id === fieldId 
-          ? { ...field, filled: true, signatureId }
-          : field
-      )
-    );
-    toast("Signature field filled!");
-  }, []);
-
-  const handleSignLocationsDetected = useCallback((locations: SignLocation[]) => {
-    setSignLocations(locations);
-    toast(`Found ${locations.length} "Sign" locations!`);
-  }, []);
+    setIsSearching(true);
+    toast("Searching for keywords...");
+  }, [keywords]);
 
   const handleDownload = useCallback(async () => {
-    if (!pdfFile || placedSignatures.length === 0) {
-      toast("No signatures to save");
+    if (!pdfFile || matchingPages.size === 0) {
+      toast("No matching pages to extract");
       return;
     }
     
-    // Here we would implement the actual PDF modification using pdf-lib
-    toast("Downloading signed PDF...");
-  }, [pdfFile, placedSignatures]);
+    try {
+      toast("Creating PDF with matching pages...");
+      
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const newPdfDoc = await PDFDocument.create();
+      
+      const sortedPages = Array.from(matchingPages).sort((a, b) => a - b);
+      
+      for (const pageNum of sortedPages) {
+        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+        newPdfDoc.addPage(copiedPage);
+      }
+      
+      const pdfBytes = await newPdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `extracted-pages-${Date.now()}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast(`Downloaded PDF with ${sortedPages.length} page(s)!`);
+    } catch (error) {
+      console.error("Error creating PDF:", error);
+      toast("Failed to create PDF");
+    }
+  }, [pdfFile, matchingPages]);
 
   const handleRemovePdf = useCallback(() => {
     setPdfFile(null);
-    setPlacedSignatures([]);
-    setSignatureFields([]);
-    setSelectedSignature(null);
-    setMode("view");
+    setMatchingPages(new Set());
+    setKeywordMatches([]);
+    setKeywords("");
     toast("PDF removed");
   }, []);
 
@@ -168,8 +115,8 @@ export const PDFSignature = () => {
                 <FileText className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">PDF Signature</h1>
-                <p className="text-sm text-muted-foreground">Professional document signing</p>
+                <h1 className="text-xl font-semibold text-foreground">PDF Keyword Extractor</h1>
+                <p className="text-sm text-muted-foreground">Extract pages by keywords</p>
               </div>
             </div>
             
@@ -189,20 +136,12 @@ export const PDFSignature = () => {
                     Remove PDF
                   </Button>
                   <Button 
-                    variant="secondary" 
-                    onClick={() => setShowSignatureCanvas(true)}
-                    className="gap-2"
-                  >
-                    <PenTool className="w-4 h-4" />
-                    Create Signature
-                  </Button>
-                  <Button 
                     onClick={handleDownload}
-                    disabled={placedSignatures.length === 0}
+                    disabled={matchingPages.size === 0}
                     className="gap-2"
                   >
                     <Download className="w-4 h-4" />
-                    Download
+                    Download Extracted Pages
                   </Button>
                 </>
               )}
@@ -230,16 +169,54 @@ export const PDFSignature = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="lg:col-span-1">
-              <Card className="p-4 shadow-medium">
-                <Toolbar
-                  signatures={signatures}
-                  selectedSignature={selectedSignature}
-                  onSignatureSelect={setSelectedSignature}
-                  mode={mode}
-                  onModeChange={setMode}
-                  onCreateSignature={() => setShowSignatureCanvas(true)}
-                  signLocations={signLocations}
-                />
+              <Card className="p-4 shadow-medium space-y-4">
+                <div>
+                  <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
+                    Search Keywords
+                  </Label>
+                  <Input
+                    id="keywords"
+                    placeholder="e.g., contract, invoice, report"
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="mb-2"
+                  />
+                  <Button 
+                    onClick={handleSearch} 
+                    className="w-full gap-2"
+                    disabled={isSearching || !keywords.trim()}
+                  >
+                    <Search className="w-4 h-4" />
+                    {isSearching ? "Searching..." : "Search PDF"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Separate multiple keywords with commas
+                  </p>
+                </div>
+
+                {keywordMatches.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Matches Found</h3>
+                    <div className="space-y-1 max-h-96 overflow-y-auto">
+                      {Array.from(new Set(keywordMatches.map(m => m.page)))
+                        .sort((a, b) => a - b)
+                        .map((page) => {
+                          const pageMatches = keywordMatches.filter(m => m.page === page);
+                          return (
+                            <div key={page} className="text-xs p-2 bg-muted rounded">
+                              <div className="font-medium">Page {page}</div>
+                              {pageMatches.map((match, idx) => (
+                                <div key={idx} className="text-muted-foreground">
+                                  "{match.keyword}" ({match.count}x)
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </Card>
             </div>
 
@@ -248,34 +225,16 @@ export const PDFSignature = () => {
               <Card className="shadow-medium overflow-hidden">
                 <PDFViewer
                   file={pdfFile}
-                  placedSignatures={placedSignatures}
-                  signatureFields={signatureFields}
-                  signatures={signatures}
-                  mode={mode}
-                  selectedSignature={selectedSignature}
-                  signLocations={signLocations}
-                  onSignaturePlace={handleSignaturePlace}
-                  onFieldFill={handleFieldFill}
-                  onSignLocationsDetected={handleSignLocationsDetected}
-                  onSignatureUpdate={handleSignatureUpdate}
+                  keywords={keywords}
+                  matchingPages={matchingPages}
+                  isSearching={isSearching}
+                  onKeywordMatchesDetected={handleKeywordMatchesDetected}
                 />
               </Card>
             </div>
           </div>
         )}
       </main>
-
-      {/* Signature Canvas Modal */}
-      {showSignatureCanvas && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md p-6 shadow-large">
-            <SignatureCanvas
-              onSave={handleSignatureCreate}
-              onCancel={() => setShowSignatureCanvas(false)}
-            />
-          </Card>
-        </div>
-      )}
     </div>
   );
 };

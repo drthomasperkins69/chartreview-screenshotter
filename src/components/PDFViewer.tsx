@@ -10,68 +10,26 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 // @ts-ignore - assign worker instance to workerPort
 pdfjsLib.GlobalWorkerOptions.workerPort = new pdfjsWorker();
 
-interface Signature {
-  id: string;
-  dataURL: string;
-  width: number;
-  height: number;
-}
-
-interface PlacedSignature {
-  id: string;
-  signatureId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+interface KeywordMatch {
   page: number;
-}
-
-interface SignatureField {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  page: number;
-  filled: boolean;
-  signatureId?: string;
-}
-
-interface SignLocation {
-  id: string;
-  text: string;
-  x: number;
-  y: number;
-  page: number;
+  keyword: string;
+  count: number;
 }
 
 interface PDFViewerProps {
   file: File;
-  placedSignatures: PlacedSignature[];
-  signatureFields: SignatureField[];
-  signatures: Signature[];
-  mode: "view" | "sign" | "create" | "field";
-  selectedSignature: string | null;
-  signLocations: SignLocation[];
-  onSignaturePlace: (x: number, y: number, page: number) => void;
-  onFieldFill: (fieldId: string, signatureId: string) => void;
-  onSignLocationsDetected: (locations: SignLocation[]) => void;
-  onSignatureUpdate?: (signatureId: string, x: number, y: number) => void;
+  keywords: string;
+  matchingPages: Set<number>;
+  isSearching: boolean;
+  onKeywordMatchesDetected: (matches: KeywordMatch[]) => void;
 }
 
 export const PDFViewer = ({
   file,
-  placedSignatures,
-  signatureFields,
-  signatures,
-  mode,
-  selectedSignature,
-  signLocations,
-  onSignaturePlace,
-  onFieldFill,
-  onSignLocationsDetected,
-  onSignatureUpdate,
+  keywords,
+  matchingPages,
+  isSearching,
+  onKeywordMatchesDetected,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,8 +39,6 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [draggedSignature, setDraggedSignature] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -95,12 +51,6 @@ export const PDFViewer = ({
         console.log("PDF document loaded, pages:", pdfDoc.numPages);
         setPdf(pdfDoc);
         setNumPages(pdfDoc.numPages);
-        
-        // Extract text and detect sign locations
-        const signLocations = await extractSignLocations(pdfDoc);
-        console.log('Sign locations detected:', signLocations.length);
-        onSignLocationsDetected(signLocations);
-        
         setLoading(false);
         console.log("PDF load complete");
       } catch (error) {
@@ -114,43 +64,35 @@ export const PDFViewer = ({
     }
   }, [file]);
 
-  const extractSignLocations = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
-    console.log('Starting sign location extraction...');
-    const signLocations: { id: string; text: string; x: number; y: number; page: number }[] = [];
-    
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      console.log(`Scanning page ${pageNum} for "Sign" text`);
-      try {
-        const page = await pdfDoc.getPage(pageNum);
+  useEffect(() => {
+    const searchKeywords = async () => {
+      if (!pdf || !keywords.trim() || !isSearching) return;
+
+      const keywordList = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
+      const matches: KeywordMatch[] = [];
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
-        const viewport = page.getViewport({ scale: 1.0 });
-        
-        console.log(`Page ${pageNum} text items:`, textContent.items.length);
-        
-        textContent.items.forEach((item: any, index: number) => {
-          if (item.str && item.str.toLowerCase().includes('sign')) {
-            const x = item.transform[4];
-            const y = viewport.height - item.transform[5]; // Flip Y coordinate
-            
-            signLocations.push({
-              id: `sign-${pageNum}-${index}`,
-              text: item.str.trim(),
-              x,
-              y,
-              page: pageNum
-            });
-            
-            console.log(`Found "${item.str}" at page ${pageNum}, position (${x}, ${y})`);
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ')
+          .toLowerCase();
+
+        for (const keyword of keywordList) {
+          const regex = new RegExp(keyword, 'gi');
+          const count = (pageText.match(regex) || []).length;
+          if (count > 0) {
+            matches.push({ page: pageNum, keyword, count });
           }
-        });
-      } catch (error) {
-        console.error(`Error scanning page ${pageNum}:`, error);
+        }
       }
-    }
-    
-    console.log('Total sign locations found:', signLocations.length);
-    return signLocations;
-  }, []);
+
+      onKeywordMatchesDetected(matches);
+    };
+
+    searchKeywords();
+  }, [pdf, keywords, isSearching, onKeywordMatchesDetected]);
 
   const renderPage = useCallback(async () => {
     console.log("renderPage called, pdf:", !!pdf, "canvas:", !!canvasRef.current);
@@ -182,164 +124,20 @@ export const PDFViewer = ({
       }).promise;
       console.log("Page render complete");
 
-      // Render placed signatures for current page
-      const currentPageSignatures = placedSignatures.filter(ps => ps.page === currentPage);
-      
-      for (const placedSig of currentPageSignatures) {
-        const signature = signatures.find(s => s.id === placedSig.signatureId);
-        if (signature) {
-          const img = new Image();
-          img.onload = () => {
-            context.drawImage(
-              img,
-              placedSig.x,
-              placedSig.y,
-              placedSig.width,
-              placedSig.height
-            );
-          };
-          img.src = signature.dataURL;
-        }
+      // Highlight matching pages
+      if (matchingPages.has(currentPage)) {
+        context.strokeStyle = "#22c55e";
+        context.lineWidth = 4;
+        context.strokeRect(0, 0, canvas.width, canvas.height);
       }
-
-      // Render signature fields for current page
-      const currentPageFields = signatureFields.filter(sf => sf.page === currentPage);
-      
-      for (const field of currentPageFields) {
-        if (field.filled && field.signatureId) {
-          // Render filled field with signature
-          const signature = signatures.find(s => s.id === field.signatureId);
-          if (signature) {
-            const img = new Image();
-            img.onload = () => {
-              context.drawImage(
-                img,
-                field.x,
-                field.y,
-                field.width,
-                field.height
-              );
-            };
-            img.src = signature.dataURL;
-          }
-        } else {
-          // Render empty field placeholder
-          context.strokeStyle = "#3b82f6";
-          context.lineWidth = 2;
-          context.setLineDash([5, 5]);
-          context.strokeRect(
-            field.x,
-            field.y,
-            field.width,
-            field.height
-          );
-          context.setLineDash([]);
-          
-          // Add "Sign Here" text
-          context.fillStyle = "#3b82f6";
-          context.font = `${12 * scale}px Arial`;
-          context.textAlign = "center";
-          context.fillText(
-            "Sign Here",
-            (field.x + field.width / 2),
-            (field.y + field.height / 2) + 4
-          );
-        }
-      }
-
-      // Remove the green auto-fill field rendering since user doesn't want it
     } catch (error) {
       console.error("Error rendering page:", error);
     }
-  }, [pdf, currentPage, scale, rotation, placedSignatures, signatureFields, signatures]);
+  }, [pdf, currentPage, scale, rotation, matchingPages]);
 
   useEffect(() => {
     renderPage();
   }, [renderPage]);
-
-  const handleCanvasClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!canvasRef.current) return;
-
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale;
-      const y = (e.clientY - rect.top) / scale;
-
-      if (mode === "field") {
-        onSignaturePlace(x, y, currentPage);
-        return;
-      }
-
-      if (mode === "sign" && selectedSignature) {
-        // Check if clicking on an empty signature field
-        const clickedField = signatureFields.find(field => 
-          field.page === currentPage &&
-          !field.filled &&
-          x >= field.x && x <= field.x + field.width &&
-          y >= field.y && y <= field.y + field.height
-        );
-
-        if (clickedField) {
-          onFieldFill(clickedField.id, selectedSignature);
-        } else {
-          onSignaturePlace(x, y, currentPage);
-        }
-      }
-    },
-    [mode, selectedSignature, scale, currentPage, signatureFields, onSignaturePlace, onFieldFill]
-  );
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!canvasRef.current || mode !== "view") return;
-
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale;
-      const y = (e.clientY - rect.top) / scale;
-
-      // Check if clicking on a placed signature
-      const clickedSignature = placedSignatures.find(sig => 
-        sig.page === currentPage &&
-        x >= sig.x && x <= sig.x + sig.width &&
-        y >= sig.y && y <= sig.y + sig.height
-      );
-
-      if (clickedSignature) {
-        setDraggedSignature(clickedSignature.id);
-        setDragOffset({
-          x: x - clickedSignature.x,
-          y: y - clickedSignature.y
-        });
-        canvas.style.cursor = 'grabbing';
-        e.preventDefault();
-      }
-    },
-    [mode, scale, currentPage, placedSignatures]
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!canvasRef.current || !draggedSignature || !onSignatureUpdate) return;
-
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / scale - dragOffset.x;
-      const y = (e.clientY - rect.top) / scale - dragOffset.y;
-
-      onSignatureUpdate(draggedSignature, x, y);
-    },
-    [draggedSignature, scale, dragOffset, onSignatureUpdate]
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setDraggedSignature(null);
-    setDragOffset({ x: 0, y: 0 });
-    if (canvasRef.current) {
-      canvasRef.current.style.cursor = 'default';
-    }
-  }, []);
 
   const nextPage = () => {
     setCurrentPage(prev => Math.min(prev + 1, numPages));
@@ -421,17 +219,7 @@ export const PDFViewer = ({
       >
         <canvas
           ref={canvasRef}
-          onClick={handleCanvasClick}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          className={`shadow-medium border ${
-            (mode === "sign" && selectedSignature) || mode === "field"
-              ? "cursor-crosshair"
-              : mode === "view" && placedSignatures.some(sig => sig.page === currentPage)
-              ? "cursor-grab"
-              : "cursor-default"
-          }`}
+          className="shadow-medium border"
           style={{
             maxWidth: "100%",
             height: "auto",
@@ -439,22 +227,9 @@ export const PDFViewer = ({
         />
       </div>
 
-      {/* Mode indicator */}
-      {mode === "view" && placedSignatures.length > 0 && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-muted text-muted-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
-          Click and drag signatures to move them
-        </div>
-      )}
-      
-      {mode === "field" && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
-          Click to add signature fields
-        </div>
-      )}
-      
-      {mode === "sign" && selectedSignature && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-medium text-sm">
-          Click fields or anywhere to place your signature
+      {matchingPages.size > 0 && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-medium text-sm">
+          Page {currentPage} {matchingPages.has(currentPage) ? '✓ Contains keywords' : ''}
         </div>
       )}
     </div>
