@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { instructions, selectedContent, model = "gemini" } = await req.json();
+    const { instructions, selectedContent, sopContent, model = "gemini" } = await req.json();
 
     if (!instructions || !selectedContent || selectedContent.length === 0) {
       return new Response(
@@ -27,9 +27,17 @@ serve(async (req) => {
       context += `${page.text}\n\n`;
     });
 
+    // Add SOP content if provided
+    if (sopContent) {
+      context += "\n\n=== UPLOADED SOP DOCUMENTS (from rma.gov.au) ===\n";
+      context += sopContent;
+    }
+
     const systemPrompt = `You are a medical diagnostic assessment specialist. Your task is to analyze the provided PDF content and create a comprehensive diagnostic assessment based on the specific instructions given.
 
-Follow the DIA (Diagnostic Instructions Assessment) provided exactly. Be thorough, accurate, and professional in your assessment.`;
+Follow the DIA (Diagnostic Instructions Assessment) provided exactly. Be thorough, accurate, and professional in your assessment.
+
+**IMPORTANT**: When analyzing SOP factors, reference the uploaded SOP documents provided below. All SOP information is sourced from rma.gov.au (Repatriation Medical Authority).`;
 
     const userPrompt = `DIA Instructions:
 ${instructions}

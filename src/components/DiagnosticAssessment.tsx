@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileText, Sparkles } from "lucide-react";
+import { Loader2, FileText, Sparkles, Upload, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { useDIA } from "@/contexts/DIAContext";
 import { DIASettings } from "./DIASettings";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist";
 
 const FUNCTIONS_BASE = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
   "https://hpclzzykgxolszduecqa.supabase.co";
@@ -30,11 +32,36 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
   const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
   const [isGenerating, setIsGenerating] = useState(false);
   const [assessment, setAssessment] = useState<string>("");
+  const [sopFiles, setSopFiles] = useState<File[]>([]);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string>("");
 
   // Update local instructions when global instructions change
   useEffect(() => {
     setLocalInstructions(diaInstructions);
   }, [diaInstructions]);
+
+  const handleSopUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files).filter(file => 
+      file.type === "application/pdf" || 
+      file.name.toLowerCase().endsWith('.pdf')
+    );
+
+    if (newFiles.length === 0) {
+      toast.error("Please upload PDF files only");
+      return;
+    }
+
+    setSopFiles(prev => [...prev, ...newFiles]);
+    toast.success(`${newFiles.length} SOP file(s) added`);
+  };
+
+  const removeSopFile = (index: number) => {
+    setSopFiles(prev => prev.filter((_, i) => i !== index));
+    toast.success("SOP file removed");
+  };
 
   const handleGenerate = async () => {
     if (!localInstructions.trim()) {
@@ -51,6 +78,27 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
     setAssessment("");
 
     try {
+      // Parse SOP files if any
+      let sopContent = "";
+      if (sopFiles.length > 0) {
+        toast("Extracting SOP content...");
+        
+        for (const file of sopFiles) {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+          let fileText = `\n\n--- SOP Document: ${file.name} ---\n\n`;
+          
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
+            fileText += pageText + '\n';
+          }
+          
+          sopContent += fileText;
+        }
+      }
+
       // Extract content for selected pages
       const selectedContent = Array.from(selectedPages).map(key => {
         const [fileIndexStr, pageNumStr] = key.split('-');
@@ -74,6 +122,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
         body: JSON.stringify({
           instructions: localInstructions,
           selectedContent,
+          sopContent,
           model: selectedModel
         }),
       });
@@ -86,7 +135,13 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
       }
 
       const data = await resp.json();
-      setAssessment(data.assessment);
+      const assessmentText = data.assessment;
+      setAssessment(assessmentText);
+
+      // Now create the combined PDF with assessment + page screenshots
+      toast("Creating PDF document...");
+      await createCombinedPDF(assessmentText, selectedContent);
+      
       toast.success("Diagnostic assessment generated successfully!");
     } catch (error) {
       console.error("Error generating assessment:", error);
@@ -96,9 +151,140 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
     }
   };
 
+  const createCombinedPDF = async (assessmentText: string, selectedContent: any[]) => {
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Add assessment text pages
+      const fontSize = 11;
+      const lineHeight = 14;
+      const margin = 50;
+      const maxWidth = 500;
+      
+      let page = pdfDoc.addPage([595, 842]); // A4 size
+      let yPosition = 792;
+      
+      // Title
+      page.drawText("Diagnostic Assessment Report", {
+        x: margin,
+        y: yPosition,
+        size: 16,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      yPosition -= 30;
+      
+      // Add assessment text with word wrapping
+      const lines = assessmentText.split('\n');
+      for (const line of lines) {
+        if (yPosition < margin + 20) {
+          page = pdfDoc.addPage([595, 842]);
+          yPosition = 792;
+        }
+        
+        const words = line.split(' ');
+        let currentLine = '';
+        
+        for (const word of words) {
+          const testLine = currentLine + (currentLine ? ' ' : '') + word;
+          const width = font.widthOfTextAtSize(testLine, fontSize);
+          
+          if (width > maxWidth && currentLine) {
+            page.drawText(currentLine, {
+              x: margin,
+              y: yPosition,
+              size: fontSize,
+              font: font,
+              color: rgb(0, 0, 0),
+            });
+            yPosition -= lineHeight;
+            currentLine = word;
+            
+            if (yPosition < margin + 20) {
+              page = pdfDoc.addPage([595, 842]);
+              yPosition = 792;
+            }
+          } else {
+            currentLine = testLine;
+          }
+        }
+        
+        if (currentLine) {
+          page.drawText(currentLine, {
+            x: margin,
+            y: yPosition,
+            size: fontSize,
+            font: font,
+            color: rgb(0, 0, 0),
+          });
+          yPosition -= lineHeight;
+        }
+      }
+      
+      // Add source pages section
+      page = pdfDoc.addPage([595, 842]);
+      page.drawText("Source Document Pages", {
+        x: margin,
+        y: 792,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      let sourceY = 760;
+      for (const content of selectedContent) {
+        if (sourceY < margin + 40) {
+          page = pdfDoc.addPage([595, 842]);
+          sourceY = 792;
+        }
+        
+        page.drawText(`• ${content.fileName} - Page ${content.pageNum}`, {
+          x: margin,
+          y: sourceY,
+          size: 10,
+          font: font,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+        sourceY -= 20;
+      }
+      
+      // Save and create download URL
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setGeneratedPdfUrl(url);
+      
+    } catch (error) {
+      console.error("Error creating PDF:", error);
+      toast.error("Failed to create PDF document");
+    }
+  };
+
   const handleCopy = () => {
     navigator.clipboard.writeText(assessment);
     toast.success("Assessment copied to clipboard!");
+  };
+
+  const handleDownload = () => {
+    if (generatedPdfUrl) {
+      const link = document.createElement('a');
+      link.href = generatedPdfUrl;
+      link.download = `diagnostic-assessment-${Date.now()}.pdf`;
+      link.click();
+      toast.success("PDF downloaded!");
+    } else {
+      // Fallback to text download
+      const blob = new Blob([assessment], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `diagnostic-assessment-${Date.now()}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Assessment downloaded!");
+    }
   };
 
   return (
@@ -138,7 +324,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
 
         <div>
           <Label htmlFor="dia-instructions" className="text-sm font-medium mb-2 block">
-            DIA
+            DIA Instructions
           </Label>
           <Textarea
             id="dia-instructions"
@@ -147,6 +333,50 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
             onChange={(e) => setLocalInstructions(e.target.value)}
             className="min-h-[150px] font-mono text-sm"
           />
+        </div>
+
+        <div>
+          <Label className="text-sm font-medium mb-2 block">
+            Upload SOP Documents (from rma.gov.au)
+          </Label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => document.getElementById('sop-upload')?.click()}
+                className="w-full gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload SOP PDFs
+              </Button>
+              <input
+                id="sop-upload"
+                type="file"
+                accept=".pdf"
+                multiple
+                onChange={handleSopUpload}
+                className="hidden"
+              />
+            </div>
+            {sopFiles.length > 0 && (
+              <div className="space-y-1">
+                {sopFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
+                    <span className="truncate flex-1">{file.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSopFile(index)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -161,7 +391,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
           {isGenerating ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Generating Assessment...
+              Generating Assessment & PDF...
             </>
           ) : (
             <>
@@ -176,9 +406,15 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
         <Card className="flex-1 flex flex-col overflow-hidden">
           <div className="border-b p-3 flex items-center justify-between">
             <h3 className="font-semibold text-sm">Assessment Results</h3>
-            <Button size="sm" variant="outline" onClick={handleCopy}>
-              Copy
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleCopy}>
+                Copy
+              </Button>
+              <Button size="sm" variant="default" onClick={handleDownload} className="gap-2">
+                <Download className="w-4 h-4" />
+                Download PDF
+              </Button>
+            </div>
           </div>
           <ScrollArea className="flex-1 p-4">
             <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -193,7 +429,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
           <div className="space-y-2">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Enter DIA instructions and click Generate to create your diagnostic assessment
+              Enter DIA instructions, upload SOP documents (optional), and click Generate to create your diagnostic assessment PDF
             </p>
           </div>
         </Card>
