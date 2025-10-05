@@ -83,10 +83,33 @@ interface PDFContent {
   pages: Array<{ pageNum: number; text: string }>;
 }
 
-export const PDFSignature = () => {
+export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; path: string; name: string } | null }) => {
   const { user } = useAuth();
   const { selectedWorkspace, refreshFiles } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  
+  // Load selected file from storage
+  useEffect(() => {
+    const loadFileFromStorage = async () => {
+      if (!selectedFile) return;
+      
+      try {
+        const { data, error } = await supabase.storage
+          .from('pdf-files')
+          .download(selectedFile.path);
+        
+        if (error) throw error;
+        
+        const file = new File([data], selectedFile.name, { type: 'application/pdf' });
+        setPdfFiles([file]);
+      } catch (error) {
+        console.error('Error loading file:', error);
+        toast.error('Failed to load file');
+      }
+    };
+    
+    loadFileFromStorage();
+  }, [selectedFile]);
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
@@ -1906,35 +1929,17 @@ export const PDFSignature = () => {
                 </Card>
               )}
 
-        {/* 3-Panel Layout: Search Controls | PDF Viewer + Assessment | Matches */}
+        {/* 3-Panel Layout: Search Categories | PDF Viewer | AI Assistant & Matches */}
         <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-300px)] rounded-lg border">
-                {/* Left Panel: AI Assistant & Search Categories in Tabs */}
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                {/* Left Panel: Search Categories Only */}
+                <ResizablePanel defaultSize={20} minSize={15} maxSize={30} collapsible>
                   <Card className="h-full rounded-none border-0">
-                    <Tabs defaultValue="ai" className="h-full flex flex-col">
-                      <TabsList className="w-full rounded-none border-b grid grid-cols-2">
-                        <TabsTrigger value="ai">AI Assistant</TabsTrigger>
-                        <TabsTrigger value="categories">Search Categories</TabsTrigger>
-                      </TabsList>
+                    <div className="p-4 border-b">
+                      <h3 className="font-semibold">Search Categories</h3>
+                    </div>
                       
-                      <TabsContent value="ai" className="flex-1 mt-0 p-0 h-full">
-                        <ScrollArea className="h-full">
-                          <div className="p-4">
-                            <AISearchAssistant 
-                              onKeywordSuggest={handleKeywordSuggest}
-                              onPagesSelected={handleAIPageSelection}
-                              currentKeywords={keywords}
-                              pdfContent={pdfContent}
-                              onTriggerAutoScan={handleAutoScanAllPDFs}
-                              isAutoScanning={isAutoScanningAll}
-                            />
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-                      
-                      <TabsContent value="categories" className="flex-1 mt-0 p-0 h-full">
-                        <ScrollArea className="h-full">
-                          <div className="p-4">
+                      <ScrollArea className="h-full">
+                        <div className="p-4">
                         <div className="space-y-4">
                           <div className="grid grid-cols-1 gap-6">
                             {/* Body Parts */}
@@ -2062,8 +2067,6 @@ export const PDFSignature = () => {
                           </div>
                           </div>
                         </ScrollArea>
-                      </TabsContent>
-                    </Tabs>
                   </Card>
                 </ResizablePanel>
 
@@ -2110,10 +2113,33 @@ export const PDFSignature = () => {
 
                 <ResizableHandle withHandle />
 
-                {/* Right Panel: Matches Found */}
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                  <Card className="h-full rounded-none border-0 p-4 flex flex-col">
-                    {keywordMatches.length > 0 ? (
+                {/* Right Panel: AI Assistant & Matches in Tabs */}
+                <ResizablePanel defaultSize={25} minSize={20} maxSize={40} collapsible>
+                  <Card className="h-full rounded-none border-0 flex flex-col">
+                    <Tabs defaultValue="assistant" className="h-full flex flex-col">
+                      <TabsList className="w-full rounded-none border-b grid grid-cols-2">
+                        <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
+                        <TabsTrigger value="matches">Matches ({selectedPagesForExtraction.size})</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="assistant" className="flex-1 mt-0 p-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="p-4">
+                            <AISearchAssistant 
+                              onKeywordSuggest={handleKeywordSuggest}
+                              onPagesSelected={handleAIPageSelection}
+                              currentKeywords={keywords}
+                              pdfContent={pdfContent}
+                              onTriggerAutoScan={handleAutoScanAllPDFs}
+                              isAutoScanning={isAutoScanningAll}
+                            />
+                          </div>
+                        </ScrollArea>
+                      </TabsContent>
+                      
+                      <TabsContent value="matches" className="flex-1 mt-0 p-0 h-full">
+                        <div className="p-4 flex flex-col h-full">
+                        {keywordMatches.length > 0 ? (
                       <>
                         <div className="space-y-2 mb-3">
                           <div className="flex items-center justify-between">
@@ -2212,14 +2238,17 @@ export const PDFSignature = () => {
                                   </div>
                                 );
                               })}
-                          </div>
-                        </ScrollArea>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                        No matches yet. Use AI or search to find pages.
-                      </div>
-                    )}
+                           </div>
+                         </ScrollArea>
+                       </>
+                     ) : (
+                       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                         No matches yet. Use AI or search to find pages.
+                       </div>
+                     )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </Card>
                 </ResizablePanel>
         </ResizablePanelGroup>

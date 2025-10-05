@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -9,12 +9,17 @@ import { Loader2 } from "lucide-react";
 const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [selectedFileData, setSelectedFileData] = useState<{ id: string; path: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
     }
   }, [user, loading, navigate]);
+
+  const handleFileSelect = (fileId: string, filePath: string, fileName: string) => {
+    setSelectedFileData({ id: fileId, path: filePath, name: fileName });
+  };
 
   if (loading) {
     return (
@@ -34,8 +39,8 @@ const Index = () => {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        <WorkspaceSidebar />
-        <WorkspaceContent />
+        <WorkspaceSidebar onFileSelect={handleFileSelect} />
+        <WorkspaceContent selectedFileFromSidebar={selectedFileData} />
       </div>
     </SidebarProvider>
   );

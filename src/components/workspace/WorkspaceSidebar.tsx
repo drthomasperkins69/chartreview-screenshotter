@@ -24,12 +24,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, LogOut, User, Trash2 } from "lucide-react";
+import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown } from "lucide-react";
 import dvaLogo from "@/assets/dva-logo.png";
 
-export const WorkspaceSidebar = () => {
-  const { workspaces, selectedWorkspace, selectWorkspace, createWorkspace, deleteWorkspace } =
+interface WorkspaceSidebarProps {
+  onFileSelect?: (fileId: string, filePath: string, fileName: string) => void;
+}
+
+export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
+  const { workspaces, selectedWorkspace, workspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace } =
     useWorkspace();
   const { user, signOut } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -37,6 +46,7 @@ export const WorkspaceSidebar = () => {
   const [newPatientId, setNewPatientId] = useState("");
   const [newNotes, setNewNotes] = useState("");
   const [creating, setCreating] = useState(false);
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(new Set([selectedWorkspace?.id || ""]));
 
   const handleCreateWorkspace = async () => {
     if (!newName.trim()) return;
@@ -59,6 +69,21 @@ export const WorkspaceSidebar = () => {
     if (confirm("Are you sure you want to delete this workspace?")) {
       await deleteWorkspace(workspaceId);
     }
+  };
+
+  const toggleWorkspace = (workspaceId: string) => {
+    const newExpanded = new Set(expandedWorkspaces);
+    if (newExpanded.has(workspaceId)) {
+      newExpanded.delete(workspaceId);
+    } else {
+      newExpanded.add(workspaceId);
+    }
+    setExpandedWorkspaces(newExpanded);
+  };
+
+  const handleWorkspaceClick = (workspaceId: string) => {
+    selectWorkspace(workspaceId);
+    setExpandedWorkspaces(new Set([workspaceId]));
   };
 
   return (
@@ -127,35 +152,72 @@ export const WorkspaceSidebar = () => {
           <SidebarGroupContent>
             <ScrollArea className="h-[calc(100vh-300px)]">
               <SidebarMenu>
-                {workspaces.map((workspace) => (
-                  <SidebarMenuItem key={workspace.id}>
-                    <SidebarMenuButton
-                      isActive={selectedWorkspace?.id === workspace.id}
-                      onClick={() => selectWorkspace(workspace.id)}
-                      className="group"
-                    >
-                      <FolderOpen className="h-4 w-4" />
-                      <div className="flex-1 flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{workspace.name}</div>
-                          {workspace.patient_id && (
-                            <div className="text-xs text-muted-foreground">
-                              ID: {workspace.patient_id}
+                {workspaces.map((workspace) => {
+                  const isExpanded = expandedWorkspaces.has(workspace.id);
+                  const filesForWorkspace = workspace.id === selectedWorkspace?.id ? workspaceFiles : [];
+                  
+                  return (
+                    <Collapsible key={workspace.id} open={isExpanded} onOpenChange={() => toggleWorkspace(workspace.id)}>
+                      <SidebarMenuItem>
+                        <div className="flex items-center w-full group">
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 mr-1">
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                          </CollapsibleTrigger>
+                          <SidebarMenuButton
+                            isActive={selectedWorkspace?.id === workspace.id}
+                            onClick={() => handleWorkspaceClick(workspace.id)}
+                            className="flex-1"
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                            <div className="flex-1 flex items-center justify-between min-w-0">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{workspace.name}</div>
+                                {workspace.patient_id && (
+                                  <div className="text-xs text-muted-foreground">
+                                    ID: {workspace.patient_id}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
+                          </SidebarMenuButton>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => handleDelete(e, workspace.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => handleDelete(e, workspace.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                        
+                        <CollapsibleContent>
+                          <div className="ml-8 mt-1 space-y-1">
+                            {filesForWorkspace.length === 0 ? (
+                              <div className="text-xs text-muted-foreground py-2 px-2">
+                                No files yet
+                              </div>
+                            ) : (
+                              filesForWorkspace.map((file) => (
+                                <Button
+                                  key={file.id}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start text-xs h-8"
+                                  onClick={() => onFileSelect?.(file.id, file.file_path, file.file_name)}
+                                >
+                                  <FileText className="h-3 w-3 mr-2" />
+                                  <span className="truncate">{file.file_name}</span>
+                                </Button>
+                              ))
+                            )}
+                          </div>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  );
+                })}
               </SidebarMenu>
             </ScrollArea>
           </SidebarGroupContent>

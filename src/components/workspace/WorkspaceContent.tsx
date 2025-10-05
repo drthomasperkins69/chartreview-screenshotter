@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -9,10 +9,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export const WorkspaceContent = () => {
+export const WorkspaceContent = ({ selectedFileFromSidebar }: { selectedFileFromSidebar: { id: string; path: string; name: string } | null }) => {
   const { selectedWorkspace, workspaceFiles, refreshFiles } = useWorkspace();
   const { user } = useAuth();
   const [showPdfTools, setShowPdfTools] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{ id: string; path: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (selectedFileFromSidebar) {
+      setSelectedFile(selectedFileFromSidebar);
+      setShowPdfTools(true);
+    }
+  }, [selectedFileFromSidebar]);
 
   const handleDownloadFile = async (filePath: string, fileName: string) => {
     try {
@@ -37,6 +45,17 @@ export const WorkspaceContent = () => {
     }
   };
 
+  const handleFileSelect = async (fileId: string, filePath: string, fileName: string) => {
+    setSelectedFile({ id: fileId, path: filePath, name: fileName });
+    setShowPdfTools(true);
+  };
+
+  useEffect(() => {
+    if (!showPdfTools) {
+      setSelectedFile(null);
+    }
+  }, [showPdfTools]);
+
   if (!selectedWorkspace) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -55,14 +74,16 @@ export const WorkspaceContent = () => {
       <div className="flex-1 flex flex-col">
         <div className="border-b p-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{selectedWorkspace.name}</h2>
-            <p className="text-sm text-muted-foreground">PDF Analysis Tools</p>
+            <h2 className="text-lg font-semibold">{selectedWorkspace?.name}</h2>
+            {selectedFile && (
+              <p className="text-sm text-muted-foreground">Viewing: {selectedFile.name}</p>
+            )}
           </div>
           <Button variant="outline" onClick={() => setShowPdfTools(false)}>
             Back to Files
           </Button>
         </div>
-        <PDFSignature />
+        <PDFSignature selectedFile={selectedFile} />
       </div>
     );
   }
