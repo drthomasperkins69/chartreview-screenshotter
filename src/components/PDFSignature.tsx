@@ -297,20 +297,24 @@ export const PDFSignature = () => {
     }
   }, [searchCategories]);
 
-  const updateCategoryTerms = useCallback(async (categoryId: number, terms: string) => {
-    // Update local state immediately
+  const updateCategoryTerms = useCallback((categoryId: number, terms: string) => {
+    // Update local state only
     setSearchCategories(prev => 
       prev.map(cat => 
         cat.id === categoryId ? { ...cat, terms } : cat
       )
     );
+  }, []);
 
-    // Update database
+  const saveCategoryTerms = useCallback(async (categoryId: number) => {
+    const category = searchCategories.find(cat => cat.id === categoryId);
+    if (!category) return;
+
     const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
     if (!url || !key) {
-      console.warn('Backend not available, changes not persisted');
+      toast.error('Backend not available');
       return;
     }
 
@@ -318,17 +322,20 @@ export const PDFSignature = () => {
       const { supabase } = await import('@/integrations/supabase/client');
       const { error } = await supabase
         .from('search_categories')
-        .update({ terms })
+        .update({ terms: category.terms })
         .eq('id', categoryId);
 
       if (error) {
         console.error('Error updating search category:', error);
         toast.error('Failed to save keywords');
+      } else {
+        toast.success('Keywords saved successfully');
       }
     } catch (e) {
       console.error('Failed to update category', e);
+      toast.error('Failed to save keywords');
     }
-  }, []);
+  }, [searchCategories]);
 
 
   return (
@@ -471,12 +478,21 @@ export const PDFSignature = () => {
                       >
                         {category.label}
                       </Label>
-                      <Input
-                        placeholder="Enter keywords (comma separated)"
-                        value={category.terms}
-                        onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                        className="text-sm"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter keywords (comma separated)"
+                          value={category.terms}
+                          onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                          className="text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => saveCategoryTerms(category.id)}
+                          className="whitespace-nowrap"
+                        >
+                          Save
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
