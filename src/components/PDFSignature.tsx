@@ -706,6 +706,100 @@ export const PDFSignature = () => {
     }
   }, [pdfFiles, ocrCompletedFiles, handlePDFTextExtracted]);
 
+  const handleDiagnosisChange = useCallback(async (fileIndex: number, pageNum: number, diagnosis: string) => {
+    // Update state immediately for UI responsiveness
+    setPageDiagnoses(prev => ({
+      ...prev,
+      [`${fileIndex}-${pageNum}`]: diagnosis
+    }));
+
+    // If diagnosis is empty, just update state and return
+    if (!diagnosis.trim()) return;
+
+    try {
+      const file = pdfFiles[fileIndex];
+      if (!file) return;
+
+      // Load the PDF
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const page = pdfDoc.getPage(pageNum - 1); // Convert to 0-indexed
+      
+      // Get page dimensions
+      const { width, height } = page.getSize();
+      
+      // Embed font
+      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Add diagnosis text at the top of the page
+      const fontSize = 12;
+      const textWidth = font.widthOfTextAtSize(diagnosis, fontSize);
+      const maxWidth = width - 100; // Leave margins
+      
+      // Wrap text if too long
+      const words = diagnosis.split(' ');
+      let lines: string[] = [];
+      let currentLine = '';
+      
+      words.forEach(word => {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+        
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      });
+      if (currentLine) lines.push(currentLine);
+      
+      // Draw text on page (top section with background)
+      const padding = 10;
+      const lineHeight = 16;
+      const boxHeight = (lines.length * lineHeight) + (padding * 2);
+      
+      // Draw background rectangle
+      page.drawRectangle({
+        x: 20,
+        y: height - 30 - boxHeight,
+        width: width - 40,
+        height: boxHeight,
+        color: rgb(1, 1, 0.9),
+        borderColor: rgb(0.8, 0.8, 0.8),
+        borderWidth: 1,
+      });
+      
+      // Draw text lines
+      lines.forEach((line, index) => {
+        page.drawText(line, {
+          x: 30,
+          y: height - 40 - (index * lineHeight),
+          size: fontSize,
+          font: font,
+          color: rgb(0, 0, 0),
+        });
+      });
+      
+      // Save the modified PDF
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const newFile = new File([blob], file.name, { type: 'application/pdf' });
+      
+      // Update the files array
+      setPdfFiles(prev => {
+        const newFiles = [...prev];
+        newFiles[fileIndex] = newFile;
+        return newFiles;
+      });
+      
+      toast.success("Diagnosis added to PDF page");
+    } catch (error) {
+      console.error("Error adding diagnosis to PDF:", error);
+      toast.error("Failed to add diagnosis to PDF");
+    }
+  }, [pdfFiles]);
+
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
       toast.error("Please select at least one page");
@@ -1288,12 +1382,7 @@ export const PDFSignature = () => {
                         onTogglePageSelection={togglePageSelection}
                         selectedPagesForExtraction={selectedPagesForExtraction}
                         pageDiagnoses={pageDiagnoses}
-                        onDiagnosisChange={(fileIndex, pageNum, diagnosis) => {
-                          setPageDiagnoses(prev => ({
-                            ...prev,
-                            [`${fileIndex}-${pageNum}`]: diagnosis
-                          }));
-                        }}
+                        onDiagnosisChange={handleDiagnosisChange}
                         onDeletePage={removeMatchFromList}
                       />
                     )}
