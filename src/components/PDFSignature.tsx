@@ -1004,12 +1004,13 @@ export const PDFSignature = () => {
       const zip = new JSZip();
 
       for (const group of getDiagnosisGroups) {
-        const pagesForDiagnosis = Array.from(selectedPagesForExtraction).filter(
-          key => pageDiagnoses[key]?.trim().toLowerCase() === group.diagnosis.toLowerCase()
-        );
+        // Get all pages with this diagnosis (not just selected ones)
+        const pagesForDiagnosis = Object.entries(pageDiagnoses)
+          .filter(([_, d]) => d?.trim().toLowerCase() === group.diagnosis.toLowerCase())
+          .map(([key]) => key);
 
         const selectedContent = await captureSelectedPages(pagesForDiagnosis);
-        const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses);
+        const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses, group.diagnosis);
         
         const safeFilename = group.diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
         zip.file(`${safeFilename}.pdf`, pdfBytes);
@@ -1699,6 +1700,21 @@ export const PDFSignature = () => {
           )}
         </div>
       </main>
+      
+      {/* Download All Diagnoses as ZIP Button */}
+      {getDiagnosisGroups.length > 0 && (
+        <div className="container mx-auto px-4 py-4 border-t">
+          <Button
+            onClick={handleDownloadAllAsZip}
+            variant="outline"
+            size="lg"
+            className="w-full gap-2"
+          >
+            <FileArchive className="w-5 h-5" />
+            Download All Diagnoses as ZIP ({getDiagnosisGroups.length} diagnosis{getDiagnosisGroups.length !== 1 ? 'es' : ''})
+          </Button>
+        </div>
+      )}
       
       {/* Download All Modified PDFs Button */}
       {pdfFiles.length > 0 && (
