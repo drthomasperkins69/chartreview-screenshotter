@@ -11,27 +11,11 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const { messages, model = "gemini" } = await req.json();
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    console.log("Calling Lovable AI with", messages.length, "messages");
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are a helpful AI assistant that helps users search through PDF documents. 
+    const systemMessage = {
+      role: "system",
+      content: `You are a helpful AI assistant that helps users search through PDF documents. 
 Your role is to:
 1. Understand what the user wants to find in their PDF
 2. Suggest relevant keywords to search for (comma-separated)
@@ -46,12 +30,57 @@ For date-based queries:
 - Combine dates with the user's topic (e.g., if they ask for "2023 reports", suggest: 2023, report, annual, yearly)
 
 Be conversational and helpful. Ask clarifying questions if needed.`
-          },
-          ...messages,
-        ],
-        stream: false,
-      }),
-    });
+    };
+
+    let response;
+    
+    if (model === "claude") {
+      const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!ANTHROPIC_API_KEY) {
+        throw new Error("ANTHROPIC_API_KEY is not configured");
+      }
+
+      console.log("Calling Claude API with", messages.length, "messages");
+
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          system: systemMessage.content,
+          messages: messages,
+        }),
+      });
+    } else {
+      // Gemini
+      const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+      if (!GOOGLE_API_KEY) {
+        throw new Error("GOOGLE_API_KEY is not configured");
+      }
+
+      console.log("Calling Gemini API with", messages.length, "messages");
+
+      const geminiMessages = [systemMessage, ...messages].map(msg => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }]
+      }));
+
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: geminiMessages,
+          }),
+        }
+      );
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -73,9 +102,9 @@ Be conversational and helpful. Ask clarifying questions if needed.`
         );
       }
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("AI API error:", response.status, errorText);
       return new Response(
-        JSON.stringify({ error: "AI gateway error" }),
+        JSON.stringify({ error: "AI API error" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -86,8 +115,16 @@ Be conversational and helpful. Ask clarifying questions if needed.`
     const data = await response.json();
     console.log("AI response received");
 
+    let messageContent;
+    if (model === "claude") {
+      messageContent = data.content[0].text;
+    } else {
+      // Gemini
+      messageContent = data.candidates[0].content.parts[0].text;
+    }
+
     return new Response(
-      JSON.stringify({ message: data.choices[0].message.content }),
+      JSON.stringify({ message: messageContent }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }

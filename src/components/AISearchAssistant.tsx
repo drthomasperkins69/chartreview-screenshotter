@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Send, Bot, User, FileSearch } from "lucide-react";
 const FUNCTIONS_BASE = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
   "https://hpclzzykgxolszduecqa.supabase.co";
@@ -44,6 +45,7 @@ export const AISearchAssistant = ({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
 
   const extractKeywords = (text: string): string | null => {
     const keywordPattern = /\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*(?:,\s*[a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*)+)\b/;
@@ -66,7 +68,8 @@ export const AISearchAssistant = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           query: input,
-          pdfContent: pdfContent 
+          pdfContent: pdfContent,
+          model: selectedModel
         }),
       });
 
@@ -141,7 +144,10 @@ export const AISearchAssistant = ({
       const resp = await fetch(`${FUNCTIONS_BASE}/functions/v1/pdf-search-assistant`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updatedMessages }),
+        body: JSON.stringify({ 
+          messages: updatedMessages,
+          model: selectedModel
+        }),
       });
 
       if (!resp.ok) {
@@ -196,6 +202,15 @@ export const AISearchAssistant = ({
       <div className="flex items-center gap-2 mb-4 pb-2 border-b">
         <Bot className="w-5 h-5 text-primary" />
         <h3 className="font-semibold">AI Search Assistant</h3>
+        <Select value={selectedModel} onValueChange={(value: "gemini" | "claude") => setSelectedModel(value)}>
+          <SelectTrigger className="w-[140px] h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="gemini">Gemini</SelectItem>
+            <SelectItem value="claude">Claude</SelectItem>
+          </SelectContent>
+        </Select>
         {pdfContent.length > 0 && (
           <span className="text-xs text-muted-foreground ml-auto">
             {pdfContent.length} PDF(s) loaded
