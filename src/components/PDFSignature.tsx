@@ -1929,151 +1929,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                 </Card>
               )}
 
-        {/* 3-Panel Layout: Search Categories | PDF Viewer | AI Assistant & Matches */}
+        {/* 2-Panel Layout: PDF Viewer | Right Panel (AI Assistant, Matches, Search Categories) */}
         <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-300px)] rounded-lg border">
-                {/* Left Panel: Search Categories Only */}
-                <ResizablePanel defaultSize={20} minSize={15} maxSize={30} collapsible>
-                  <Card className="h-full rounded-none border-0">
-                    <div className="p-4 border-b">
-                      <h3 className="font-semibold">Search Categories</h3>
-                    </div>
-                      
-                      <ScrollArea className="h-full">
-                        <div className="p-4">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 gap-6">
-                            {/* Body Parts */}
-                            <div>
-                              <h3 className="text-sm font-semibold mb-3 text-primary">Body Regions</h3>
-                              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                                {searchCategories.filter(cat => BODY_PART_IDS.includes(cat.id)).map((category) => (
-                                  <div key={category.id} className="flex items-start gap-3">
-                                    <input
-                                      type="checkbox"
-                                      id={`category-${category.id}`}
-                                      checked={category.checked}
-                                      onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
-                                      className="mt-1 w-4 h-4 cursor-pointer"
-                                    />
-                                    <div className="flex-1 space-y-2">
-                                      <Label 
-                                        htmlFor={`category-${category.id}`} 
-                                        className="text-sm font-medium cursor-pointer"
-                                      >
-                                        {category.label}
-                                      </Label>
-                                      <div className="flex gap-2">
-                                        <Input
-                                          placeholder="Keywords"
-                                          value={category.terms}
-                                          onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                                          className="text-sm"
-                                        />
-                                        <Button
-                                          size="sm"
-                                          onClick={() => saveCategoryTerms(category.id)}
-                                          className="whitespace-nowrap"
-                                        >
-                                          Save
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Conditions */}
-                            <div>
-                              <h3 className="text-sm font-semibold mb-3 text-primary">Conditions</h3>
-                              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                                {searchCategories.filter(cat => CONDITION_IDS.includes(cat.id)).map((category) => (
-                                  <div key={category.id} className="flex items-start gap-3">
-                                    <input
-                                      type="checkbox"
-                                      id={`category-${category.id}`}
-                                      checked={category.checked}
-                                      onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
-                                      className="mt-1 w-4 h-4 cursor-pointer"
-                                    />
-                                    <div className="flex-1 space-y-2">
-                                      <Label 
-                                        htmlFor={`category-${category.id}`} 
-                                        className="text-sm font-medium cursor-pointer"
-                                      >
-                                        {category.label}
-                                      </Label>
-                                      <div className="flex gap-2">
-                                        <Input
-                                          placeholder="Keywords"
-                                          value={category.terms}
-                                          onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                                          className="text-sm"
-                                        />
-                                        <Button
-                                          size="sm"
-                                          onClick={() => saveCategoryTerms(category.id)}
-                                          className="whitespace-nowrap"
-                                        >
-                                          Save
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Main Search Input */}
-                          <div className="pt-4 border-t">
-                            <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
-                              Search Keywords
-                            </Label>
-                            <Input
-                              id="keywords"
-                              placeholder="e.g., contract, invoice, report"
-                              value={keywords}
-                              onChange={(e) => setKeywords(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                              className="mb-2"
-                            />
-                            
-                            <div className="flex gap-2">
-                              {suggestedKeywords && (
-                                <Button 
-                                  onClick={useSuggestedKeywords}
-                                  variant="outline"
-                                  className="gap-2"
-                                  size="sm"
-                                >
-                                  Use Keywords
-                                </Button>
-                              )}
-                              
-                              <Button 
-                                onClick={handleSearch} 
-                                className="gap-2"
-                                disabled={isSearching || !keywords.trim() || pdfFiles.length === 0}
-                              >
-                                <Search className="w-4 h-4" />
-                                {isSearching ? "Searching..." : "Search"}
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Separate multiple keywords with commas
-                            </p>
-                          </div>
-                          </div>
-                          </div>
-                        </ScrollArea>
-                  </Card>
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-
-                {/* Middle Panel: PDF Viewer Only */}
-                <ResizablePanel defaultSize={50} minSize={30}>
+                {/* Left Panel: PDF Viewer */}
+                <ResizablePanel defaultSize={70} minSize={40}>
                   <Card className="h-full rounded-none border-0 overflow-hidden">
             {pdfFiles.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center p-6">
@@ -2113,13 +1972,14 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
                 <ResizableHandle withHandle />
 
-                {/* Right Panel: AI Assistant & Matches in Tabs */}
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40} collapsible>
+                {/* Right Panel: AI Assistant, Matches & Search Categories in Tabs */}
+                <ResizablePanel defaultSize={30} minSize={20} maxSize={50} collapsible>
                   <Card className="h-full rounded-none border-0 flex flex-col">
                     <Tabs defaultValue="assistant" className="h-full flex flex-col">
-                      <TabsList className="w-full rounded-none border-b grid grid-cols-2">
+                      <TabsList className="w-full rounded-none border-b grid grid-cols-3">
                         <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
                         <TabsTrigger value="matches">Matches ({selectedPagesForExtraction.size})</TabsTrigger>
+                        <TabsTrigger value="categories">Search</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="assistant" className="flex-1 mt-0 p-0 h-full">
@@ -2248,9 +2108,141 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                      )}
                         </div>
                       </TabsContent>
-                    </Tabs>
-                  </Card>
-                </ResizablePanel>
+                       
+                       <TabsContent value="categories" className="flex-1 mt-0 p-0 h-full">
+                         <ScrollArea className="h-full">
+                           <div className="p-4">
+                             <div className="space-y-4">
+                               <div className="grid grid-cols-1 gap-6">
+                                 {/* Body Parts */}
+                                 <div>
+                                   <h3 className="text-sm font-semibold mb-3 text-primary">Body Regions</h3>
+                                   <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                                     {searchCategories.filter(cat => BODY_PART_IDS.includes(cat.id)).map((category) => (
+                                       <div key={category.id} className="flex items-start gap-3">
+                                         <input
+                                           type="checkbox"
+                                           id={`category-${category.id}`}
+                                           checked={category.checked}
+                                           onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                                           className="mt-1 w-4 h-4 cursor-pointer"
+                                         />
+                                         <div className="flex-1 space-y-2">
+                                           <Label 
+                                             htmlFor={`category-${category.id}`} 
+                                             className="text-sm font-medium cursor-pointer"
+                                           >
+                                             {category.label}
+                                           </Label>
+                                           <div className="flex gap-2">
+                                             <Input
+                                               placeholder="Keywords"
+                                               value={category.terms}
+                                               onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                                               className="text-sm"
+                                             />
+                                             <Button
+                                               size="sm"
+                                               onClick={() => saveCategoryTerms(category.id)}
+                                               className="whitespace-nowrap"
+                                             >
+                                               Save
+                                             </Button>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     ))}
+                                   </div>
+                                 </div>
+
+                                 {/* Conditions */}
+                                 <div>
+                                   <h3 className="text-sm font-semibold mb-3 text-primary">Conditions</h3>
+                                   <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                                     {searchCategories.filter(cat => CONDITION_IDS.includes(cat.id)).map((category) => (
+                                       <div key={category.id} className="flex items-start gap-3">
+                                         <input
+                                           type="checkbox"
+                                           id={`category-${category.id}`}
+                                           checked={category.checked}
+                                           onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                                           className="mt-1 w-4 h-4 cursor-pointer"
+                                         />
+                                         <div className="flex-1 space-y-2">
+                                           <Label 
+                                             htmlFor={`category-${category.id}`} 
+                                             className="text-sm font-medium cursor-pointer"
+                                           >
+                                             {category.label}
+                                           </Label>
+                                           <div className="flex gap-2">
+                                             <Input
+                                               placeholder="Keywords"
+                                               value={category.terms}
+                                               onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                                               className="text-sm"
+                                             />
+                                             <Button
+                                               size="sm"
+                                               onClick={() => saveCategoryTerms(category.id)}
+                                               className="whitespace-nowrap"
+                                             >
+                                               Save
+                                             </Button>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     ))}
+                                   </div>
+                                 </div>
+                               </div>
+
+                               {/* Main Search Input */}
+                               <div className="pt-4 border-t">
+                                 <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
+                                   Search Keywords
+                                 </Label>
+                                 <Input
+                                   id="keywords"
+                                   placeholder="e.g., contract, invoice, report"
+                                   value={keywords}
+                                   onChange={(e) => setKeywords(e.target.value)}
+                                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                   className="mb-2"
+                                 />
+                                 
+                                 <div className="flex gap-2">
+                                   {suggestedKeywords && (
+                                     <Button 
+                                       onClick={useSuggestedKeywords}
+                                       variant="outline"
+                                       className="gap-2"
+                                       size="sm"
+                                     >
+                                       Use Keywords
+                                     </Button>
+                                   )}
+                                   
+                                   <Button 
+                                     onClick={handleSearch} 
+                                     className="gap-2"
+                                     disabled={isSearching || !keywords.trim() || pdfFiles.length === 0}
+                                   >
+                                     <Search className="w-4 h-4" />
+                                     {isSearching ? "Searching..." : "Search"}
+                                   </Button>
+                                 </div>
+                                 <p className="text-xs text-muted-foreground mt-2">
+                                   Separate multiple keywords with commas
+                                 </p>
+                               </div>
+                             </div>
+                           </div>
+                         </ScrollArea>
+                       </TabsContent>
+                     </Tabs>
+                   </Card>
+                 </ResizablePanel>
         </ResizablePanelGroup>
 
         {/* Diagnosis Tracker Section */}
