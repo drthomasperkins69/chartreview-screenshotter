@@ -14,6 +14,8 @@ interface KeywordMatch {
   page: number;
   keyword: string;
   count: number;
+  fileName: string;
+  fileIndex: number;
 }
 
 export const PDFSignature = () => {
@@ -61,17 +63,18 @@ export const PDFSignature = () => {
 
   const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
     setKeywordMatches(matches);
-    const pages = new Set(matches.map(m => m.page));
+    const pages = new Set(matches.filter(m => m.fileIndex === currentPdfIndex).map(m => m.page));
     setMatchingPages(pages);
-    setSelectedPagesForExtraction(pages); // Auto-select all found pages
+    setSelectedPagesForExtraction(pages);
     
     if (matches.length > 0) {
-      toast(`Found keywords on ${pages.size} page(s)!`);
+      const totalPages = new Set(matches.map(m => `${m.fileIndex}-${m.page}`)).size;
+      toast(`Found keywords on ${totalPages} page(s) across ${new Set(matches.map(m => m.fileIndex)).size} PDF(s)!`);
     } else {
       toast("No matching keywords found");
     }
     setIsSearching(false);
-  }, []);
+  }, [currentPdfIndex]);
 
   const handleSearch = useCallback(() => {
     if (searchMode === "keyword" && !keywords.trim()) {
@@ -158,11 +161,14 @@ export const PDFSignature = () => {
     fileInputRef.current?.click();
   };
 
-  const handlePageClick = useCallback((pageNum: number) => {
+  const handlePageClick = useCallback((pageNum: number, fileIndex: number) => {
+    if (fileIndex !== currentPdfIndex) {
+      setCurrentPdfIndex(fileIndex);
+    }
     if (autoNavigate) {
       setSelectedPage(pageNum);
     }
-  }, [autoNavigate]);
+  }, [autoNavigate, currentPdfIndex]);
 
   const togglePageSelection = useCallback((pageNum: number) => {
     setSelectedPagesForExtraction(prev => {
@@ -394,7 +400,9 @@ export const PDFSignature = () => {
                 {keywordMatches.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">Matches Found ({selectedPagesForExtraction.size}/{matchingPages.size})</h3>
+                      <h3 className="text-sm font-semibold">
+                        Matches Found ({selectedPagesForExtraction.size} selected)
+                      </h3>
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="ghost" 
@@ -423,37 +431,59 @@ export const PDFSignature = () => {
                         </label>
                       </div>
                     </div>
-                    <div className="space-y-1 max-h-60 overflow-y-auto">
-                      {Array.from(new Set(keywordMatches.map(m => m.page)))
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {/* Group matches by file */}
+                      {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
                         .sort((a, b) => a - b)
-                        .map((page) => {
-                          const pageMatches = keywordMatches.filter(m => m.page === page);
-                          const isSelected = selectedPagesForExtraction.has(page);
+                        .map((fileIndex) => {
+                          const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
+                          const fileName = fileMatches[0]?.fileName || `PDF ${fileIndex + 1}`;
+                          const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
+                          
                           return (
-                            <div 
-                              key={page} 
-                              className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
-                                selectedPage === page ? 'ring-2 ring-primary' : ''
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => togglePageSelection(page)}
-                                className="mt-0.5 w-4 h-4 cursor-pointer"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div 
-                                className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => handlePageClick(page)}
-                              >
-                                <div className="font-medium">Page {page}</div>
-                                {pageMatches.map((match, idx) => (
-                                  <div key={idx} className="text-muted-foreground">
-                                    "{match.keyword}" ({match.count}x)
-                                  </div>
-                                ))}
+                            <div key={fileIndex} className="space-y-1">
+                              <div className="text-xs font-semibold text-primary sticky top-0 bg-background py-1">
+                                📄 {fileName}
                               </div>
+                              {pages.map((page) => {
+                                const pageMatches = fileMatches.filter(m => m.page === page);
+                                const isSelected = selectedPagesForExtraction.has(page) && fileIndex === currentPdfIndex;
+                                const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
+                                
+                                return (
+                                  <div 
+                                    key={`${fileIndex}-${page}`}
+                                    className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
+                                      isCurrent ? 'ring-2 ring-primary' : ''
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        if (fileIndex === currentPdfIndex) {
+                                          togglePageSelection(page);
+                                        } else {
+                                          toast("Switch to this PDF first to select pages");
+                                        }
+                                      }}
+                                      className="mt-0.5 w-4 h-4 cursor-pointer"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <div 
+                                      className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => handlePageClick(page, fileIndex)}
+                                    >
+                                      <div className="font-medium">Page {page}</div>
+                                      {pageMatches.map((match, idx) => (
+                                        <div key={idx} className="text-muted-foreground">
+                                          "{match.keyword}" ({match.count}x)
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           );
                         })}
@@ -466,7 +496,8 @@ export const PDFSignature = () => {
             {/* PDF Viewer */}
             <Card className="shadow-medium overflow-hidden">
               <PDFViewer
-                file={currentPdf}
+                files={pdfFiles}
+                currentFileIndex={currentPdfIndex}
                 keywords={searchMode === "keyword" ? keywords : ""}
                 dateSearch={searchMode === "date" ? dateSearch : ""}
                 matchingPages={matchingPages}

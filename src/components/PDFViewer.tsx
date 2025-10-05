@@ -14,10 +14,13 @@ interface KeywordMatch {
   page: number;
   keyword: string;
   count: number;
+  fileName: string;
+  fileIndex: number;
 }
 
 interface PDFViewerProps {
-  file: File | null;
+  files: File[];
+  currentFileIndex: number;
   keywords: string;
   dateSearch: string;
   matchingPages: Set<number>;
@@ -28,7 +31,8 @@ interface PDFViewerProps {
 }
 
 export const PDFViewer = ({
-  file,
+  files,
+  currentFileIndex,
   keywords,
   dateSearch,
   matchingPages,
@@ -46,6 +50,8 @@ export const PDFViewer = ({
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const currentFile = files[currentFileIndex] || null;
+
   // Navigate to selected page when it changes
   useEffect(() => {
     if (selectedPage !== null && selectedPage !== currentPage) {
@@ -55,17 +61,18 @@ export const PDFViewer = ({
 
   useEffect(() => {
     const loadPdf = async () => {
-      if (!file) return;
+      if (!currentFile) return;
       
       try {
         console.log("Starting PDF load...");
         setLoading(true);
-        const arrayBuffer = await file.arrayBuffer();
+        const arrayBuffer = await currentFile.arrayBuffer();
         console.log("PDF arrayBuffer created, size:", arrayBuffer.byteLength);
         const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
         console.log("PDF document loaded, pages:", pdfDoc.numPages);
         setPdf(pdfDoc);
         setNumPages(pdfDoc.numPages);
+        setCurrentPage(1);
         setLoading(false);
         console.log("PDF load complete");
       } catch (error) {
@@ -75,37 +82,55 @@ export const PDFViewer = ({
     };
 
     loadPdf();
-  }, [file]);
+  }, [currentFile]);
 
   useEffect(() => {
     const searchKeywords = async () => {
-      if (!pdf || !isSearching) return;
+      if (files.length === 0 || !isSearching) return;
       if (!keywords.trim() && !dateSearch.trim()) return;
 
       const matches: KeywordMatch[] = [];
 
-      // Generate date format variations if searching by date
-      let searchTerms: string[] = [];
-      
-      if (dateSearch.trim()) {
-        searchTerms = generateDateFormats(dateSearch);
-      } else if (keywords.trim()) {
-        searchTerms = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
-      }
+      // Search across ALL PDF files
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        const file = files[fileIndex];
+        
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
 
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-
-        for (const term of searchTerms) {
-          const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-          const count = (pageText.match(regex) || []).length;
-          if (count > 0) {
-            matches.push({ page: pageNum, keyword: term, count });
+          // Generate date format variations if searching by date
+          let searchTerms: string[] = [];
+          
+          if (dateSearch.trim()) {
+            searchTerms = generateDateFormats(dateSearch);
+          } else if (keywords.trim()) {
+            searchTerms = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
           }
+
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items
+              .map((item: any) => item.str)
+              .join(' ');
+
+            for (const term of searchTerms) {
+              const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+              const count = (pageText.match(regex) || []).length;
+              if (count > 0) {
+                matches.push({ 
+                  page: pageNum, 
+                  keyword: term, 
+                  count,
+                  fileName: file.name,
+                  fileIndex 
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error searching file ${file.name}:`, error);
         }
       }
 
@@ -194,7 +219,7 @@ export const PDFViewer = ({
     };
 
     searchKeywords();
-  }, [pdf, keywords, dateSearch, isSearching, onKeywordMatchesDetected]);
+  }, [files, keywords, dateSearch, isSearching, onKeywordMatchesDetected]);
 
   const renderPage = useCallback(async () => {
     console.log("renderPage called, pdf:", !!pdf, "canvas:", !!canvasRef.current);
