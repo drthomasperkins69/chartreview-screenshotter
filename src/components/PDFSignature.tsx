@@ -385,19 +385,24 @@ export const PDFSignature = () => {
       fileIndex: p.fileIndex
     }));
     
-    setKeywordMatches(matches);
+    // Add to existing matches instead of replacing
+    setKeywordMatches(prev => [...prev, ...matches]);
     
-    // Update matching pages for current PDF
-    const currentPdfPages = new Set(
+    // Add matching pages for current PDF
+    setMatchingPages(prev => {
+      const newPages = new Set(prev);
       matches
         .filter(m => m.fileIndex === currentPdfIndex)
-        .map(m => m.page)
-    );
-    setMatchingPages(currentPdfPages);
+        .forEach(m => newPages.add(m.page));
+      return newPages;
+    });
     
-    // Select all AI-selected pages for extraction
-    const pageKeys = new Set(pages.map(p => `${p.fileIndex}-${p.pageNum}`));
-    setSelectedPagesForExtraction(pageKeys);
+    // Add AI-selected pages to existing selections
+    setSelectedPagesForExtraction(prev => {
+      const newSet = new Set(prev);
+      pages.forEach(p => newSet.add(`${p.fileIndex}-${p.pageNum}`));
+      return newSet;
+    });
   }, [pdfFiles, currentPdfIndex]);
 
   const handlePDFTextExtracted = useCallback((fileIndex: number, fileName: string, pageTexts: Array<{ pageNum: number; text: string }>) => {
