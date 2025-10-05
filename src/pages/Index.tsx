@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Header } from "@/components/Header";
-import { PDFSignature } from "@/components/PDFSignature";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
+import { WorkspaceContent } from "@/components/workspace/WorkspaceContent";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -31,10 +32,12 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <PDFSignature />
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <WorkspaceSidebar />
+        <WorkspaceContent />
+      </div>
+    </SidebarProvider>
   );
 };
 
