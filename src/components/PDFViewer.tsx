@@ -462,6 +462,23 @@ export const PDFViewer = ({
         </div>
       </div>
 
+      {/* Diagnosis Input - Above PDF */}
+      {onDiagnosisChange && (
+        <div className="border-b bg-toolbar-background p-4">
+          <label htmlFor="diagnosis-input" className="block text-sm font-medium mb-2">
+            Diagnosis for Page {currentPage}:
+          </label>
+          <input
+            id="diagnosis-input"
+            type="text"
+            value={currentDiagnosis}
+            onChange={(e) => onDiagnosisChange(currentFileIndex, currentPage, e.target.value)}
+            placeholder="Enter diagnosis..."
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+          />
+        </div>
+      )}
+
       {/* PDF Canvas */}
       <div
         ref={containerRef}
@@ -489,23 +506,6 @@ export const PDFViewer = ({
       {matchingPages.size > 0 && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-medium text-sm">
           Page {currentPage} {matchingPages.has(currentPage) ? '✓ Contains keywords' : ''}
-        </div>
-      )}
-      
-      {/* Diagnosis Input */}
-      {onDiagnosisChange && (
-        <div className="border-t bg-toolbar-background p-4">
-          <label htmlFor="diagnosis-input" className="block text-sm font-medium mb-2">
-            Diagnosis for Page {currentPage}:
-          </label>
-          <input
-            id="diagnosis-input"
-            type="text"
-            value={currentDiagnosis}
-            onChange={(e) => onDiagnosisChange(currentFileIndex, currentPage, e.target.value)}
-            placeholder="Enter diagnosis..."
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          />
         </div>
       )}
     </div>
