@@ -26,7 +26,7 @@ export const PDFSignature = () => {
   const [searchMode, setSearchMode] = useState<"keyword" | "date">("keyword");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
-  const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<number>>(new Set());
+  const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set()); // Format: "fileIndex-pageNumber"
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
@@ -74,7 +74,10 @@ export const PDFSignature = () => {
     setKeywordMatches(validMatches);
     const pages = new Set(validMatches.filter(m => m.fileIndex === currentPdfIndex).map(m => m.page));
     setMatchingPages(pages);
-    setSelectedPagesForExtraction(pages);
+    
+    // Auto-select all matching pages across all documents
+    const allMatchingPages = new Set(validMatches.map(m => `${m.fileIndex}-${m.page}`));
+    setSelectedPagesForExtraction(allMatchingPages);
     
     if (validMatches.length > 0) {
       const totalPages = new Set(validMatches.map(m => `${m.fileIndex}-${m.page}`)).size;
@@ -99,7 +102,7 @@ export const PDFSignature = () => {
   }, [keywords, dateSearch, searchMode]);
 
   const handleDownload = useCallback(async () => {
-    if (!currentPdf || selectedPagesForExtraction.size === 0) {
+    if (selectedPagesForExtraction.size === 0) {
       toast("No pages selected for extraction");
       return;
     }
@@ -107,15 +110,35 @@ export const PDFSignature = () => {
     try {
       toast("Creating PDF with selected pages...");
       
-      const arrayBuffer = await currentPdf.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
       const newPdfDoc = await PDFDocument.create();
       
-      const sortedPages = Array.from(selectedPagesForExtraction).sort((a, b) => a - b);
+      // Group selections by file index
+      const pagesByFile = new Map<number, number[]>();
+      Array.from(selectedPagesForExtraction).forEach(key => {
+        const [fileIndexStr, pageStr] = key.split('-');
+        const fileIndex = parseInt(fileIndexStr);
+        const page = parseInt(pageStr);
+        
+        if (!pagesByFile.has(fileIndex)) {
+          pagesByFile.set(fileIndex, []);
+        }
+        pagesByFile.get(fileIndex)!.push(page);
+      });
       
-      for (const pageNum of sortedPages) {
-        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
-        newPdfDoc.addPage(copiedPage);
+      // Sort file indices and process in order
+      const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
+      
+      for (const fileIndex of sortedFileIndices) {
+        const pages = pagesByFile.get(fileIndex)!.sort((a, b) => a - b);
+        const file = pdfFiles[fileIndex];
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        
+        for (const pageNum of pages) {
+          const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+          newPdfDoc.addPage(copiedPage);
+        }
       }
       
       const pdfBytes = await newPdfDoc.save();
@@ -127,12 +150,12 @@ export const PDFSignature = () => {
       link.click();
       URL.revokeObjectURL(url);
       
-      toast(`Downloaded PDF with ${sortedPages.length} page(s)!`);
+      toast(`Downloaded PDF with ${selectedPagesForExtraction.size} page(s) from ${sortedFileIndices.length} document(s)!`);
     } catch (error) {
       console.error("Error creating PDF:", error);
       toast("Failed to create PDF");
     }
-  }, [currentPdf, selectedPagesForExtraction]);
+  }, [pdfFiles, selectedPagesForExtraction]);
 
   const handleRemovePdf = useCallback((index: number) => {
     setPdfFiles(prev => prev.filter((_, i) => i !== index));
@@ -174,11 +197,10 @@ export const PDFSignature = () => {
     if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < pdfFiles.length) {
       if (fileIndex !== currentPdfIndex) {
         setCurrentPdfIndex(fileIndex);
-        // Reset matches when switching PDFs
+        // Update matches for the new PDF
         const newMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
         const pages = new Set(newMatches.map(m => m.page));
         setMatchingPages(pages);
-        setSelectedPagesForExtraction(pages);
       }
       if (autoNavigate) {
         setSelectedPage(pageNum);
@@ -186,21 +208,23 @@ export const PDFSignature = () => {
     }
   }, [autoNavigate, currentPdfIndex, pdfFiles.length, keywordMatches]);
 
-  const togglePageSelection = useCallback((pageNum: number) => {
+  const togglePageSelection = useCallback((pageNum: number, fileIndex: number) => {
     setSelectedPagesForExtraction(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(pageNum)) {
-        newSet.delete(pageNum);
+      const key = `${fileIndex}-${pageNum}`;
+      if (newSet.has(key)) {
+        newSet.delete(key);
       } else {
-        newSet.add(pageNum);
+        newSet.add(key);
       }
       return newSet;
     });
   }, []);
 
   const selectAllPages = useCallback(() => {
-    setSelectedPagesForExtraction(new Set(matchingPages));
-  }, [matchingPages]);
+    const allMatchingPages = new Set(keywordMatches.map(m => `${m.fileIndex}-${m.page}`));
+    setSelectedPagesForExtraction(allMatchingPages);
+  }, [keywordMatches]);
 
   const deselectAllPages = useCallback(() => {
     setSelectedPagesForExtraction(new Set());
@@ -485,7 +509,8 @@ export const PDFSignature = () => {
                                 </div>
                                 {pages.map((page) => {
                                   const pageMatches = fileMatches.filter(m => m.page === page);
-                                  const isSelected = selectedPagesForExtraction.has(page) && fileIndex === currentPdfIndex;
+                                  const selectionKey = `${fileIndex}-${page}`;
+                                  const isSelected = selectedPagesForExtraction.has(selectionKey);
                                   const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
                                   
                                   return (
@@ -498,13 +523,7 @@ export const PDFSignature = () => {
                                       <input
                                         type="checkbox"
                                         checked={isSelected}
-                                        onChange={() => {
-                                          if (fileIndex === currentPdfIndex) {
-                                            togglePageSelection(page);
-                                          } else {
-                                            toast("Switch to this PDF first to select pages");
-                                          }
-                                        }}
+                                        onChange={() => togglePageSelection(page, fileIndex)}
                                         className="mt-0.5 w-4 h-4 cursor-pointer"
                                         onClick={(e) => e.stopPropagation()}
                                       />
