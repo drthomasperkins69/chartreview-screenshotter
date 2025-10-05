@@ -315,14 +315,6 @@ export const PDFSignature = () => {
               </Card>
             )}
 
-            {/* AI Assistant at Top */}
-            <div className="h-[400px]">
-              <AISearchAssistant 
-                onKeywordSuggest={handleKeywordSuggest}
-                currentKeywords={keywords}
-              />
-            </div>
-
             {/* Search Controls */}
             <Card className="p-4 shadow-medium">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -510,6 +502,14 @@ export const PDFSignature = () => {
                 )}
               </div>
             </Card>
+
+            {/* AI Assistant */}
+            <div className="h-[400px]">
+              <AISearchAssistant 
+                onKeywordSuggest={handleKeywordSuggest}
+                currentKeywords={keywords}
+              />
+            </div>
 
             {/* PDF Viewer */}
             <Card className="shadow-medium overflow-hidden">
