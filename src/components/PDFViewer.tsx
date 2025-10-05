@@ -116,7 +116,8 @@ export const PDFViewer = ({
               .join(' ');
 
             for (const term of searchTerms) {
-              const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+              // Use word boundaries to match exact words only
+              const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
               const count = (pageText.match(regex) || []).length;
               if (count > 0) {
                 matches.push({ 
