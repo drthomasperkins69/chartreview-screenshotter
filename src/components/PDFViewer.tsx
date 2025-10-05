@@ -246,7 +246,7 @@ export const PDFViewer = ({
     searchKeywords();
   }, [files, keywords, dateSearch, isSearching, onKeywordMatchesDetected]);
 
-  // Function to extract dates from text using regex
+  // Function to extract and format dates from text using regex
   const extractDatesFromText = (text: string): string[] => {
     const datePatterns = [
       // DD/MM/YYYY or MM/DD/YYYY
@@ -259,11 +259,20 @@ export const PDFViewer = ({
     ];
 
     const foundDates = new Set<string>();
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
     datePatterns.forEach(pattern => {
       const matches = text.match(pattern);
       if (matches) {
-        matches.forEach(match => foundDates.add(match.trim()));
+        matches.forEach(match => {
+          const parsedDate = new Date(match.trim());
+          if (!isNaN(parsedDate.getTime())) {
+            const day = String(parsedDate.getDate()).padStart(2, '0');
+            const month = monthNamesShort[parsedDate.getMonth()];
+            const year = parsedDate.getFullYear();
+            foundDates.add(`${day} ${month} ${year}`);
+          }
+        });
       }
     });
 
