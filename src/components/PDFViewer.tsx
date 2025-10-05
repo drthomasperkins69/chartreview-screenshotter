@@ -743,7 +743,7 @@ export const PDFViewer = ({
         <PDFPageDialog
           open={showEnlargedPage}
           onOpenChange={setShowEnlargedPage}
-          file={currentFile}
+          pdfDocument={pdf}
           pageNumber={currentPage}
           title={`${currentFile.name} - Page ${currentPage}`}
         />

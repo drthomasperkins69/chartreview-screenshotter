@@ -6,23 +6,41 @@ import { Loader2 } from "lucide-react";
 interface PDFPageDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  file: File;
+  pdfDocument?: pdfjsLib.PDFDocumentProxy | null;
+  file?: File;
   pageNumber: number;
   title?: string;
 }
 
-export const PDFPageDialog = ({ open, onOpenChange, file, pageNumber, title }: PDFPageDialogProps) => {
+export const PDFPageDialog = ({ open, onOpenChange, pdfDocument, file, pageNumber, title }: PDFPageDialogProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
+  const [loadedPdf, setLoadedPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+
+  // Load PDF from file if pdfDocument is not provided
+  useEffect(() => {
+    if (!open || !file || pdfDocument) return;
+
+    const loadPdf = async () => {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+        setLoadedPdf(pdf);
+      } catch (error) {
+        console.error("Error loading PDF:", error);
+      }
+    };
+
+    loadPdf();
+  }, [open, file, pdfDocument]);
 
   useEffect(() => {
-    if (!open || !canvasRef.current) return;
+    const pdf = pdfDocument || loadedPdf;
+    if (!open || !canvasRef.current || !pdf) return;
 
     const renderPage = async () => {
       setLoading(true);
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
         const page = await pdf.getPage(pageNumber);
         
         const canvas = canvasRef.current;
@@ -50,7 +68,7 @@ export const PDFPageDialog = ({ open, onOpenChange, file, pageNumber, title }: P
     };
 
     renderPage();
-  }, [open, file, pageNumber]);
+  }, [open, pdfDocument, loadedPdf, pageNumber]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
