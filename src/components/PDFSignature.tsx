@@ -22,6 +22,10 @@ import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
 import JSZip from "jszip";
 
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import mammoth from "mammoth";
+
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
   { id: 1, label: 'Lumbar' },
@@ -158,17 +162,92 @@ export const PDFSignature = () => {
     toast.success("PDF added successfully!");
   }, []);
 
-  const handleMultipleFileSelect = useCallback((files: FileList) => {
-    const pdfFilesArray = Array.from(files).filter(file => file.type === "application/pdf");
-    if (pdfFilesArray.length === 0) {
-      toast("No valid PDF files selected");
+  const handleMultipleFileSelect = useCallback(async (files: FileList) => {
+    const filesArray = Array.from(files);
+    const processedFiles: File[] = [];
+    
+    toast.info(`Processing ${filesArray.length} file(s)...`);
+    
+    for (const file of filesArray) {
+      try {
+        let processedFile = file;
+        
+        // Convert HTML to PDF
+        if (file.type === 'text/html' || file.name.match(/\.(html?|htm)$/i)) {
+          toast.info(`Converting ${file.name} to PDF...`);
+          const html = await file.text();
+          const container = document.createElement('div');
+          container.innerHTML = html;
+          container.style.position = 'absolute';
+          container.style.left = '-9999px';
+          container.style.width = '800px';
+          document.body.appendChild(container);
+          
+          try {
+            const canvas = await html2canvas(container, { scale: 2, useCORS: true, logging: false });
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+            const pdfBlob = pdf.output('blob');
+            processedFile = new File([pdfBlob], file.name.replace(/\.(html?|htm)$/i, '.pdf'), { type: 'application/pdf' });
+          } finally {
+            document.body.removeChild(container);
+          }
+        }
+        // Convert Word to PDF
+        else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.match(/\.docx?$/i)) {
+          toast.info(`Converting ${file.name} to PDF...`);
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          const html = result.value;
+          
+          const container = document.createElement('div');
+          container.innerHTML = html;
+          container.style.position = 'absolute';
+          container.style.left = '-9999px';
+          container.style.width = '800px';
+          container.style.padding = '40px';
+          container.style.fontFamily = 'Arial, sans-serif';
+          container.style.fontSize = '14px';
+          container.style.lineHeight = '1.6';
+          document.body.appendChild(container);
+          
+          try {
+            const canvas = await html2canvas(container, { scale: 2, useCORS: true, logging: false });
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'a4' });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            const imgWidth = pdf.internal.pageSize.getWidth();
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+            const pdfBlob = pdf.output('blob');
+            processedFile = new File([pdfBlob], file.name.replace(/\.docx?$/i, '.pdf'), { type: 'application/pdf' });
+          } finally {
+            document.body.removeChild(container);
+          }
+        }
+        // Check if it's a PDF
+        else if (file.type !== "application/pdf") {
+          toast.error(`Unsupported file type: ${file.name}`);
+          continue;
+        }
+        
+        processedFiles.push(processedFile);
+      } catch (error) {
+        console.error(`Error processing file ${file.name}:`, error);
+        toast.error(`Failed to process ${file.name}`);
+      }
+    }
+    
+    if (processedFiles.length === 0) {
+      toast.error("No valid files to add");
       return;
     }
-    setPdfFiles(prev => [...prev, ...pdfFilesArray]);
+    
+    setPdfFiles(prev => [...prev, ...processedFiles]);
     setMatchingPages(new Set());
     setKeywordMatches([]);
     setSelectedPagesForExtraction(new Set());
-    toast(`${pdfFilesArray.length} PDF(s) added successfully!`);
+    toast.success(`${processedFiles.length} file(s) added successfully!`);
   }, []);
 
   const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
@@ -1883,7 +1962,7 @@ export const PDFSignature = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.html,.htm,.docx,.doc"
         multiple
         onChange={(e) => {
           const files = e.target.files;
