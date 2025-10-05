@@ -35,6 +35,8 @@ interface PDFViewerProps {
   triggerScan?: (fileIndex: number) => void;
   onTogglePageSelection?: (fileIndex: number, pageNum: number) => void;
   selectedPagesForExtraction?: Set<string>;
+  pageDiagnoses?: Record<string, string>;
+  onDiagnosisChange?: (fileIndex: number, pageNum: number, diagnosis: string) => void;
 }
 
 export const PDFViewer = ({
@@ -52,6 +54,8 @@ export const PDFViewer = ({
   triggerScan,
   onTogglePageSelection,
   selectedPagesForExtraction,
+  pageDiagnoses = {},
+  onDiagnosisChange,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -393,6 +397,7 @@ export const PDFViewer = ({
   };
 
   const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
+  const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
 
   if (loading) {
     return (
@@ -406,7 +411,7 @@ export const PDFViewer = ({
   }
 
   return (
-    <div className="relative bg-pdf-background">
+    <div className="relative bg-pdf-background flex flex-col h-full">
       {/* Controls */}
       <div className="flex items-center justify-between p-4 bg-toolbar-background border-b">
         <div className="flex items-center gap-2">
@@ -460,7 +465,7 @@ export const PDFViewer = ({
       {/* PDF Canvas */}
       <div
         ref={containerRef}
-        className="flex justify-center p-6 min-h-[600px] overflow-auto"
+        className="flex-1 flex justify-center p-6 overflow-auto"
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -484,6 +489,23 @@ export const PDFViewer = ({
       {matchingPages.size > 0 && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-medium text-sm">
           Page {currentPage} {matchingPages.has(currentPage) ? '✓ Contains keywords' : ''}
+        </div>
+      )}
+      
+      {/* Diagnosis Input */}
+      {onDiagnosisChange && (
+        <div className="border-t bg-toolbar-background p-4">
+          <label htmlFor="diagnosis-input" className="block text-sm font-medium mb-2">
+            Diagnosis for Page {currentPage}:
+          </label>
+          <input
+            id="diagnosis-input"
+            type="text"
+            value={currentDiagnosis}
+            onChange={(e) => onDiagnosisChange(currentFileIndex, currentPage, e.target.value)}
+            placeholder="Enter diagnosis..."
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          />
         </div>
       )}
     </div>

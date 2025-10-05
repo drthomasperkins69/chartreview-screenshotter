@@ -13,7 +13,7 @@ import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2 } from "lucide-react";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
@@ -95,6 +95,7 @@ export const PDFSignature = () => {
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
+  const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -670,12 +671,25 @@ export const PDFSignature = () => {
             const screenshotPage = pdfDoc.addPage([595, 842]);
             
             // Add header with page info
+            const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
             screenshotPage.drawText(`${content.fileName} - Page ${content.pageNum}`, {
               x: 50,
               y: 792,
               size: 10,
+              font: boldFont,
               color: rgb(0, 0, 0),
             });
+            
+            // Add diagnosis if provided
+            const diagnosis = pageDiagnoses[`${content.fileIndex}-${content.pageNum}`];
+            if (diagnosis && diagnosis.trim()) {
+              screenshotPage.drawText(`Diagnosis: ${diagnosis}`, {
+                x: 50,
+                y: 775,
+                size: 9,
+                color: rgb(0.2, 0.2, 0.2),
+              });
+            }
             
             // Embed the image
             const imageBytes = content.image.split(',')[1];
@@ -1086,6 +1100,13 @@ export const PDFSignature = () => {
                         triggerScan={handleScanFile}
                         onTogglePageSelection={togglePageSelection}
                         selectedPagesForExtraction={selectedPagesForExtraction}
+                        pageDiagnoses={pageDiagnoses}
+                        onDiagnosisChange={(fileIndex, pageNum, diagnosis) => {
+                          setPageDiagnoses(prev => ({
+                            ...prev,
+                            [`${fileIndex}-${pageNum}`]: diagnosis
+                          }));
+                        }}
                       />
                     )}
                   </Card>
