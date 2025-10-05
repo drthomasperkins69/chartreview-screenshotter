@@ -558,16 +558,10 @@ export const PDFSignature = () => {
                 <FileText className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">PDF Keyword Extractor</h1>
-                <p className="text-sm text-muted-foreground">Extract pages by keywords</p>
+                <h1 className="text-xl font-semibold text-foreground">DVA Screenshotter</h1>
+                <p className="text-sm text-muted-foreground">Extract pages by keywords with AI</p>
                 <p className="text-xs text-muted-foreground/70 mt-0.5">
-                  v1.0.0 • Updated {new Date().toLocaleString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  🔒 All data stays in your browser - nothing stored or transmitted
                 </p>
               </div>
             </div>
@@ -629,7 +623,22 @@ export const PDFSignature = () => {
 
       <main className="container mx-auto px-4 py-6">
         {pdfFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[40vh]">
+            <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-6">
+              <Card className="p-6 max-w-2xl bg-accent/20 border-accent">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent/30 flex items-center justify-center">
+                    🔒
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-foreground">Your Privacy is Protected</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      All PDF processing happens entirely in your browser. Your documents are never uploaded to any server, 
+                      and no data is stored or transmitted. When you close this tab, everything is automatically cleared from memory. 
+                      Your sensitive documents remain completely private and secure on your device.
+                    </p>
+                  </div>
+                </div>
+              </Card>
               <FileUpload onFileSelect={handleFileSelect} />
             </div>
           ) : (
