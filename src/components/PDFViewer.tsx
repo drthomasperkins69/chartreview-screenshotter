@@ -308,7 +308,7 @@ export const PDFViewer = ({
       
       const datesFound = extractDatesFromText(pageText);
       
-      // Render Bates numbering for dates
+      // Display dates found on page
       if (datesFound.length > 0) {
         context.save();
         context.font = `${12 * scale}px Arial`;
@@ -321,14 +321,12 @@ export const PDFViewer = ({
         const padding = 10 * scale;
         
         datesFound.forEach((date, index) => {
-          const batesNumber = `DATE-${String(index + 1).padStart(3, '0')}`;
-          const label = `${batesNumber}: ${date}`;
           const yPos = startY + (index * lineHeight);
           
           // Draw white outline for readability
-          context.strokeText(label, padding, yPos);
+          context.strokeText(date, padding, yPos);
           // Draw red text
-          context.fillText(label, padding, yPos);
+          context.fillText(date, padding, yPos);
         });
         
         context.restore();
