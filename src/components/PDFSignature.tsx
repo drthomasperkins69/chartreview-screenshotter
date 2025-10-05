@@ -1845,7 +1845,7 @@ export const PDFSignature = () => {
 
                 {/* Right Panel: Matches Found */}
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                  <Card className="h-full rounded-none border-0 p-4 flex flex-col">
+                  <Card className="h-full min-h-0 rounded-none border-0 p-0 flex flex-col">
                     {keywordMatches.length > 0 ? (
                       <>
                         <div className="space-y-2 mb-3">
@@ -1949,9 +1949,9 @@ export const PDFSignature = () => {
                         </ScrollArea>
                       </>
                     ) : (
-                      <div className="flex-1 overflow-y-auto flex flex-col">
+                      <div className="flex-1 min-h-0 flex flex-col">
                         {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 ? (
-                          <div className="p-4">
+                          <div className="p-4 h-full flex flex-col min-h-0">
                             <div className="flex items-center justify-between mb-3">
                               <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
                               <Button
@@ -1964,7 +1964,7 @@ export const PDFSignature = () => {
                                 Download All as ZIP
                               </Button>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
                               {(() => {
                                 // Split comma-separated diagnoses and group pages by individual diagnosis
                                 const diagnosisGroups: Record<string, Array<{ key: string; fileIndex: number; pageNum: number; fileName: string }>> = {};
