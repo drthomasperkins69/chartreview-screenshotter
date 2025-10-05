@@ -1,15 +1,41 @@
 import { useState } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileUpload } from "@/components/FileUpload";
 import { PDFSignature } from "@/components/PDFSignature";
-import { Upload, FileText, Calendar } from "lucide-react";
+import { Upload, FileText, Calendar, Download } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const WorkspaceContent = () => {
-  const { selectedWorkspace, workspaceFiles } = useWorkspace();
+  const { selectedWorkspace, workspaceFiles, refreshFiles } = useWorkspace();
+  const { user } = useAuth();
   const [showPdfTools, setShowPdfTools] = useState(false);
+
+  const handleDownloadFile = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('pdf-files')
+        .download(filePath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('File downloaded');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
+    }
+  };
 
   if (!selectedWorkspace) {
     return (
@@ -81,7 +107,7 @@ export const WorkspaceContent = () => {
                 {workspaceFiles.map((file) => (
                   <Card key={file.id} className="p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-8 w-8 text-primary" />
+                      <FileText className="h-8 w-8 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium truncate">{file.file_name}</h3>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
@@ -95,6 +121,14 @@ export const WorkspaceContent = () => {
                           </span>
                         </div>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadFile(file.file_path, file.file_name)}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
                     </div>
                   </Card>
                 ))}

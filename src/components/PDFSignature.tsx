@@ -19,6 +19,9 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { uploadPdfToStorage } from "@/utils/supabaseStorage";
 import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
 import JSZip from "jszip";
@@ -81,6 +84,8 @@ interface PDFContent {
 }
 
 export const PDFSignature = () => {
+  const { user } = useAuth();
+  const { selectedWorkspace, refreshFiles } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
@@ -1386,7 +1391,7 @@ export const PDFSignature = () => {
       const selectedContent = await captureSelectedPages(Array.from(selectedPagesForExtraction));
       const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses);
       
-      downloadPDF(pdfBytes, `all-pages-${Date.now()}.pdf`);
+      await downloadPDF(pdfBytes, `all-pages-${Date.now()}.pdf`);
       toast.success("PDF with screenshots created successfully!");
     } catch (error) {
       console.error("Error creating PDF:", error);
@@ -1531,8 +1536,16 @@ export const PDFSignature = () => {
     return await pdfDoc.save();
   };
 
-  const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
+  const downloadPDF = async (pdfBytes: Uint8Array, filename: string) => {
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    
+    // Save to Supabase if workspace is selected
+    if (selectedWorkspace && user) {
+      await uploadPdfToStorage(blob, filename, selectedWorkspace.id, user.id);
+      await refreshFiles();
+    }
+    
+    // Also download locally
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -1563,7 +1576,7 @@ export const PDFSignature = () => {
       const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses, diagnosis);
       
       const safeFilename = diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      downloadPDF(pdfBytes, `${safeFilename}-${Date.now()}.pdf`);
+      await downloadPDF(pdfBytes, `${safeFilename}-${Date.now()}.pdf`);
       toast.success(`PDF for ${diagnosis} created successfully!`);
     } catch (error) {
       console.error("Error creating diagnosis PDF:", error);
@@ -2060,7 +2073,14 @@ export const PDFSignature = () => {
                 <ResizablePanel defaultSize={50} minSize={30}>
                   <Card className="h-full rounded-none border-0 overflow-hidden">
             {pdfFiles.length === 0 ? (
-                      <div className="h-full flex items-center justify-center p-6">
+                      <div className="h-full flex flex-col items-center justify-center p-6">
+                        {!selectedWorkspace && (
+                          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md max-w-md">
+                            <p className="text-sm text-yellow-800">
+                              ⚠️ No workspace selected. Altered PDFs will only download locally. Select a workspace to save to cloud.
+                            </p>
+                          </div>
+                        )}
                         <FileUpload onFileSelect={handleFileSelect} />
                       </div>
                     ) : (
