@@ -1011,6 +1011,37 @@ export const PDFSignature = () => {
     }
   };
 
+  const handleDownloadAllModifiedPDFs = async () => {
+    if (pdfFiles.length === 0) {
+      toast.error("No PDFs to download");
+      return;
+    }
+
+    try {
+      toast("Creating ZIP with all modified PDFs...");
+      const zip = new JSZip();
+
+      for (let i = 0; i < pdfFiles.length; i++) {
+        const file = pdfFiles[i];
+        const arrayBuffer = await file.arrayBuffer();
+        zip.file(file.name, arrayBuffer);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `all-modified-pdfs-${Date.now()}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success("All modified PDFs downloaded!");
+    } catch (error) {
+      console.error("Error creating ZIP:", error);
+      toast.error("Failed to create ZIP file");
+    }
+  };
+
   const getDiagnosisGroups = useMemo(() => {
     const groups: Record<string, string[]> = {};
     
@@ -1564,6 +1595,21 @@ export const PDFSignature = () => {
           )}
         </div>
       </main>
+      
+      {/* Download All Modified PDFs Button */}
+      {pdfFiles.length > 0 && (
+        <div className="container mx-auto px-4 py-4 border-t">
+          <Button
+            onClick={handleDownloadAllModifiedPDFs}
+            variant="outline"
+            size="lg"
+            className="w-full gap-2"
+          >
+            <FileArchive className="w-5 h-5" />
+            Download All Modified PDF Files ({pdfFiles.length} file{pdfFiles.length !== 1 ? 's' : ''})
+          </Button>
+        </div>
+      )}
       
       <input
         ref={fileInputRef}
