@@ -563,7 +563,7 @@ export const PDFSignature = () => {
                 className="w-12 h-12 object-contain"
               />
               <div>
-                <h1 className="text-xl font-semibold text-foreground">Dr Advocate.ai</h1>
+                <h1 className="text-xl font-semibold text-foreground">dr.adocate.ai (Beta)</h1>
                 <p className="text-sm text-muted-foreground">Extract pages by keywords with AI</p>
                 <p className="text-xs text-muted-foreground/70 mt-0.5">
                   🔒 All data stays in your browser - nothing stored or transmitted
