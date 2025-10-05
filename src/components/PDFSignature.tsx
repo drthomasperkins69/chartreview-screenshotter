@@ -13,7 +13,7 @@ import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
@@ -1439,7 +1439,28 @@ export const PDFSignature = () => {
         {/* PDF File Selector */}
         {pdfFiles.length > 0 && (
                 <Card className="p-4 shadow-medium mb-4">
-                  <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-medium">Select PDF to View</Label>
+                    <Button
+                      onClick={() => handleAutoScanAllPDFs("gemini")}
+                      disabled={isAutoScanningAll}
+                      variant="secondary"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      {isAutoScanningAll ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Scanning...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Scan All Files
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {pdfFiles.map((file, index) => {
                       const isComplete = ocrCompletedFiles.has(index);
