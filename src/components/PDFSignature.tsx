@@ -869,9 +869,26 @@ export const PDFSignature = () => {
     );
   };
 
-  const createPDFWithPages = async (pages: any[], diagnoses: Record<string, string>) => {
+  const createPDFWithPages = async (pages: any[], diagnoses: Record<string, string>, coverPageDiagnosis?: string) => {
     const pdfDoc = await PDFDocument.create();
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Add cover page if diagnosis is provided
+    if (coverPageDiagnosis) {
+      const coverPage = pdfDoc.addPage([595, 842]);
+      const fontSize = 36;
+      const textWidth = boldFont.widthOfTextAtSize(coverPageDiagnosis, fontSize);
+      const x = (595 - textWidth) / 2;
+      const y = 421; // Center vertically
+      
+      coverPage.drawText(coverPageDiagnosis, {
+        x,
+        y,
+        size: fontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+    }
     
     for (const content of pages) {
       if (content.image) {
@@ -965,7 +982,7 @@ export const PDFSignature = () => {
     try {
       toast(`Creating PDF for ${diagnosis}...`);
       const selectedContent = await captureSelectedPages(pagesForDiagnosis);
-      const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses);
+      const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses, diagnosis);
       
       const safeFilename = diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       downloadPDF(pdfBytes, `${safeFilename}-${Date.now()}.pdf`);
