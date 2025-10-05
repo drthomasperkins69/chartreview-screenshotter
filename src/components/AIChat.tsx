@@ -15,6 +15,15 @@ interface Message {
   model?: string;
 }
 
+interface DiagnosisContext {
+  diagnosis: string;
+  files: Array<{ fileName: string; pageNum: number; text?: string }>;
+}
+
+interface AIChatProps {
+  diagnosesContext?: DiagnosisContext[] | null;
+}
+
 const AI_PROVIDERS = [
   { 
     value: 'lovable', 
@@ -72,7 +81,7 @@ const AI_PROVIDERS = [
   },
 ];
 
-export const AIChat = () => {
+export const AIChat = ({ diagnosesContext }: AIChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,14 +100,34 @@ export const AIChat = () => {
     setLoading(true);
 
     try {
+      // Build context message if diagnoses are selected
+      let contextMessage = '';
+      if (diagnosesContext && diagnosesContext.length > 0) {
+        contextMessage = '\n\n--- Context: Selected Diagnoses and Files ---\n';
+        diagnosesContext.forEach(({ diagnosis, files }) => {
+          contextMessage += `\nDiagnosis: ${diagnosis}\nFiles:\n`;
+          files.forEach(({ fileName, pageNum, text }) => {
+            contextMessage += `  - ${fileName}, Page ${pageNum}\n`;
+            if (text) {
+              contextMessage += `    Text: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}\n`;
+            }
+          });
+        });
+        contextMessage += '--- End Context ---\n\n';
+      }
+
+      const messagesToSend = diagnosesContext && diagnosesContext.length > 0
+        ? [
+            ...messages.map(m => ({ role: m.role, content: m.content })),
+            { role: 'user' as const, content: contextMessage + userMessage.content }
+          ]
+        : [...messages, userMessage].map(m => ({ role: m.role, content: m.content }));
+
       const { data, error } = await supabase.functions.invoke('multi-provider-chat', {
         body: {
           provider,
           model: model || availableModels[0]?.value,
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
+          messages: messagesToSend,
         },
       });
 
@@ -161,12 +190,29 @@ export const AIChat = () => {
       </div>
 
       <ScrollArea className="flex-1 p-4">
+        {diagnosesContext && diagnosesContext.length > 0 && (
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+            <p className="text-xs font-medium text-primary mb-1">
+              Selected Diagnoses ({diagnosesContext.length})
+            </p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              {diagnosesContext.map((ctx, idx) => (
+                <div key={idx}>
+                  {ctx.diagnosis}: {ctx.files.length} file{ctx.files.length !== 1 ? 's' : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <Sparkles className="w-12 h-12 mb-4 text-muted-foreground/50" />
             <p className="text-lg font-medium mb-2">Choose an AI provider and start chatting</p>
             <p className="text-sm max-w-md">
-              Switch between different AI models to compare responses and capabilities
+              {diagnosesContext && diagnosesContext.length > 0 
+                ? 'AI has access to selected diagnoses and their files'
+                : 'Switch between different AI models to compare responses and capabilities'}
             </p>
           </div>
         ) : (

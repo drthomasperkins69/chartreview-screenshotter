@@ -15,6 +15,7 @@ import { AISearchAssistant } from "./AISearchAssistant";
 import { PDFPageDialog } from "./PDFPageDialog";
 import { AIChat } from "./AIChat";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit, ZoomIn } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
@@ -177,6 +178,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
+  const [selectedDiagnosesForChat, setSelectedDiagnosesForChat] = useState<Set<string>>(new Set());
   const [isAutoScanningAll, setIsAutoScanningAll] = useState(false);
   const [editingDiagnosis, setEditingDiagnosis] = useState<string | null>(null);
   const [editDiagnosisValue, setEditDiagnosisValue] = useState<string>("");
@@ -1857,6 +1859,76 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     })).sort((a, b) => a.diagnosis.localeCompare(b.diagnosis));
   }, [selectedPagesForExtraction, pageDiagnoses]);
 
+  const handleToggleDiagnosisForChat = useCallback((diagnosis: string) => {
+    setSelectedDiagnosesForChat(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(diagnosis)) {
+        newSet.delete(diagnosis);
+      } else {
+        newSet.add(diagnosis);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const getSelectedDiagnosesContext = useMemo(() => {
+    if (selectedDiagnosesForChat.size === 0) return null;
+
+    const context: Array<{
+      diagnosis: string;
+      files: Array<{ fileName: string; pageNum: number; text?: string }>;
+    }> = [];
+
+    selectedDiagnosesForChat.forEach(diagnosis => {
+      // Find all pages with this diagnosis
+      const pagesWithDiagnosis: Array<{ fileIndex: number; pageNum: number; fileName: string }> = [];
+      
+      Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
+        if (!diagnosisString?.trim()) return;
+        
+        const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
+        
+        if (individualDiagnoses.includes(diagnosis)) {
+          const [fileIndex, pageNum] = key.split('-').map(Number);
+          pagesWithDiagnosis.push({
+            fileIndex,
+            pageNum,
+            fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
+          });
+        }
+      });
+
+      const files = pagesWithDiagnosis.map(page => ({
+        fileName: page.fileName,
+        pageNum: page.pageNum,
+        text: pdfContent[page.fileIndex]?.[page.pageNum]
+      }));
+
+      context.push({ diagnosis, files });
+    });
+
+    // Add ADMIN.pdf if it exists in workspace
+    const adminFile = workspaceFiles.find(f => f.file_name === 'ADMIN.pdf');
+    if (adminFile && selectedWorkspace) {
+      // Find the file index for ADMIN.pdf
+      const adminFileIndex = pdfFiles.findIndex(f => f.name === 'ADMIN.pdf');
+      if (adminFileIndex >= 0 && pdfContent[adminFileIndex]) {
+        const adminPages = Object.entries(pdfContent[adminFileIndex]).map(([pageNum, text]) => ({
+          fileName: 'ADMIN.pdf',
+          pageNum: parseInt(pageNum),
+          text
+        }));
+        
+        context.push({
+          diagnosis: 'ADMIN.pdf (Reference Document)',
+          files: adminPages
+        });
+      }
+    }
+
+    return context;
+  }, [selectedDiagnosesForChat, pageDiagnoses, pdfFiles, pdfContent, workspaceFiles, selectedWorkspace]);
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="border-b bg-card shadow-soft">
@@ -2451,7 +2523,22 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                       <Collapsible key={diagnosis} defaultOpen={true}>
                         <div className="border rounded-lg">
                           <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
-                            <div className="flex items-center gap-2 flex-1">
+                            <div className="flex items-center gap-3 flex-1">
+                              <Checkbox
+                                id={`chat-${diagnosis}`}
+                                checked={selectedDiagnosesForChat.has(diagnosis)}
+                                onCheckedChange={(checked) => {
+                                  handleToggleDiagnosisForChat(diagnosis);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <label 
+                                htmlFor={`chat-${diagnosis}`}
+                                className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Add to Chat
+                              </label>
                               <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
                               {editingDiagnosis === diagnosis ? (
                                 <Input
@@ -2618,7 +2705,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           
           {/* Right Column: AI Chat */}
           <div className="flex flex-col">
-            <AIChat />
+            <AIChat diagnosesContext={getSelectedDiagnosesContext} />
           </div>
         </div>
 
