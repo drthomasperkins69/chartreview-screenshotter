@@ -12,7 +12,8 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
@@ -1535,6 +1536,79 @@ export const PDFSignature = () => {
                   </Card>
                 </ResizablePanel>
         </ResizablePanelGroup>
+
+        {/* Diagnosis Tracker Section */}
+        {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 && (
+          <Card className="mt-4 p-4">
+            <h3 className="text-lg font-semibold mb-3">Diagnosis Tracker</h3>
+            <div className="space-y-2">
+              {Array.from(new Set(Object.values(pageDiagnoses).filter(d => d?.trim()))).sort().map((diagnosis, index) => {
+                const pagesWithDiagnosis = Object.entries(pageDiagnoses)
+                  .filter(([_, d]) => d === diagnosis)
+                  .map(([key]) => {
+                    const [fileIndex, pageNum] = key.split('-').map(Number);
+                    return {
+                      key,
+                      fileIndex,
+                      pageNum,
+                      fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
+                    };
+                  })
+                  .sort((a, b) => {
+                    if (a.fileIndex !== b.fileIndex) return a.fileIndex - b.fileIndex;
+                    return a.pageNum - b.pageNum;
+                  });
+
+                return (
+                  <Collapsible key={index} defaultOpen={true}>
+                    <div className="border rounded-lg">
+                      <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
+                        <div className="flex items-center gap-2">
+                          <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
+                          <span className="font-medium">{diagnosis}</span>
+                          <span className="text-sm text-muted-foreground">
+                            ({pagesWithDiagnosis.length} page{pagesWithDiagnosis.length !== 1 ? 's' : ''})
+                          </span>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3 space-y-1">
+                          {pagesWithDiagnosis.map((page) => (
+                            <div
+                              key={page.key}
+                              className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/10 cursor-pointer"
+                              onClick={() => {
+                                setCurrentPdfIndex(page.fileIndex);
+                                setSelectedPage(page.pageNum);
+                              }}
+                            >
+                              <div className="flex items-center gap-2 text-sm">
+                                <FileText className="w-4 h-4 text-muted-foreground" />
+                                <span>{page.fileName}</span>
+                                <span className="text-muted-foreground">- Page {page.pageNum}</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeMatchFromList(page.fileIndex, page.pageNum);
+                                }}
+                                className="h-7 w-7 p-0 hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
         {/* Diagnosis Summary Section */}
         {getDiagnosisGroups.length > 0 && (
