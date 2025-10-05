@@ -170,20 +170,17 @@ Analyze these medical records and extract information for a DVA Diagnosis Form.`
     const today = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
     page.drawText(today, { x: 50, y: yPosition, size: 10, font, color: rgb(0, 0, 0) });
 
-    // Generate PDF bytes
-    const pdfBytes = await pdfDoc.save();
-
-    console.log('Successfully generated diagnosis form PDF');
+    console.log('Successfully generated diagnosis form data');
 
     return new Response(
-      pdfBytes,
+      JSON.stringify({ 
+        success: true,
+        diagnosis,
+        formData
+      }),
       { 
         status: 200,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="diagnosis-form-${diagnosis.replace(/\s+/g, '-')}.pdf"`
-        } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
 

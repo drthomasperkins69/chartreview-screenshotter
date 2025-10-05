@@ -107,6 +107,13 @@ export const PDFSignature = () => {
   const [editingDiagnosis, setEditingDiagnosis] = useState<string | null>(null);
   const [editDiagnosisValue, setEditDiagnosisValue] = useState<string>("");
   const [generatingForm, setGeneratingForm] = useState<string | null>(null);
+  const [diagnosisForms, setDiagnosisForms] = useState<Record<string, {
+    medicalDiagnosis: string;
+    basisForDiagnosis: string;
+    relatedConditions: string;
+    dateOfOnset: string;
+    firstConsultation: string;
+  }>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfFilesRef = useRef<File[]>(pdfFiles);
@@ -923,6 +930,17 @@ export const PDFSignature = () => {
       return updated;
     });
 
+    // Rename the form data key if it exists
+    setDiagnosisForms(prev => {
+      if (prev[oldDiagnosis]) {
+        const updated = { ...prev };
+        updated[newDiagnosis] = prev[oldDiagnosis];
+        delete updated[oldDiagnosis];
+        return updated;
+      }
+      return prev;
+    });
+
     setEditingDiagnosis(null);
     toast.success(`Renamed "${oldDiagnosis}" to "${newDiagnosis}"`);
   }, []);
@@ -942,6 +960,13 @@ export const PDFSignature = () => {
         }
       });
       
+      return updated;
+    });
+
+    // Remove the form data for this diagnosis
+    setDiagnosisForms(prev => {
+      const updated = { ...prev };
+      delete updated[diagnosisToDelete];
       return updated;
     });
 
@@ -983,7 +1008,7 @@ export const PDFSignature = () => {
         return;
       }
 
-      // Call the edge function using fetch to get the PDF blob
+      // Call the edge function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-diagnosis-form`,
         {
@@ -1003,18 +1028,19 @@ export const PDFSignature = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Get the PDF blob from the response
-      const pdfBlob = await response.blob();
+      const data = await response.json();
       
-      // Create download link for the PDF
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `DVA_Diagnosis_Form_${diagnosis.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      if (!data.success || !data.formData) {
+        throw new Error('Invalid response from server');
+      }
 
-      toast.success('Diagnosis form generated and downloaded!');
+      // Store the form data in state
+      setDiagnosisForms(prev => ({
+        ...prev,
+        [diagnosis]: data.formData
+      }));
+
+      toast.success('Diagnosis form generated!');
     } catch (error) {
       console.error('Error generating diagnosis form:', error);
       toast.error('Failed to generate diagnosis form');
@@ -2299,6 +2325,34 @@ export const PDFSignature = () => {
                             </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
+                            {diagnosisForms[diagnosis] && (
+                              <div className="px-3 py-3 bg-accent/5 border-b space-y-3">
+                                <div className="grid gap-3">
+                                  <div>
+                                    <Label className="text-sm font-semibold">Medical Diagnosis</Label>
+                                    <p className="text-sm mt-1">{diagnosisForms[diagnosis].medicalDiagnosis}</p>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-semibold">Basis for Diagnosis</Label>
+                                    <p className="text-sm mt-1 whitespace-pre-wrap">{diagnosisForms[diagnosis].basisForDiagnosis}</p>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-semibold">Related Conditions</Label>
+                                    <p className="text-sm mt-1">{diagnosisForms[diagnosis].relatedConditions}</p>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <Label className="text-sm font-semibold">Date of Onset</Label>
+                                      <p className="text-sm mt-1">{diagnosisForms[diagnosis].dateOfOnset}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm font-semibold">First Consultation</Label>
+                                      <p className="text-sm mt-1">{diagnosisForms[diagnosis].firstConsultation}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             <div className="px-3 pb-3 space-y-1">
                               {sortedPages.map((page) => (
                             <div
