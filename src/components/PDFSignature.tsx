@@ -97,8 +97,10 @@ export const PDFSignature = () => {
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
+  const [sopFiles, setSopFiles] = useState<File[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sopFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentPdf = pdfFiles[currentPdfIndex] || null;
 
@@ -470,6 +472,25 @@ export const PDFSignature = () => {
     if (current >= total) {
       setTimeout(() => setOcrProgress(null), 2000);
     }
+  }, []);
+
+  const handleSopUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const pdfFiles = Array.from(files).filter(file => file.type === "application/pdf");
+    if (pdfFiles.length === 0) {
+      toast.error("Please select PDF files only");
+      return;
+    }
+    
+    setSopFiles(prev => [...prev, ...pdfFiles]);
+    toast.success(`${pdfFiles.length} SOP file(s) added`);
+  }, []);
+
+  const removeSopFile = useCallback((index: number) => {
+    setSopFiles(prev => prev.filter((_, i) => i !== index));
+    toast.success("SOP file removed");
   }, []);
 
   const handleScanFile = useCallback(async (fileIndex: number) => {
@@ -1032,12 +1053,50 @@ export const PDFSignature = () => {
                 </ResizablePanel>
               </ResizablePanelGroup>
 
+              {/* SOP Upload Section */}
+              <Card className="mt-4 p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Upload SOP Documents (Optional)</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => sopFileInputRef.current?.click()}
+                      className="gap-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Add SOP
+                    </Button>
+                  </div>
+                  
+                  {sopFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {sopFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-accent/10 rounded border">
+                          <span className="text-sm truncate flex-1">{file.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeSopFile(index)}
+                            className="h-6 px-2 text-destructive"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+
               {/* Generate Button - Full Width at Bottom */}
               <div className="mt-4">
                 <Button 
                   onClick={() => {
                     // Trigger generation in DiagnosticAssessment component
-                    const event = new CustomEvent('generate-assessment');
+                    const event = new CustomEvent('generate-assessment', {
+                      detail: { sopFiles }
+                    });
                     window.dispatchEvent(event);
                   }}
                   disabled={selectedPagesForExtraction.size === 0}
@@ -1061,6 +1120,14 @@ export const PDFSignature = () => {
               handleMultipleFileSelect(files);
             }
           }}
+          className="hidden"
+        />
+        <input
+          ref={sopFileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          multiple
+          onChange={handleSopUpload}
           className="hidden"
         />
       </main>
