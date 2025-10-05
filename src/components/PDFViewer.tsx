@@ -246,6 +246,30 @@ export const PDFViewer = ({
     searchKeywords();
   }, [files, keywords, dateSearch, isSearching, onKeywordMatchesDetected]);
 
+  // Function to extract dates from text using regex
+  const extractDatesFromText = (text: string): string[] => {
+    const datePatterns = [
+      // DD/MM/YYYY or MM/DD/YYYY
+      /\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g,
+      // YYYY-MM-DD or YYYY/MM/DD
+      /\b\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}\b/g,
+      // Month DD, YYYY or DD Month YYYY
+      /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}\b/gi,
+      /\b\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4}\b/gi,
+    ];
+
+    const foundDates = new Set<string>();
+    
+    datePatterns.forEach(pattern => {
+      const matches = text.match(pattern);
+      if (matches) {
+        matches.forEach(match => foundDates.add(match.trim()));
+      }
+    });
+
+    return Array.from(foundDates);
+  };
+
   const renderPage = useCallback(async () => {
     console.log("renderPage called, pdf:", !!pdf, "canvas:", !!canvasRef.current);
     if (!pdf || !canvasRef.current) return;
@@ -275,6 +299,40 @@ export const PDFViewer = ({
         canvas: canvas,
       }).promise;
       console.log("Page render complete");
+
+      // Extract text and find dates
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      
+      const datesFound = extractDatesFromText(pageText);
+      
+      // Render Bates numbering for dates
+      if (datesFound.length > 0) {
+        context.save();
+        context.font = `${12 * scale}px Arial`;
+        context.fillStyle = 'rgba(255, 0, 0, 0.9)';
+        context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        context.lineWidth = 3;
+        
+        const lineHeight = 20 * scale;
+        const startY = 30 * scale;
+        const padding = 10 * scale;
+        
+        datesFound.forEach((date, index) => {
+          const batesNumber = `DATE-${String(index + 1).padStart(3, '0')}`;
+          const label = `${batesNumber}: ${date}`;
+          const yPos = startY + (index * lineHeight);
+          
+          // Draw white outline for readability
+          context.strokeText(label, padding, yPos);
+          // Draw red text
+          context.fillText(label, padding, yPos);
+        });
+        
+        context.restore();
+      }
 
       // Highlight matching pages
       if (matchingPages.has(currentPage)) {
