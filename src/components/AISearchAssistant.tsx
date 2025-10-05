@@ -22,7 +22,7 @@ interface PDFContent {
 
 interface AISearchAssistantProps {
   onKeywordSuggest: (keywords: string) => void;
-  onPagesSelected?: (pages: Array<{ fileIndex: number; pageNum: number }>) => void;
+  onPagesSelected?: (pages: Array<{ fileIndex: number; pageNum: number; reason?: string }>) => void;
   currentKeywords?: string;
   pdfContent?: PDFContent[];
 }
@@ -107,7 +107,8 @@ export const AISearchAssistant = ({
       if (data.relevantPages && data.relevantPages.length > 0 && onPagesSelected) {
         onPagesSelected(data.relevantPages.map((p: any) => ({
           fileIndex: p.fileIndex,
-          pageNum: p.pageNum
+          pageNum: p.pageNum,
+          reason: p.reason
         })));
         toast.success(`Selected ${data.relevantPages.length} relevant pages for extraction`);
       }

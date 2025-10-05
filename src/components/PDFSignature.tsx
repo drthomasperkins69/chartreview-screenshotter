@@ -387,11 +387,11 @@ export const PDFSignature = () => {
     }
   }, [searchCategories]);
 
-  const handleAIPageSelection = useCallback((pages: Array<{ fileIndex: number; pageNum: number }>) => {
+  const handleAIPageSelection = useCallback((pages: Array<{ fileIndex: number; pageNum: number; reason?: string }>) => {
     // Create keyword matches for display in the Matches Found panel
     const matches: KeywordMatch[] = pages.map(p => ({
       page: p.pageNum,
-      keyword: "AI Selected",
+      keyword: p.reason || "AI Selected",
       count: 1,
       fileName: pdfFiles[p.fileIndex]?.name || `Document ${p.fileIndex + 1}`,
       fileIndex: p.fileIndex
