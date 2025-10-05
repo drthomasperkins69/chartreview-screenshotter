@@ -1559,7 +1559,18 @@ export const PDFSignature = () => {
         {/* Diagnosis Tracker Section */}
         {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 && (
           <Card className="mt-4 p-4">
-            <h3 className="text-lg font-semibold mb-3">Diagnosis Tracker</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
+              <Button
+                onClick={handleDownloadAllAsZip}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <FileArchive className="w-4 h-4" />
+                Download All as ZIP
+              </Button>
+            </div>
             <div className="space-y-2">
               {Array.from(new Set(Object.values(pageDiagnoses).filter(d => d?.trim()))).sort().map((diagnosis, index) => {
                 const pagesWithDiagnosis = Object.entries(pageDiagnoses)
@@ -1700,21 +1711,6 @@ export const PDFSignature = () => {
           )}
         </div>
       </main>
-      
-      {/* Download All Diagnoses as ZIP Button */}
-      {getDiagnosisGroups.length > 0 && (
-        <div className="container mx-auto px-4 py-4 border-t">
-          <Button
-            onClick={handleDownloadAllAsZip}
-            variant="outline"
-            size="lg"
-            className="w-full gap-2"
-          >
-            <FileArchive className="w-5 h-5" />
-            Download All Diagnoses as ZIP ({getDiagnosisGroups.length} diagnosis{getDiagnosisGroups.length !== 1 ? 'es' : ''})
-          </Button>
-        </div>
-      )}
       
       {/* Download All Modified PDFs Button */}
       {pdfFiles.length > 0 && (
