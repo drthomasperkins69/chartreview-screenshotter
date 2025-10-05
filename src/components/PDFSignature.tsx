@@ -969,9 +969,14 @@ export const PDFSignature = () => {
   };
 
   const handleDownloadByDiagnosis = async (diagnosis: string) => {
-    // Get all pages with this diagnosis (not just selected ones)
+    // Get all pages that have this diagnosis (could be part of a comma-separated list)
     const pagesForDiagnosis = Object.entries(pageDiagnoses)
-      .filter(([_, d]) => d?.trim().toLowerCase() === diagnosis.toLowerCase())
+      .filter(([_, diagnosisString]) => {
+        if (!diagnosisString?.trim()) return false;
+        // Split by comma and check if this diagnosis is in the list
+        const individualDiagnoses = diagnosisString.split(',').map(d => d.trim());
+        return individualDiagnoses.includes(diagnosis);
+      })
       .map(([key]) => key);
 
     if (pagesForDiagnosis.length === 0) {
@@ -994,10 +999,18 @@ export const PDFSignature = () => {
   };
 
   const handleDownloadAllAsZip = async () => {
-    // Get all unique diagnoses from pageDiagnoses
-    const allDiagnoses = Array.from(new Set(Object.values(pageDiagnoses).filter(d => d?.trim())));
+    // Get all unique individual diagnoses by splitting comma-separated values
+    const allIndividualDiagnoses = new Set<string>();
+    Object.values(pageDiagnoses).forEach(diagnosisString => {
+      if (diagnosisString?.trim()) {
+        diagnosisString.split(',').forEach(d => {
+          const trimmed = d.trim();
+          if (trimmed) allIndividualDiagnoses.add(trimmed);
+        });
+      }
+    });
     
-    if (allDiagnoses.length === 0) {
+    if (allIndividualDiagnoses.size === 0) {
       toast.error("No diagnoses to download");
       return;
     }
@@ -1006,10 +1019,14 @@ export const PDFSignature = () => {
       toast("Creating ZIP file with all diagnoses...");
       const zip = new JSZip();
 
-      for (const diagnosis of allDiagnoses) {
-        // Get all pages with this diagnosis
+      for (const diagnosis of Array.from(allIndividualDiagnoses)) {
+        // Get all pages that contain this diagnosis
         const pagesForDiagnosis = Object.entries(pageDiagnoses)
-          .filter(([_, d]) => d?.trim() === diagnosis)
+          .filter(([_, diagnosisString]) => {
+            if (!diagnosisString?.trim()) return false;
+            const individualDiagnoses = diagnosisString.split(',').map(d => d.trim());
+            return individualDiagnoses.includes(diagnosis);
+          })
           .map(([key]) => key);
 
         const selectedContent = await captureSelectedPages(pagesForDiagnosis);
@@ -1575,50 +1592,67 @@ export const PDFSignature = () => {
               </Button>
             </div>
             <div className="space-y-2">
-              {Array.from(new Set(Object.values(pageDiagnoses).filter(d => d?.trim()))).sort().map((diagnosis, index) => {
-                const pagesWithDiagnosis = Object.entries(pageDiagnoses)
-                  .filter(([_, d]) => d === diagnosis)
-                  .map(([key]) => {
+              {(() => {
+                // Split comma-separated diagnoses and group pages by individual diagnosis
+                const diagnosisGroups: Record<string, Array<{ key: string; fileIndex: number; pageNum: number; fileName: string }>> = {};
+                
+                Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
+                  if (!diagnosisString?.trim()) return;
+                  
+                  // Split by comma and trim each diagnosis
+                  const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
+                  
+                  individualDiagnoses.forEach(diagnosis => {
+                    if (!diagnosisGroups[diagnosis]) {
+                      diagnosisGroups[diagnosis] = [];
+                    }
+                    
                     const [fileIndex, pageNum] = key.split('-').map(Number);
-                    return {
+                    diagnosisGroups[diagnosis].push({
                       key,
                       fileIndex,
                       pageNum,
                       fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
-                    };
-                  })
-                  .sort((a, b) => {
-                    if (a.fileIndex !== b.fileIndex) return a.fileIndex - b.fileIndex;
-                    return a.pageNum - b.pageNum;
+                    });
                   });
+                });
+                
+                // Sort diagnoses alphabetically and then sort pages within each diagnosis
+                return Object.entries(diagnosisGroups)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([diagnosis, pages]) => {
+                    const sortedPages = pages.sort((a, b) => {
+                      if (a.fileIndex !== b.fileIndex) return a.fileIndex - b.fileIndex;
+                      return a.pageNum - b.pageNum;
+                    });
 
-                return (
-                  <Collapsible key={index} defaultOpen={true}>
-                    <div className="border rounded-lg">
-                      <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
-                        <div className="flex items-center gap-2 flex-1">
-                          <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
-                          <span className="font-medium">{diagnosis}</span>
-                          <span className="text-sm text-muted-foreground">
-                            ({pagesWithDiagnosis.length} page{pagesWithDiagnosis.length !== 1 ? 's' : ''})
-                          </span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadByDiagnosis(diagnosis);
-                          }}
-                          className="gap-2 ml-2"
-                        >
-                          <Download className="w-4 h-4" />
-                          Download PDF
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="px-3 pb-3 space-y-1">
-                          {pagesWithDiagnosis.map((page) => (
+                    return (
+                      <Collapsible key={diagnosis} defaultOpen={true}>
+                        <div className="border rounded-lg">
+                          <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
+                            <div className="flex items-center gap-2 flex-1">
+                              <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
+                              <span className="font-medium">{diagnosis}</span>
+                              <span className="text-sm text-muted-foreground">
+                                ({sortedPages.length} page{sortedPages.length !== 1 ? 's' : ''})
+                              </span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadByDiagnosis(diagnosis);
+                              }}
+                              className="gap-2 ml-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download PDF
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="px-3 pb-3 space-y-1">
+                              {sortedPages.map((page) => (
                             <div
                               key={page.key}
                               className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/10 cursor-pointer"
@@ -1650,7 +1684,8 @@ export const PDFSignature = () => {
                     </div>
                   </Collapsible>
                 );
-              })}
+              });
+              })()}
             </div>
           </Card>
         )}
