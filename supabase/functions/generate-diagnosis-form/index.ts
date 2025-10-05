@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,75 +21,59 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!ANTHROPIC_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }),
+        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log('Generating diagnosis form for:', diagnosis);
 
-    // Prepare the prompt for AI
+    // Prepare the prompt for Claude
     const systemPrompt = `You are a medical documentation assistant helping to fill out a DVA (Department of Veterans' Affairs) Diagnosis Form. Based on the provided medical records and diagnosis, extract and organize relevant information to complete the form fields.
 
-The form requires the following information:
-1. Medical diagnosis (ICD code and description if available)
-2. Basis for diagnosis (brief summary with key findings)
-3. Related diagnosed conditions (if any)
-4. Approximate date of onset
-5. Key medical findings and test results
+Return the information in this exact JSON format:
+{
+  "medicalDiagnosis": "The specific diagnosis with ICD code if available",
+  "basisForDiagnosis": "Detailed summary including clinical examination findings, test results, imaging reports, and symptom history",
+  "relatedConditions": "List of related conditions, or 'None specified' if not mentioned",
+  "dateOfOnset": "MM/YYYY or DD/MM/YYYY format, or 'Not specified in records'",
+  "firstConsultation": "Today's date in DD/MM/YYYY format"
+}
 
-Analyze the provided medical records carefully and extract relevant information. Be factual and only include information that is clearly stated in the records. If information is not available, indicate "Not specified in records".`;
+Be factual and only include information clearly stated in the records.`;
 
     const userPrompt = `Diagnosis: ${diagnosis}
 
 Medical Records Content:
 ${pdfContent}
 
-Please analyze the above medical records and provide a structured response with the following information for the DVA Diagnosis Form:
+Analyze these medical records and extract information for a DVA Diagnosis Form.`;
 
-1. **Medical Diagnosis**: Provide the full medical diagnosis with ICD code if mentioned
-2. **Basis for Diagnosis**: Summarize the key medical findings, test results, and clinical observations that support this diagnosis (2-3 paragraphs)
-3. **Related Conditions**: List any other diagnosed conditions mentioned that relate to this primary diagnosis
-4. **Date of Onset**: Provide the approximate date when symptoms or condition first appeared (if mentioned)
-5. **Key Findings**: Bullet points of important medical findings, test results, or imaging results
-
-Format your response clearly with these section headings.`;
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { 
+            role: 'user', 
+            content: `${systemPrompt}\n\n${userPrompt}` 
+          }
         ],
-        temperature: 0.3,
       }),
     });
 
     if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
       const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
+      console.error('Claude API error:', aiResponse.status, errorText);
       return new Response(
         JSON.stringify({ error: 'AI service error' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -96,19 +81,109 @@ Format your response clearly with these section headings.`;
     }
 
     const aiData = await aiResponse.json();
-    const generatedContent = aiData.choices?.[0]?.message?.content || '';
+    const aiContent = aiData.content?.[0]?.text || '';
+    
+    console.log('Claude response:', aiContent);
 
-    console.log('Successfully generated diagnosis form content');
+    // Parse JSON from Claude response
+    let formData;
+    try {
+      // Extract JSON from markdown code blocks if present
+      const jsonMatch = aiContent.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+                       aiContent.match(/(\{[\s\S]*\})/);
+      formData = JSON.parse(jsonMatch ? jsonMatch[1] : aiContent);
+    } catch (e) {
+      console.error('Failed to parse Claude response:', e);
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse AI response' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create PDF
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const { width, height } = page.getSize();
+    let yPosition = height - 50;
+
+    // Helper function to draw text with wrapping
+    const drawText = (text: string, x: number, y: number, size: number, maxWidth: number, currentFont = font) => {
+      const words = text.split(' ');
+      let line = '';
+      let currentY = y;
+
+      for (const word of words) {
+        const testLine = line + (line ? ' ' : '') + word;
+        const textWidth = currentFont.widthOfTextAtSize(testLine, size);
+        
+        if (textWidth > maxWidth && line) {
+          page.drawText(line, { x, y: currentY, size, font: currentFont, color: rgb(0, 0, 0) });
+          line = word;
+          currentY -= size + 4;
+        } else {
+          line = testLine;
+        }
+      }
+      
+      if (line) {
+        page.drawText(line, { x, y: currentY, size, font: currentFont, color: rgb(0, 0, 0) });
+        currentY -= size + 4;
+      }
+      
+      return currentY;
+    };
+
+    // Title
+    page.drawText('DVA Diagnosis Form', { x: 50, y: yPosition, size: 20, font: boldFont, color: rgb(0, 0, 0) });
+    yPosition -= 40;
+
+    // Medical Diagnosis
+    page.drawText('Medical Diagnosis:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    yPosition -= 20;
+    yPosition = drawText(formData.medicalDiagnosis || 'Not specified', 50, yPosition, 10, width - 100);
+    yPosition -= 20;
+
+    // Basis for Diagnosis
+    page.drawText('Basis for Diagnosis:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    yPosition -= 20;
+    yPosition = drawText(formData.basisForDiagnosis || 'Not specified', 50, yPosition, 10, width - 100);
+    yPosition -= 20;
+
+    // Related Conditions
+    page.drawText('Related Diagnosed Conditions:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    yPosition -= 20;
+    yPosition = drawText(formData.relatedConditions || 'None specified', 50, yPosition, 10, width - 100);
+    yPosition -= 20;
+
+    // Date of Onset
+    page.drawText('Approximate Date of Onset:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    yPosition -= 20;
+    page.drawText(formData.dateOfOnset || 'Not specified', { x: 50, y: yPosition, size: 10, font, color: rgb(0, 0, 0) });
+    yPosition -= 30;
+
+    // Date of First Consultation
+    page.drawText('Date of First Consultation:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+    yPosition -= 20;
+    const today = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    page.drawText(today, { x: 50, y: yPosition, size: 10, font, color: rgb(0, 0, 0) });
+
+    // Generate PDF bytes
+    const pdfBytes = await pdfDoc.save();
+
+    console.log('Successfully generated diagnosis form PDF');
 
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        diagnosis,
-        content: generatedContent
-      }),
+      pdfBytes,
       { 
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="diagnosis-form-${diagnosis.replace(/\s+/g, '-')}.pdf"`
+        } 
       }
     );
 

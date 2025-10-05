@@ -983,46 +983,34 @@ export const PDFSignature = () => {
         return;
       }
 
-      // Call the edge function
-      const { data, error } = await supabase.functions.invoke('generate-diagnosis-form', {
-        body: { 
-          diagnosis,
-          pdfContent: combinedContent
+      // Call the edge function using fetch to get the PDF blob
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-diagnosis-form`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          },
+          body: JSON.stringify({
+            diagnosis,
+            pdfContent: combinedContent
+          })
         }
-      });
+      );
 
-      if (error) {
-        console.error('Edge function error:', error);
-        toast.error(error.message || 'Failed to generate form');
-        setGeneratingForm(null);
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      if (!data?.success) {
-        toast.error('Failed to generate diagnosis form');
-        setGeneratingForm(null);
-        return;
-      }
-
-      // Show the generated content in a dialog or download as a document
-      // For now, let's create a text file with the form content
-      const formContent = `DVA DIAGNOSIS FORM
-Generated: ${new Date().toLocaleDateString()}
-
-Diagnosis: ${diagnosis}
-
-${data.content}
-
----
-Associated Pages: ${associatedPages.length}
-${associatedPages.map(p => `- ${pdfFiles[p.fileIndex]?.name || 'Document'} Page ${p.pageNum}`).join('\n')}
-`;
-
-      const blob = new Blob([formContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
+      // Get the PDF blob from the response
+      const pdfBlob = await response.blob();
+      
+      // Create download link for the PDF
+      const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Diagnosis_Form_${diagnosis.replace(/[^a-z0-9]/gi, '_')}.txt`;
+      link.download = `DVA_Diagnosis_Form_${diagnosis.replace(/[^a-z0-9]/gi, '_')}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
 
