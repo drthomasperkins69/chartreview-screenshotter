@@ -556,18 +556,18 @@ export const PDFViewer = ({
             Diagnosis for Page {currentPage}:
           </label>
           <div className="flex gap-2">
-            <input
+            <textarea
               id="diagnosis-input"
-              type="text"
               value={diagnosisInput}
               onChange={(e) => setDiagnosisInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && e.ctrlKey) {
                   onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput);
                 }
               }}
               placeholder="Enter diagnosis..."
-              className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+              rows={3}
+              className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background resize-y"
             />
             <Button
               onClick={handleAISuggest}
