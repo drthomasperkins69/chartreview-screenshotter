@@ -491,6 +491,9 @@ export const PDFViewer = ({
 
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
         try {
+          // Show progress
+          toast.info(`Scanning page ${pageNum}/${totalPages}...`, { duration: 1000 });
+          
           // Render the page to canvas to get image
           const page = await pdf.getPage(pageNum);
           const viewport = page.getViewport({ scale: 1.2 });
@@ -527,14 +530,14 @@ export const PDFViewer = ({
 
           if (error) {
             console.error(`AI suggestion error for page ${pageNum}:`, error);
+            toast.error(`Page ${pageNum} failed`, { duration: 2000 });
             continue;
           }
 
           if (data?.diagnosis) {
-            // Auto-save the diagnosis
-            onDiagnosisChange(currentFileIndex, pageNum, data.diagnosis);
+            // Wait for the diagnosis to be saved to PDF before continuing
+            await onDiagnosisChange(currentFileIndex, pageNum, data.diagnosis);
             successCount++;
-            toast.success(`Page ${pageNum}/${totalPages}: ${data.diagnosis}`);
           }
 
           // Small delay to avoid rate limiting
@@ -542,10 +545,11 @@ export const PDFViewer = ({
 
         } catch (pageError) {
           console.error(`Error processing page ${pageNum}:`, pageError);
+          toast.error(`Error on page ${pageNum}`, { duration: 2000 });
         }
       }
 
-      toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed.`);
+      toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to PDF.`);
     } catch (error) {
       console.error("Error in auto-scan:", error);
       toast.error("Auto-scan failed");
@@ -669,7 +673,7 @@ export const PDFViewer = ({
             </Button>
             <Button
               onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
-              disabled={diagnosisInput === currentDiagnosis || isAutoScanning}
+              disabled={diagnosisInput === currentDiagnosis}
               size="default"
               className="gap-2"
             >

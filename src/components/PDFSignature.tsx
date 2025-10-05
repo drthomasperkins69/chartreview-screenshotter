@@ -715,7 +715,10 @@ export const PDFSignature = () => {
     }));
 
     // If diagnosis is empty, just update state and return
-    if (!diagnosis.trim()) return;
+    if (!diagnosis.trim()) {
+      toast.success("Diagnosis cleared");
+      return;
+    }
 
     try {
       const file = pdfFiles[fileIndex];
@@ -787,17 +790,22 @@ export const PDFSignature = () => {
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const newFile = new File([blob], file.name, { type: 'application/pdf' });
       
-      // Update the files array
-      setPdfFiles(prev => {
-        const newFiles = [...prev];
-        newFiles[fileIndex] = newFile;
-        return newFiles;
+      // Update the files array and wait for state to update
+      await new Promise<void>(resolve => {
+        setPdfFiles(prev => {
+          const newFiles = [...prev];
+          newFiles[fileIndex] = newFile;
+          return newFiles;
+        });
+        // Small delay to ensure state update completes
+        setTimeout(resolve, 50);
       });
       
-      toast.success("Diagnosis added to PDF page");
+      toast.success("Diagnosis saved to PDF");
     } catch (error) {
       console.error("Error adding diagnosis to PDF:", error);
-      toast.error("Failed to add diagnosis to PDF");
+      toast.error("Failed to save diagnosis to PDF");
+      throw error; // Re-throw to handle in auto-scan
     }
   }, [pdfFiles]);
 
