@@ -9,6 +9,7 @@ import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
+import { supabase } from "@/integrations/supabase/client";
 
 interface KeywordMatch {
   page: number;
@@ -23,12 +24,12 @@ export const PDFSignature = () => {
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
-  const [searchCategories, setSearchCategories] = useState(() => {
-    const saved = localStorage.getItem('pdfSearchCategories');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, label: "Lumbar", terms: "", checked: false }
-    ];
-  });
+  const [searchCategories, setSearchCategories] = useState<Array<{
+    id: number;
+    label: string;
+    terms: string;
+    checked: boolean;
+  }>>([]);
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
   const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set()); // Format: "fileIndex-pageNumber"
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
@@ -39,6 +40,28 @@ export const PDFSignature = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentPdf = pdfFiles[currentPdfIndex] || null;
+
+  // Fetch search categories from Supabase on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from('search_categories')
+        .select('id, label, terms')
+        .order('id');
+      
+      if (error) {
+        console.error('Error fetching search categories:', error);
+        toast.error('Failed to load search categories');
+        return;
+      }
+      
+      if (data) {
+        setSearchCategories(data.map(cat => ({ ...cat, checked: false })));
+      }
+    };
+    
+    fetchCategories();
+  }, []);
 
   const handleFileSelect = useCallback((file: File) => {
     if (file.type !== "application/pdf") {
@@ -262,20 +285,6 @@ export const PDFSignature = () => {
     }
   }, [searchCategories]);
 
-  const updateCategoryTerms = useCallback((categoryId: number, terms: string) => {
-    setSearchCategories(prev => {
-      const updated = prev.map(cat => 
-        cat.id === categoryId ? { ...cat, terms } : cat
-      );
-      localStorage.setItem('pdfSearchCategories', JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  // Persist search categories to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('pdfSearchCategories', JSON.stringify(searchCategories));
-  }, [searchCategories]);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -417,12 +426,9 @@ export const PDFSignature = () => {
                       >
                         {category.label}
                       </Label>
-                      <Input
-                        placeholder="Enter keywords (comma separated)"
-                        value={category.terms}
-                        onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                        className="text-sm"
-                      />
+                      <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                        {category.terms || 'No keywords set'}
+                      </div>
                     </div>
                   </div>
                 ))}
