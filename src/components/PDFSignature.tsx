@@ -33,7 +33,14 @@ const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
   { id: 18, label: 'Left Wrist' },
   { id: 19, label: 'Right Hand' },
   { id: 20, label: 'Left Hand' },
+  { id: 21, label: 'Strain and Sprain' },
+  { id: 22, label: 'Osteoarthritis' },
+  { id: 23, label: 'Labral Tear' },
 ];
+
+// IDs 1-20 are body parts, 21-23 are conditions
+const BODY_PART_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const CONDITION_IDS = [21, 22, 23];
 
 interface KeywordMatch {
   page: number;
@@ -498,41 +505,88 @@ export const PDFSignature = () => {
                 Quick Search Categories
               </Label>
               
-              <div className="space-y-3 mb-4 max-h-[400px] overflow-y-auto pr-2">
-                {searchCategories.map((category) => (
-                  <div key={category.id} className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      id={`category-${category.id}`}
-                      checked={category.checked}
-                      onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
-                      className="mt-1 w-4 h-4 cursor-pointer"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <Label 
-                        htmlFor={`category-${category.id}`} 
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        {category.label}
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Enter keywords (comma separated)"
-                          value={category.terms}
-                          onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                          className="text-sm"
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Body Parts Column */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 text-primary">Body Regions</h3>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    {searchCategories.filter(cat => BODY_PART_IDS.includes(cat.id)).map((category) => (
+                      <div key={category.id} className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          id={`category-${category.id}`}
+                          checked={category.checked}
+                          onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                          className="mt-1 w-4 h-4 cursor-pointer"
                         />
-                        <Button
-                          size="sm"
-                          onClick={() => saveCategoryTerms(category.id)}
-                          className="whitespace-nowrap"
-                        >
-                          Save
-                        </Button>
+                        <div className="flex-1 space-y-2">
+                          <Label 
+                            htmlFor={`category-${category.id}`} 
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            {category.label}
+                          </Label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter keywords (comma separated)"
+                              value={category.terms}
+                              onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                              className="text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => saveCategoryTerms(category.id)}
+                              className="whitespace-nowrap"
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                {/* Conditions Column */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 text-primary">Conditions</h3>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    {searchCategories.filter(cat => CONDITION_IDS.includes(cat.id)).map((category) => (
+                      <div key={category.id} className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          id={`category-${category.id}`}
+                          checked={category.checked}
+                          onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                          className="mt-1 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="flex-1 space-y-2">
+                          <Label 
+                            htmlFor={`category-${category.id}`} 
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            {category.label}
+                          </Label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter keywords (comma separated)"
+                              value={category.terms}
+                              onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                              className="text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => saveCategoryTerms(category.id)}
+                              className="whitespace-nowrap"
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
