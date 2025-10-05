@@ -25,6 +25,7 @@ interface WorkspaceContextType {
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
   workspaceFiles: WorkspaceFile[];
+  allWorkspaceFiles: Record<string, WorkspaceFile[]>;
   selectWorkspace: (workspaceId: string) => void;
   createWorkspace: (name: string, patientId?: string, notes?: string) => Promise<void>;
   deleteWorkspace: (workspaceId: string) => Promise<void>;
@@ -39,6 +40,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
+  const [allWorkspaceFiles, setAllWorkspaceFiles] = useState<Record<string, WorkspaceFile[]>>({});
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -58,6 +60,26 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       if (data && data.length > 0 && !selectedWorkspace) {
         setSelectedWorkspace(data[0]);
       }
+      
+      // Fetch files for all workspaces
+      if (data && data.length > 0) {
+        const filesPromises = data.map(workspace =>
+          supabase
+            .from("workspace_files")
+            .select("*")
+            .eq("workspace_id", workspace.id)
+            .order("created_at", { ascending: false })
+        );
+        
+        const filesResults = await Promise.all(filesPromises);
+        const filesMap: Record<string, WorkspaceFile[]> = {};
+        
+        data.forEach((workspace, index) => {
+          filesMap[workspace.id] = filesResults[index].data || [];
+        });
+        
+        setAllWorkspaceFiles(filesMap);
+      }
     }
     setLoading(false);
   };
@@ -76,6 +98,11 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       toast.error("Failed to load files");
     } else {
       setWorkspaceFiles(data || []);
+      // Also update the all files map
+      setAllWorkspaceFiles(prev => ({
+        ...prev,
+        [selectedWorkspace.id]: data || []
+      }));
     }
   };
 
@@ -148,6 +175,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         workspaces,
         selectedWorkspace,
         workspaceFiles,
+        allWorkspaceFiles,
         selectWorkspace,
         createWorkspace,
         deleteWorkspace,

@@ -38,7 +38,7 @@ interface WorkspaceSidebarProps {
 }
 
 export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
-  const { workspaces, selectedWorkspace, workspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace } =
+  const { workspaces, selectedWorkspace, allWorkspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace } =
     useWorkspace();
   const { user, signOut } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -154,26 +154,29 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
               <SidebarMenu>
                 {workspaces.map((workspace) => {
                   const isExpanded = expandedWorkspaces.has(workspace.id);
-                  const filesForWorkspace = workspace.id === selectedWorkspace?.id ? workspaceFiles : [];
+                  const isSelected = selectedWorkspace?.id === workspace.id;
+                  const filesForWorkspace = allWorkspaceFiles[workspace.id] || [];
                   
                   return (
                     <Collapsible key={workspace.id} open={isExpanded} onOpenChange={() => toggleWorkspace(workspace.id)}>
                       <SidebarMenuItem>
-                        <div className="flex items-center w-full group">
+                        <div className={`flex items-center w-full group ${isSelected ? 'bg-accent/50 rounded-md' : ''}`}>
                           <CollapsibleTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 mr-1">
                               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             </Button>
                           </CollapsibleTrigger>
                           <SidebarMenuButton
-                            isActive={selectedWorkspace?.id === workspace.id}
+                            isActive={isSelected}
                             onClick={() => handleWorkspaceClick(workspace.id)}
                             className="flex-1"
                           >
                             <FolderOpen className="h-4 w-4" />
                             <div className="flex-1 flex items-center justify-between min-w-0">
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{workspace.name}</div>
+                                <div className={`text-sm truncate ${isSelected ? 'font-semibold' : 'font-medium'}`}>
+                                  {workspace.name}
+                                </div>
                                 {workspace.patient_id && (
                                   <div className="text-xs text-muted-foreground">
                                     ID: {workspace.patient_id}
