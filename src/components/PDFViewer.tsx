@@ -76,6 +76,9 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Magnifier constants
+  const MAGNIFIER_RADIUS = 90;
+  const MAGNIFICATION = 2.5;
   // Magnifier state for zoom effect on hover
   const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null);
   const magnifierCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -375,24 +378,38 @@ export const PDFViewer = ({
   }, [pdf, currentPage, scale, rotation, matchingPages]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !magnifierCanvasRef.current) return;
+    if (!canvasRef.current || !containerRef.current) return;
     
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const containerRect = containerRef.current.getBoundingClientRect();
+
+    // Mouse position relative to canvas (CSS pixels)
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+
+    // Map CSS pixels to canvas internal pixel coordinates
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = cssX * scaleX;
+    const y = cssY * scaleY;
+
+    // Position magnifier relative to container and its scroll
+    const posX = e.clientX - containerRect.left + containerRef.current.scrollLeft;
+    const posY = e.clientY - containerRect.top + containerRef.current.scrollTop;
+    setMagnifierPos({ x: posX, y: posY });
     
-    setMagnifierPos({ x: e.clientX, y: e.clientY });
-    
-    // Draw magnified area
+    // Draw magnified area if overlay canvas exists
+    if (!magnifierCanvasRef.current) return;
     const magnifierCanvas = magnifierCanvasRef.current;
     const magnifierCtx = magnifierCanvas.getContext("2d");
     if (!magnifierCtx) return;
     
-    const magnification = 2;
-    const radius = 75;
-    magnifierCanvas.width = radius * 2;
-    magnifierCanvas.height = radius * 2;
+    magnifierCanvas.width = MAGNIFIER_RADIUS * 2;
+    magnifierCanvas.height = MAGNIFIER_RADIUS * 2;
+
+    // Improve text crispness
+    magnifierCtx.imageSmoothingEnabled = false;
     
     // Clear magnifier
     magnifierCtx.clearRect(0, 0, magnifierCanvas.width, magnifierCanvas.height);
@@ -400,29 +417,30 @@ export const PDFViewer = ({
     // Draw circular clip
     magnifierCtx.save();
     magnifierCtx.beginPath();
-    magnifierCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+    magnifierCtx.arc(MAGNIFIER_RADIUS, MAGNIFIER_RADIUS, MAGNIFIER_RADIUS, 0, Math.PI * 2);
     magnifierCtx.closePath();
     magnifierCtx.clip();
     
-    // Draw magnified content
-    const sourceX = x - radius / magnification;
-    const sourceY = y - radius / magnification;
-    const sourceWidth = (radius * 2) / magnification;
-    const sourceHeight = (radius * 2) / magnification;
+    // Compute source window on the main canvas
+    const sourceWidth = (MAGNIFIER_RADIUS * 2) / MAGNIFICATION;
+    const sourceHeight = (MAGNIFIER_RADIUS * 2) / MAGNIFICATION;
+    const sourceX = Math.max(0, Math.min(canvas.width - sourceWidth, x - sourceWidth / 2));
+    const sourceY = Math.max(0, Math.min(canvas.height - sourceHeight, y - sourceHeight / 2));
     
+    // Draw magnified content
     magnifierCtx.drawImage(
       canvas,
       sourceX, sourceY, sourceWidth, sourceHeight,
-      0, 0, radius * 2, radius * 2
+      0, 0, MAGNIFIER_RADIUS * 2, MAGNIFIER_RADIUS * 2
     );
     
     magnifierCtx.restore();
     
     // Draw border
-    magnifierCtx.strokeStyle = "#000";
+    magnifierCtx.strokeStyle = "rgba(0,0,0,0.6)";
     magnifierCtx.lineWidth = 3;
     magnifierCtx.beginPath();
-    magnifierCtx.arc(radius, radius, radius - 1.5, 0, Math.PI * 2);
+    magnifierCtx.arc(MAGNIFIER_RADIUS, MAGNIFIER_RADIUS, MAGNIFIER_RADIUS - 1.5, 0, Math.PI * 2);
     magnifierCtx.stroke();
   };
 
@@ -791,10 +809,10 @@ export const PDFViewer = ({
             {magnifierPos && (
               <canvas
                 ref={magnifierCanvasRef}
-                className="pointer-events-none absolute rounded-full shadow-lg"
+                className="pointer-events-none absolute rounded-full shadow-lg z-20"
                 style={{
-                  left: magnifierPos.x - 75,
-                  top: magnifierPos.y - 75,
+                  left: magnifierPos.x - MAGNIFIER_RADIUS,
+                  top: magnifierPos.y - MAGNIFIER_RADIUS,
                 }}
               />
             )}
