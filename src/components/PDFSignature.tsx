@@ -21,6 +21,7 @@ import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
+import { convertToPdf } from "@/lib/fileConverter";
 
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
@@ -144,16 +145,25 @@ export const PDFSignature = () => {
     fetchCategories();
   }, []);
 
-  const handleFileSelect = useCallback((file: File) => {
-    if (file.type !== "application/pdf") {
-      toast("Please select a PDF file");
-      return;
+  const handleFileSelect = useCallback(async (file: File) => {
+    try {
+      // Show loading toast
+      const loadingToast = toast.loading("Processing file...");
+      
+      // Convert to PDF if needed
+      const pdfFile = await convertToPdf(file);
+      
+      setPdfFiles(prev => [...prev, pdfFile]);
+      setMatchingPages(new Set());
+      setKeywordMatches([]);
+      setSelectedPagesForExtraction(new Set());
+      
+      toast.dismiss(loadingToast);
+      toast.success(`${file.name} ${file.type === 'application/pdf' ? 'added' : 'converted and added'} successfully!`);
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to process file');
     }
-    setPdfFiles(prev => [...prev, file]);
-    setMatchingPages(new Set());
-    setKeywordMatches([]);
-    setSelectedPagesForExtraction(new Set());
-    toast("PDF added successfully!");
   }, []);
 
   const handleMultipleFileSelect = useCallback((files: FileList) => {
@@ -756,24 +766,22 @@ export const PDFSignature = () => {
                               ×
                             </Button>
                           </div>
-                          {!isComplete && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleScanFile(index)}
-                              disabled={isScanning}
-                              className="w-full text-xs"
-                            >
-                              {isScanning ? (
-                                <>
-                                  <Clock className="w-3 h-3 mr-1 animate-spin" />
-                                  Scanning...
-                                </>
-                              ) : (
-                                <>Scan & OCR</>
-                              )}
-                            </Button>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleScanFile(index)}
+                            disabled={isScanning}
+                            className="w-full text-xs"
+                          >
+                            {isScanning ? (
+                              <>
+                                <Clock className="w-3 h-3 mr-1 animate-spin" />
+                                Scanning...
+                              </>
+                            ) : (
+                              <>{isComplete ? 'Rescan & OCR' : 'Scan & OCR'}</>
+                            )}
+                          </Button>
                         </div>
                       );
                     })}
