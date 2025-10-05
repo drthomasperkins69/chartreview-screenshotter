@@ -358,12 +358,10 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles, sele
   return (
     <div className="h-full flex flex-col gap-4 p-4">
       {isGenerating && (
-        <Card className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-2">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-            <p className="text-sm text-muted-foreground">Generating assessment...</p>
-          </div>
-        </Card>
+        <div className="text-center space-y-2 py-4">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+          <p className="text-xs text-muted-foreground">Generating assessment...</p>
+        </div>
       )}
     </div>
   );
