@@ -150,6 +150,17 @@ export const AISearchAssistant = ({
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
+    const isDateQuery = /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|between .* and .*|from .* to .*|on \d{1,2}|before|after|since)\b/i.test(input);
+
+    // If this is a date query and we have PDF content, route to analyzer instead of chat
+    if (isDateQuery && pdfContent.length > 0) {
+      await analyzeWithAI();
+      return;
+    }
+    if (isDateQuery && pdfContent.length === 0) {
+      toast("To extract pages by date, upload and scan your PDFs first.");
+    }
+
     const userMessage: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
