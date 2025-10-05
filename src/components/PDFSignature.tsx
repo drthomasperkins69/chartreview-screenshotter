@@ -1199,7 +1199,7 @@ export const PDFSignature = () => {
         )}
 
         {/* PDF File Selector */}
-        {pdfFiles.length > 1 && (
+        {pdfFiles.length > 0 && (
                 <Card className="p-4 shadow-medium mb-4">
                   <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
                   <div className="flex flex-wrap gap-2">
