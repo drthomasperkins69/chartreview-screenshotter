@@ -77,7 +77,7 @@ export const PDFViewer = ({
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
   // Magnifier constants
-  const MAGNIFIER_RADIUS = 90;
+  const MAGNIFIER_RADIUS = 360;
   const MAGNIFICATION = 2.5;
   // Magnifier state for zoom effect on hover
   const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null);
