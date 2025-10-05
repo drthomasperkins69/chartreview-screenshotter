@@ -23,6 +23,7 @@ export const PDFSignature = () => {
   const [searchMode, setSearchMode] = useState<"keyword" | "date">("keyword");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
+  const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<number>>(new Set());
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
@@ -45,6 +46,7 @@ export const PDFSignature = () => {
     setKeywordMatches(matches);
     const pages = new Set(matches.map(m => m.page));
     setMatchingPages(pages);
+    setSelectedPagesForExtraction(pages); // Auto-select all found pages
     
     if (matches.length > 0) {
       toast(`Found keywords on ${pages.size} page(s)!`);
@@ -68,19 +70,19 @@ export const PDFSignature = () => {
   }, [keywords, dateSearch, searchMode]);
 
   const handleDownload = useCallback(async () => {
-    if (!pdfFile || matchingPages.size === 0) {
-      toast("No matching pages to extract");
+    if (!pdfFile || selectedPagesForExtraction.size === 0) {
+      toast("No pages selected for extraction");
       return;
     }
     
     try {
-      toast("Creating PDF with matching pages...");
+      toast("Creating PDF with selected pages...");
       
       const arrayBuffer = await pdfFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const newPdfDoc = await PDFDocument.create();
       
-      const sortedPages = Array.from(matchingPages).sort((a, b) => a - b);
+      const sortedPages = Array.from(selectedPagesForExtraction).sort((a, b) => a - b);
       
       for (const pageNum of sortedPages) {
         const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
@@ -101,11 +103,12 @@ export const PDFSignature = () => {
       console.error("Error creating PDF:", error);
       toast("Failed to create PDF");
     }
-  }, [pdfFile, matchingPages]);
+  }, [pdfFile, selectedPagesForExtraction]);
 
   const handleRemovePdf = useCallback(() => {
     setPdfFile(null);
     setMatchingPages(new Set());
+    setSelectedPagesForExtraction(new Set());
     setKeywordMatches([]);
     setKeywords("");
     setDateSearch("");
@@ -131,6 +134,26 @@ export const PDFSignature = () => {
       setSelectedPage(pageNum);
     }
   }, [autoNavigate]);
+
+  const togglePageSelection = useCallback((pageNum: number) => {
+    setSelectedPagesForExtraction(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pageNum)) {
+        newSet.delete(pageNum);
+      } else {
+        newSet.add(pageNum);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const selectAllPages = useCallback(() => {
+    setSelectedPagesForExtraction(new Set(matchingPages));
+  }, [matchingPages]);
+
+  const deselectAllPages = useCallback(() => {
+    setSelectedPagesForExtraction(new Set());
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -164,11 +187,11 @@ export const PDFSignature = () => {
                   </Button>
                   <Button 
                     onClick={handleDownload}
-                    disabled={matchingPages.size === 0}
+                    disabled={selectedPagesForExtraction.size === 0}
                     className="gap-2"
                   >
                     <Download className="w-4 h-4" />
-                    Download Extracted Pages
+                    Download {selectedPagesForExtraction.size > 0 ? `(${selectedPagesForExtraction.size})` : 'Extracted Pages'}
                   </Button>
                 </>
               )}
@@ -296,8 +319,24 @@ export const PDFSignature = () => {
                 {keywordMatches.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">Matches Found</h3>
+                      <h3 className="text-sm font-semibold">Matches Found ({selectedPagesForExtraction.size}/{matchingPages.size})</h3>
                       <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={selectAllPages}
+                          className="h-7 text-xs"
+                        >
+                          Select All
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={deselectAllPages}
+                          className="h-7 text-xs"
+                        >
+                          Clear
+                        </Button>
                         <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
                           <input
                             type="checkbox"
@@ -314,20 +353,32 @@ export const PDFSignature = () => {
                         .sort((a, b) => a - b)
                         .map((page) => {
                           const pageMatches = keywordMatches.filter(m => m.page === page);
+                          const isSelected = selectedPagesForExtraction.has(page);
                           return (
                             <div 
                               key={page} 
-                              className={`text-xs p-2 bg-muted rounded cursor-pointer hover:bg-muted/80 transition-colors ${
+                              className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
                                 selectedPage === page ? 'ring-2 ring-primary' : ''
                               }`}
-                              onClick={() => handlePageClick(page)}
                             >
-                              <div className="font-medium">Page {page}</div>
-                              {pageMatches.map((match, idx) => (
-                                <div key={idx} className="text-muted-foreground">
-                                  "{match.keyword}" ({match.count}x)
-                                </div>
-                              ))}
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => togglePageSelection(page)}
+                                className="mt-0.5 w-4 h-4 cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div 
+                                className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handlePageClick(page)}
+                              >
+                                <div className="font-medium">Page {page}</div>
+                                {pageMatches.map((match, idx) => (
+                                  <div key={idx} className="text-muted-foreground">
+                                    "{match.keyword}" ({match.count}x)
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           );
                         })}
