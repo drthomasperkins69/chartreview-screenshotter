@@ -461,7 +461,7 @@ export const PDFSignature = () => {
                 Quick Search Categories
               </Label>
               
-              <div className="space-y-3 mb-4">
+              <div className="space-y-3 mb-4 max-h-[400px] overflow-y-auto pr-2">
                 {searchCategories.map((category) => (
                   <div key={category.id} className="flex items-start gap-3">
                     <input
