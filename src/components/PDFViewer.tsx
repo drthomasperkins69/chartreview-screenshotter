@@ -56,10 +56,11 @@ export const PDFViewer = ({
 
   // Navigate to selected page when it changes
   useEffect(() => {
-    if (selectedPage !== null && selectedPage !== currentPage) {
+    if (selectedPage !== null && selectedPage !== currentPage && selectedPage <= numPages) {
       setCurrentPage(selectedPage);
+      onPageChange(selectedPage);
     }
-  }, [selectedPage]);
+  }, [selectedPage, currentPage, numPages]);
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -74,7 +75,12 @@ export const PDFViewer = ({
         console.log("PDF document loaded, pages:", pdfDoc.numPages);
         setPdf(pdfDoc);
         setNumPages(pdfDoc.numPages);
-        setCurrentPage(1);
+        // Only reset to page 1 if there's no selectedPage, otherwise keep the selection
+        if (selectedPage === null || selectedPage > pdfDoc.numPages) {
+          setCurrentPage(1);
+        } else {
+          setCurrentPage(selectedPage);
+        }
         setLoading(false);
         console.log("PDF load complete");
       } catch (error) {
@@ -84,7 +90,7 @@ export const PDFViewer = ({
     };
 
     loadPdf();
-  }, [currentFile]);
+  }, [currentFile, selectedPage]);
 
   // Extract text from all pages for AI analysis
   useEffect(() => {
