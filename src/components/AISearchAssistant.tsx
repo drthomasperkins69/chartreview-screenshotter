@@ -112,6 +112,7 @@ export const AISearchAssistant = ({
         }
       } else {
         responseContent = "No relevant pages found matching your query. Try refining your search.";
+        toast.info("No pages found for those dates.");
       }
 
       const assistantMessage: Message = {
