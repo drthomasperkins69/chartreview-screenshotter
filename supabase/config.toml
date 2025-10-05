@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.generate-diagnostic-assessment]
 verify_jwt = false
+
+[functions.suggest-diagnosis]
+verify_jwt = false

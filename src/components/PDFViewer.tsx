@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
 // Use Vite worker for pdf.js to avoid CORS/version issues
@@ -18,6 +19,12 @@ interface KeywordMatch {
   count: number;
   fileName: string;
   fileIndex: number;
+}
+
+interface PDFContent {
+  fileName: string;
+  fileIndex: number;
+  pages: Array<{ pageNum: number; text: string }>;
 }
 
 interface PDFViewerProps {
@@ -38,6 +45,7 @@ interface PDFViewerProps {
   pageDiagnoses?: Record<string, string>;
   onDiagnosisChange?: (fileIndex: number, pageNum: number, diagnosis: string) => void;
   onDeletePage?: (fileIndex: number, pageNum: number) => void;
+  pdfContent?: PDFContent[];
 }
 
 export const PDFViewer = ({
@@ -58,6 +66,7 @@ export const PDFViewer = ({
   pageDiagnoses = {},
   onDiagnosisChange,
   onDeletePage,
+  pdfContent = [],
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -408,11 +417,63 @@ export const PDFViewer = ({
   const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
   const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
   const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
+  const [isAISuggesting, setIsAISuggesting] = useState(false);
 
   // Update local input when page changes
   useEffect(() => {
     setDiagnosisInput(currentDiagnosis);
   }, [currentDiagnosis, currentPage, currentFileIndex]);
+
+  const handleAISuggest = async () => {
+    if (!canvasRef.current || !currentFile) {
+      toast.error("Unable to capture page");
+      return;
+    }
+
+    setIsAISuggesting(true);
+    try {
+      // Capture current page as image
+      const pageImage = canvasRef.current.toDataURL('image/jpeg', 0.85);
+      
+      // Get extracted text for current page if available
+      const fileContent = pdfContent.find(p => p.fileIndex === currentFileIndex);
+      const pageText = fileContent?.pages.find(p => p.pageNum === currentPage)?.text || "";
+
+      // Call edge function
+      const { data, error } = await supabase.functions.invoke('suggest-diagnosis', {
+        body: {
+          pageImage,
+          pageText,
+          fileName: currentFile.name,
+          pageNum: currentPage
+        }
+      });
+
+      if (error) {
+        console.error("AI suggestion error:", error);
+        if (error.message?.includes('429')) {
+          toast.error("Rate limits exceeded. Please try again later.");
+        } else if (error.message?.includes('402')) {
+          toast.error("Payment required. Please add funds to your workspace.");
+        } else {
+          toast.error("Failed to get AI suggestion");
+        }
+        return;
+      }
+
+      if (data?.diagnosis) {
+        setDiagnosisInput(data.diagnosis);
+        toast.success("AI diagnosis suggested!");
+      } else {
+        toast.error("No diagnosis suggestion received");
+      }
+    } catch (error) {
+      console.error("Error suggesting diagnosis:", error);
+      toast.error("Failed to suggest diagnosis");
+    } finally {
+      setIsAISuggesting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -508,6 +569,25 @@ export const PDFViewer = ({
               placeholder="Enter diagnosis..."
               className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
             />
+            <Button
+              onClick={handleAISuggest}
+              disabled={isAISuggesting}
+              size="default"
+              variant="secondary"
+              className="gap-2"
+            >
+              {isAISuggesting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  AI Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  AI Suggest
+                </>
+              )}
+            </Button>
             <Button
               onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
               disabled={diagnosisInput === currentDiagnosis}

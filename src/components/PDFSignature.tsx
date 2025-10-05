@@ -1455,6 +1455,7 @@ export const PDFSignature = () => {
                         pageDiagnoses={pageDiagnoses}
                         onDiagnosisChange={handleDiagnosisChange}
                         onDeletePage={removeMatchFromList}
+                        pdfContent={pdfContent}
                       />
                     )}
                   </Card>
