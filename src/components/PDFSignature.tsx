@@ -17,6 +17,7 @@ import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Tras
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
 import JSZip from "jszip";
@@ -98,6 +99,7 @@ export const PDFSignature = () => {
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
+  const [isAutoScanningAll, setIsAutoScanningAll] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfFilesRef = useRef<File[]>(pdfFiles);
@@ -814,6 +816,103 @@ export const PDFSignature = () => {
     }
   }, [pdfFiles]);
 
+  const handleAutoScanAllPDFs = useCallback(async (model: "gemini" | "claude") => {
+    if (pdfFiles.length === 0) {
+      toast.error("No PDFs to scan");
+      return;
+    }
+
+    setIsAutoScanningAll(true);
+    let totalScanned = 0;
+    let totalPages = 0;
+
+    try {
+      toast(`Starting AI auto-scan of all ${pdfFiles.length} PDF(s)...`);
+
+      // Calculate total pages across all PDFs
+      for (const file of pdfFiles) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+        totalPages += pdfDoc.numPages;
+      }
+
+      // Scan each PDF
+      for (let fileIndex = 0; fileIndex < pdfFiles.length; fileIndex++) {
+        const file = pdfFiles[fileIndex];
+        toast.info(`Scanning ${file.name}...`);
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+        const numPages = pdfDoc.numPages;
+
+        // Scan each page in this PDF
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          try {
+            totalScanned++;
+            toast.info(`Scanning page ${totalScanned}/${totalPages}...`, { duration: 1000 });
+
+            // Render page to get image
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.2 });
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = viewport.width;
+            tempCanvas.height = viewport.height;
+            const context = tempCanvas.getContext('2d');
+            
+            if (!context) continue;
+
+            await page.render({
+              canvasContext: context,
+              viewport: viewport,
+              canvas: tempCanvas,
+            }).promise;
+
+            const pageImage = tempCanvas.toDataURL('image/jpeg', 0.85);
+            
+            // Get extracted text for this page if available
+            const fileContent = pdfContent.find(p => p.fileIndex === fileIndex);
+            const pageText = fileContent?.pages.find(p => p.pageNum === pageNum)?.text || "";
+
+            // Call edge function with selected model
+            const { data, error } = await supabase.functions.invoke('suggest-diagnosis', {
+              body: {
+                pageImage,
+                pageText,
+                fileName: file.name,
+                pageNum: pageNum,
+                model: model
+              }
+            });
+
+            if (error) {
+              console.error(`AI suggestion error for ${file.name} page ${pageNum}:`, error);
+              continue;
+            }
+
+            if (data?.diagnosis) {
+              // Wait for the diagnosis to be saved to PDF before continuing
+              await handleDiagnosisChange(fileIndex, pageNum, data.diagnosis);
+            }
+
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+          } catch (pageError) {
+            console.error(`Error processing ${file.name} page ${pageNum}:`, pageError);
+          }
+        }
+      }
+
+      toast.success(`Auto-scan complete! Scanned ${totalScanned} pages across ${pdfFiles.length} PDF(s).`);
+    } catch (error) {
+      console.error("Error in auto-scan all:", error);
+      toast.error("Auto-scan failed");
+    } finally {
+      setIsAutoScanningAll(false);
+    }
+  }, [pdfFiles, pdfContent, handleDiagnosisChange]);
+
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
       toast.error("Please select at least one page");
@@ -1306,6 +1405,8 @@ export const PDFSignature = () => {
                           onPagesSelected={handleAIPageSelection}
                           currentKeywords={keywords}
                           pdfContent={pdfContent}
+                          onTriggerAutoScan={handleAutoScanAllPDFs}
+                          isAutoScanning={isAutoScanningAll}
                         />
                       </TabsContent>
                       

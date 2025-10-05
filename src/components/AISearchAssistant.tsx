@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send, Bot, User, FileSearch } from "lucide-react";
+import { Loader2, Send, Bot, User, FileSearch, Sparkles } from "lucide-react";
 const FUNCTIONS_BASE = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
   "https://hpclzzykgxolszduecqa.supabase.co";
 import { toast } from "sonner";
@@ -26,13 +26,17 @@ interface AISearchAssistantProps {
   onPagesSelected?: (pages: Array<{ fileIndex: number; pageNum: number; reason?: string }>) => void;
   currentKeywords?: string;
   pdfContent?: PDFContent[];
+  onTriggerAutoScan?: (model: "gemini" | "claude") => Promise<void>;
+  isAutoScanning?: boolean;
 }
 
 export const AISearchAssistant = ({ 
   onKeywordSuggest, 
   onPagesSelected,
   currentKeywords,
-  pdfContent = []
+  pdfContent = [],
+  onTriggerAutoScan,
+  isAutoScanning = false
 }: AISearchAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -281,22 +285,45 @@ export const AISearchAssistant = ({
 
   return (
     <Card className="p-4 h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-        <Bot className="w-5 h-5 text-primary" />
-        <h3 className="font-semibold">AI Search Assistant</h3>
-        <Select value={selectedModel} onValueChange={(value: "gemini" | "claude") => setSelectedModel(value)}>
-          <SelectTrigger className="w-[140px] h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="gemini">Gemini</SelectItem>
-            <SelectItem value="claude">Claude</SelectItem>
-          </SelectContent>
-        </Select>
-        {pdfContent.length > 0 && (
-          <span className="text-xs text-muted-foreground ml-auto">
-            {pdfContent.length} PDF(s) loaded
-          </span>
+      <div className="space-y-3 mb-4 pb-3 border-b">
+        <div className="flex items-center gap-2">
+          <Bot className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold">AI Search Assistant</h3>
+          <Select value={selectedModel} onValueChange={(value: "gemini" | "claude") => setSelectedModel(value)}>
+            <SelectTrigger className="w-[140px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gemini">Gemini</SelectItem>
+              <SelectItem value="claude">Claude</SelectItem>
+            </SelectContent>
+          </Select>
+          {pdfContent.length > 0 && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              {pdfContent.length} PDF(s) loaded
+            </span>
+          )}
+        </div>
+        {onTriggerAutoScan && pdfContent.length > 0 && (
+          <Button
+            onClick={() => onTriggerAutoScan(selectedModel)}
+            disabled={isAutoScanning}
+            className="w-full gap-2"
+            variant="secondary"
+            size="sm"
+          >
+            {isAutoScanning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Auto-scanning all PDFs...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Auto-Scan All PDFs with {selectedModel === "gemini" ? "Gemini" : "Claude"}
+              </>
+            )}
+          </Button>
         )}
       </div>
 

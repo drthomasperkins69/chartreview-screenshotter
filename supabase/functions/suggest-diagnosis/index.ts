@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { pageImage, pageText, fileName, pageNum } = await req.json();
+    const { pageImage, pageText, fileName, pageNum, model } = await req.json();
 
     if (!pageImage && !pageText) {
       return new Response(
@@ -26,6 +26,11 @@ serve(async (req) => {
     }
 
     console.log(`Analyzing page ${pageNum} from ${fileName}`);
+
+    // Determine which model to use based on input (default to Gemini)
+    const aiModel = model === "claude" 
+      ? "anthropic/claude-3.5-sonnet" 
+      : "google/gemini-2.5-flash";
 
     // Build the message content
     const messages: any[] = [
@@ -75,7 +80,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: aiModel,
         messages,
         max_tokens: 500,
         temperature: 0.3,
