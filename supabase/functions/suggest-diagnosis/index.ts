@@ -36,7 +36,7 @@ serve(async (req) => {
     const messages: any[] = [
       {
         role: "system",
-        content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnosis codes or conditions. Keep it concise - maximum 3-5 diagnoses. Do not include explanations, just the diagnosis names or codes."
+        content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses in PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names instead. Keep it concise - maximum 3-5 diagnoses. Do not include explanations, just the diagnosis names in plain words."
       }
     ];
 
