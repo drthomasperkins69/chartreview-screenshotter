@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
@@ -873,94 +874,98 @@ export const PDFSignature = () => {
 
                 {/* Right Panel: Matches Found */}
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                  <Card className="h-full rounded-none border-0 p-4 overflow-auto">
+                  <Card className="h-full rounded-none border-0 p-4 flex flex-col">
                     {keywordMatches.length > 0 ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-semibold">
-                            Matches Found ({selectedPagesForExtraction.size})
-                          </h3>
+                      <>
+                        <div className="space-y-2 mb-3">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold">
+                              Matches Found ({selectedPagesForExtraction.size})
+                            </h3>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={selectAllPages}
+                              className="h-7 text-xs"
+                            >
+                              Select All
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={deselectAllPages}
+                              className="h-7 text-xs"
+                            >
+                              Clear
+                            </Button>
+                            <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={autoNavigate}
+                                onChange={(e) => setAutoNavigate(e.target.checked)}
+                                className="w-3 h-3"
+                              />
+                              Auto-nav
+                            </label>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={selectAllPages}
-                            className="h-7 text-xs"
-                          >
-                            Select All
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={deselectAllPages}
-                            className="h-7 text-xs"
-                          >
-                            Clear
-                          </Button>
-                          <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
-                            <input
-                              type="checkbox"
-                              checked={autoNavigate}
-                              onChange={(e) => setAutoNavigate(e.target.checked)}
-                              className="w-3 h-3"
-                            />
-                            Auto-nav
-                          </label>
-                        </div>
-                        <div className="space-y-3">
-                          {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
-                            .filter(idx => !isNaN(idx) && idx >= 0)
-                            .sort((a, b) => a - b)
-                            .map((fileIndex) => {
-                              const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
-                              const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
-                              const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
-                              
-                              return (
-                                <div key={fileIndex} className="space-y-1">
-                                  <div className="text-xs font-semibold text-primary sticky top-0 bg-card py-1">
-                                    📄 {fileName}
-                                  </div>
-                                  {pages.map((page) => {
-                                    const pageMatches = fileMatches.filter(m => m.page === page);
-                                    const selectionKey = `${fileIndex}-${page}`;
-                                    const isSelected = selectedPagesForExtraction.has(selectionKey);
-                                    const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
-                                    
-                                    return (
-                                      <div 
-                                        key={`${fileIndex}-${page}`}
-                                        className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
-                                          isCurrent ? 'ring-2 ring-primary' : ''
-                                        }`}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={() => togglePageSelection(page, fileIndex)}
-                                          className="mt-0.5 w-4 h-4 cursor-pointer"
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
+                        <ScrollArea className="flex-1">
+                          <div className="space-y-3 pr-4">
+                            {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
+                              .filter(idx => !isNaN(idx) && idx >= 0)
+                              .sort((a, b) => a - b)
+                              .map((fileIndex) => {
+                                const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
+                                const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
+                                const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
+                                
+                                return (
+                                  <div key={fileIndex} className="space-y-1">
+                                    <div className="text-xs font-semibold text-primary sticky top-0 bg-card py-1">
+                                      📄 {fileName}
+                                    </div>
+                                    {pages.map((page) => {
+                                      const pageMatches = fileMatches.filter(m => m.page === page);
+                                      const selectionKey = `${fileIndex}-${page}`;
+                                      const isSelected = selectedPagesForExtraction.has(selectionKey);
+                                      const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
+                                      
+                                      return (
                                         <div 
-                                          className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                                          onClick={() => handlePageClick(page, fileIndex)}
+                                          key={`${fileIndex}-${page}`}
+                                          className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
+                                            isCurrent ? 'ring-2 ring-primary' : ''
+                                          }`}
                                         >
-                                          <div className="font-medium">Page {page}</div>
-                                          {pageMatches.map((match, idx) => (
-                                            <div key={idx} className="text-muted-foreground">
-                                              "{match.keyword}" ({match.count}x)
-                                            </div>
-                                          ))}
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => togglePageSelection(page, fileIndex)}
+                                            className="mt-0.5 w-4 h-4 cursor-pointer"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <div 
+                                            className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                            onClick={() => handlePageClick(page, fileIndex)}
+                                          >
+                                            <div className="font-medium">Page {page}</div>
+                                            {pageMatches.map((match, idx) => (
+                                              <div key={idx} className="text-muted-foreground">
+                                                "{match.keyword}" ({match.count}x)
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </ScrollArea>
+                      </>
                     ) : (
                       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                         No matches yet. Use AI or search to find pages.
