@@ -911,49 +911,30 @@ export const PDFSignature = () => {
 
                 <ResizableHandle withHandle />
 
-                {/* Middle Panel: PDF Viewer + Diagnostic Assessment */}
+                {/* Middle Panel: PDF Viewer Only */}
                 <ResizablePanel defaultSize={50} minSize={30}>
-                  <ResizablePanelGroup direction="vertical">
-                    <ResizablePanel defaultSize={40} minSize={20}>
-                      <Card className="h-full rounded-none border-0 overflow-hidden">
-                        {pdfFiles.length === 0 ? (
-                          <div className="h-full flex items-center justify-center p-6">
-                            <FileUpload onFileSelect={handleFileSelect} />
-                          </div>
-                        ) : (
-                          <PDFViewer
-                            files={pdfFiles}
-                            currentFileIndex={currentPdfIndex}
-                            keywords={keywords}
-                            dateSearch=""
-                            matchingPages={matchingPages}
-                            isSearching={isSearching}
-                            onKeywordMatchesDetected={handleKeywordMatchesDetected}
-                            onTextExtracted={handlePDFTextExtracted}
-                            onOCRProgress={handleOCRProgress}
-                            selectedPage={selectedPage}
-                            onPageChange={setSelectedPage}
-                            triggerScan={handleScanFile}
-                          />
-                        )}
-                      </Card>
-                    </ResizablePanel>
-                    
-                    <ResizableHandle withHandle />
-                    
-                    <ResizablePanel defaultSize={60} minSize={30}>
-                      <Card className="h-full rounded-none border-0 overflow-hidden">
-                        <div className="h-full">
-                          <DiagnosticAssessment 
-                            pdfContent={pdfContent}
-                            selectedPages={selectedPagesForExtraction}
-                            pdfFiles={pdfFiles}
-                            selectedModel={selectedModel}
-                          />
-                        </div>
-                      </Card>
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
+                  <Card className="h-full rounded-none border-0 overflow-hidden">
+                    {pdfFiles.length === 0 ? (
+                      <div className="h-full flex items-center justify-center p-6">
+                        <FileUpload onFileSelect={handleFileSelect} />
+                      </div>
+                    ) : (
+                      <PDFViewer
+                        files={pdfFiles}
+                        currentFileIndex={currentPdfIndex}
+                        keywords={keywords}
+                        dateSearch=""
+                        matchingPages={matchingPages}
+                        isSearching={isSearching}
+                        onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                        onTextExtracted={handlePDFTextExtracted}
+                        onOCRProgress={handleOCRProgress}
+                        selectedPage={selectedPage}
+                        onPageChange={setSelectedPage}
+                        triggerScan={handleScanFile}
+                      />
+                    )}
+                  </Card>
                 </ResizablePanel>
 
                 <ResizableHandle withHandle />
