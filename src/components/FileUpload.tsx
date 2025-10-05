@@ -55,7 +55,7 @@ export const FileUpload = ({ onFileSelect }: FileUploadProps) => {
         
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
           <FileText className="w-4 h-4" />
-          Supports PDF files up to 20MB
+          Supports PDF files of any size
         </div>
         
         <input
