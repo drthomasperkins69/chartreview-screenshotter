@@ -951,7 +951,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       await worker.terminate();
       handlePDFTextExtracted(fileIndex, file.name, pageTexts);
       
-      // Save OCR completion status to database
+      // Save OCR completion status to database and generate embeddings
       if (selectedWorkspace && fileMetadata.has(file.name)) {
         const metadata = fileMetadata.get(file.name);
         if (metadata) {
@@ -965,6 +965,26 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             if (updateError) {
               console.error('Error updating OCR status:', updateError);
             }
+
+            // Generate embeddings for each page in the background
+            toast.info('Generating document embeddings for AI search...');
+            for (let i = 0; i < pageTexts.length; i++) {
+              const pageData = pageTexts[i];
+              if (pageData.text.trim()) {
+                try {
+                  await supabase.functions.invoke('generate-embeddings', {
+                    body: {
+                      fileId: metadata.id,
+                      content: pageData.text,
+                      pageNumber: pageData.pageNum,
+                    },
+                  });
+                } catch (embedError) {
+                  console.error(`Error generating embeddings for page ${pageData.pageNum}:`, embedError);
+                }
+              }
+            }
+            toast.success('Document embeddings generated successfully');
           } catch (dbError) {
             console.error('Error saving OCR status to database:', dbError);
           }

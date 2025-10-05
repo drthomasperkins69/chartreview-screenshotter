@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.multi-provider-chat]
 verify_jwt = false
+
+[functions.generate-embeddings]
+verify_jwt = false
+
+[functions.rag-search]
+verify_jwt = false

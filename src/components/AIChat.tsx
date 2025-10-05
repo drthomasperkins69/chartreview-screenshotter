@@ -100,26 +100,58 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
     setLoading(true);
 
     try {
-      // Build context message if diagnoses are selected
-      let contextMessage = '';
+      // Perform RAG search if we have diagnosis context
+      let ragContext = '';
       if (diagnosesContext && diagnosesContext.length > 0) {
-        contextMessage = '\n\n--- Context: Selected Diagnoses and Files ---\n';
+        try {
+          // Get file IDs from diagnosis context
+          const fileIds = Array.from(new Set(
+            diagnosesContext.flatMap(ctx => 
+              ctx.files.map(f => f.fileName)
+            )
+          ));
+
+          // Perform RAG search
+          const { data: searchResults, error: searchError } = await supabase.functions.invoke('rag-search', {
+            body: {
+              query: input,
+              limit: 10,
+            },
+          });
+
+          if (!searchError && searchResults?.matches && searchResults.matches.length > 0) {
+            ragContext = '\n\n--- Relevant Medical Document Context (via RAG) ---\n';
+            searchResults.matches.forEach((match: any, idx: number) => {
+              ragContext += `\n${idx + 1}. [Page ${match.page_number}, Chunk ${match.chunk_index}] (Relevance: ${(match.similarity * 100).toFixed(1)}%)\n${match.content}\n`;
+            });
+            ragContext += '--- End RAG Context ---\n\n';
+          }
+        } catch (ragError) {
+          console.error('RAG search error:', ragError);
+        }
+      }
+
+      // Build diagnosis context message if diagnoses are selected
+      let diagnosisContext = '';
+      if (diagnosesContext && diagnosesContext.length > 0) {
+        diagnosisContext = '\n\n--- Selected Diagnoses (Direct Context) ---\n';
         diagnosesContext.forEach(({ diagnosis, files }) => {
-          contextMessage += `\nDiagnosis: ${diagnosis}\nFiles:\n`;
+          diagnosisContext += `\nDiagnosis: ${diagnosis}\nFiles:\n`;
           files.forEach(({ fileName, pageNum, text }) => {
-            contextMessage += `  - ${fileName}, Page ${pageNum}\n`;
+            diagnosisContext += `  - ${fileName}, Page ${pageNum}\n`;
             if (text) {
-              contextMessage += `    Text: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}\n`;
+              diagnosisContext += `    Text: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}\n`;
             }
           });
         });
-        contextMessage += '--- End Context ---\n\n';
+        diagnosisContext += '--- End Direct Context ---\n\n';
       }
 
-      const messagesToSend = diagnosesContext && diagnosesContext.length > 0
+      const fullContext = ragContext + diagnosisContext;
+      const messagesToSend = fullContext
         ? [
             ...messages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user' as const, content: contextMessage + userMessage.content }
+            { role: 'user' as const, content: fullContext + userMessage.content }
           ]
         : [...messages, userMessage].map(m => ({ role: m.role, content: m.content }));
 
@@ -193,14 +225,18 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
         {diagnosesContext && diagnosesContext.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
             <p className="text-xs font-medium text-primary mb-1">
-              Selected Diagnoses ({diagnosesContext.length})
+              🔍 RAG-Enhanced Context Active
             </p>
             <div className="text-xs text-muted-foreground space-y-1">
+              <p className="mb-2">Selected Diagnoses ({diagnosesContext.length}):</p>
               {diagnosesContext.map((ctx, idx) => (
                 <div key={idx}>
-                  {ctx.diagnosis}: {ctx.files.length} file{ctx.files.length !== 1 ? 's' : ''}
+                  • {ctx.diagnosis}: {ctx.files.length} file{ctx.files.length !== 1 ? 's' : ''}
                 </div>
               ))}
+              <p className="mt-2 text-xs italic">
+                AI has access to full document content via vector search
+              </p>
             </div>
           </div>
         )}
