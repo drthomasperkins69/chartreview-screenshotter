@@ -178,16 +178,16 @@ export const PDFSignature = () => {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* AI Assistant Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="h-[600px]">
-                <AISearchAssistant onKeywordSuggest={handleKeywordSuggest} />
-              </div>
+          <div className="space-y-6">
+            {/* AI Assistant at Top */}
+            <div className="h-[400px]">
+              <AISearchAssistant onKeywordSuggest={handleKeywordSuggest} />
             </div>
 
-            {/* Search Controls */}
-            <div className="lg:col-span-1">
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Search Controls */}
+              <div className="lg:col-span-1">
               <Card className="p-4 shadow-medium space-y-4">
                 <div>
                   <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
@@ -251,8 +251,8 @@ export const PDFSignature = () => {
               </Card>
             </div>
 
-            {/* PDF Viewer */}
-            <div className="lg:col-span-3">
+              {/* PDF Viewer */}
+              <div className="lg:col-span-3">
               <Card className="shadow-medium overflow-hidden">
                 <PDFViewer
                   file={pdfFile}
@@ -262,6 +262,7 @@ export const PDFSignature = () => {
                   onKeywordMatchesDetected={handleKeywordMatchesDetected}
                 />
               </Card>
+              </div>
             </div>
           </div>
         )}

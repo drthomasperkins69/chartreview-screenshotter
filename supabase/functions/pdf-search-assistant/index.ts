@@ -35,9 +35,15 @@ serve(async (req) => {
 Your role is to:
 1. Understand what the user wants to find in their PDF
 2. Suggest relevant keywords to search for (comma-separated)
-3. Help refine searches if needed
+3. Help refine searches based on specific dates, time periods, or content requirements
+4. Understand date-based queries like "documents from 2023", "records after January", "Q4 reports", etc.
 
 When suggesting keywords, format them as: keyword1, keyword2, keyword3
+
+For date-based queries:
+- Include relevant date formats (e.g., "2023", "January 2023", "Q4", "2023-01")
+- Suggest related temporal terms (e.g., "annual", "quarterly", "monthly")
+- Combine dates with the user's topic (e.g., if they ask for "2023 reports", suggest: 2023, report, annual, yearly)
 
 Be conversational and helpful. Ask clarifying questions if needed.`
           },
