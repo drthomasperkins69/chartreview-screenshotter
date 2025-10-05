@@ -952,9 +952,10 @@ export const PDFSignature = () => {
   };
 
   const handleDownloadByDiagnosis = async (diagnosis: string) => {
-    const pagesForDiagnosis = Array.from(selectedPagesForExtraction).filter(
-      key => pageDiagnoses[key]?.trim().toLowerCase() === diagnosis.toLowerCase()
-    );
+    // Get all pages with this diagnosis (not just selected ones)
+    const pagesForDiagnosis = Object.entries(pageDiagnoses)
+      .filter(([_, d]) => d?.trim().toLowerCase() === diagnosis.toLowerCase())
+      .map(([key]) => key);
 
     if (pagesForDiagnosis.length === 0) {
       toast.error("No pages found for this diagnosis");
@@ -1563,13 +1564,25 @@ export const PDFSignature = () => {
                   <Collapsible key={index} defaultOpen={true}>
                     <div className="border rounded-lg">
                       <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-1">
                           <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
                           <span className="font-medium">{diagnosis}</span>
                           <span className="text-sm text-muted-foreground">
                             ({pagesWithDiagnosis.length} page{pagesWithDiagnosis.length !== 1 ? 's' : ''})
                           </span>
                         </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadByDiagnosis(diagnosis);
+                          }}
+                          className="gap-2 ml-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download PDF
+                        </Button>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="px-3 pb-3 space-y-1">
