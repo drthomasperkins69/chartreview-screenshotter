@@ -37,6 +37,7 @@ interface PDFViewerProps {
   selectedPagesForExtraction?: Set<string>;
   pageDiagnoses?: Record<string, string>;
   onDiagnosisChange?: (fileIndex: number, pageNum: number, diagnosis: string) => void;
+  onDeletePage?: (fileIndex: number, pageNum: number) => void;
 }
 
 export const PDFViewer = ({
@@ -56,6 +57,7 @@ export const PDFViewer = ({
   selectedPagesForExtraction,
   pageDiagnoses = {},
   onDiagnosisChange,
+  onDeletePage,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -396,6 +398,13 @@ export const PDFViewer = ({
     }
   };
 
+  const handleDeleteCurrentPage = () => {
+    if (onDeletePage) {
+      onDeletePage(currentFileIndex, currentPage);
+      toast.success("Page removed completely");
+    }
+  };
+
   const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
   const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
 
@@ -435,14 +444,26 @@ export const PDFViewer = ({
             <ChevronRight className="w-4 h-4" />
           </Button>
           {onTogglePageSelection && (
-            <Button
-              variant={isCurrentPageSelected ? "default" : "outline"}
-              size="sm"
-              onClick={handleAddCurrentPage}
-              className="ml-2"
-            >
-              {isCurrentPageSelected ? "✓ Added" : "+ Add Page"}
-            </Button>
+            <>
+              <Button
+                variant={isCurrentPageSelected ? "default" : "outline"}
+                size="sm"
+                onClick={handleAddCurrentPage}
+                className="ml-2"
+              >
+                {isCurrentPageSelected ? "✓ Added" : "+ Add Page"}
+              </Button>
+              {isCurrentPageSelected && onDeletePage && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteCurrentPage}
+                  className="ml-1"
+                >
+                  🗑️ Delete
+                </Button>
+              )}
+            </>
           )}
         </div>
 

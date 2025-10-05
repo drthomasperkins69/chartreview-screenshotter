@@ -386,6 +386,13 @@ export const PDFSignature = () => {
       return newSet;
     });
     
+    // Remove diagnosis for this page
+    setPageDiagnoses(prev => {
+      const newDiagnoses = { ...prev };
+      delete newDiagnoses[`${fileIndex}-${pageNum}`];
+      return newDiagnoses;
+    });
+    
     // Remove from matching pages if it's the current PDF
     if (fileIndex === currentPdfIndex) {
       setMatchingPages(prev => {
@@ -1196,6 +1203,7 @@ export const PDFSignature = () => {
                             [`${fileIndex}-${pageNum}`]: diagnosis
                           }));
                         }}
+                        onDeletePage={removeMatchFromList}
                       />
                     )}
                   </Card>
