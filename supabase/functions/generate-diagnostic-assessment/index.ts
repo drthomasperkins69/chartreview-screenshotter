@@ -20,14 +20,24 @@ serve(async (req) => {
       );
     }
 
+    // Log what we received
+    console.log(`Received ${selectedContent.length} pages`);
+    console.log(`Pages with images: ${selectedContent.filter((p: any) => p.image).length}`);
+    console.log(`Pages with text: ${selectedContent.filter((p: any) => p.text && p.text.trim()).length}`);
+
     // Build context from selected pages with images
     const contentParts: any[] = [];
     
-    // Add text context
-    let textContext = "Selected PDF Content:\n\n";
-    selectedContent.forEach((page: any) => {
-      textContext += `--- ${page.fileName} (Page ${page.pageNum}) ---\n`;
-      textContext += `${page.text}\n\n`;
+    // Add text context (but emphasize that images are the primary source)
+    let textContext = "Selected PDF Pages:\n\n";
+    selectedContent.forEach((page: any, index: number) => {
+      textContext += `Page ${index + 1}: ${page.fileName} (Original Page ${page.pageNum})\n`;
+      if (page.text && page.text.trim()) {
+        textContext += `Extracted text: ${page.text.substring(0, 500)}${page.text.length > 500 ? '...' : ''}\n`;
+      } else {
+        textContext += `(Text extraction unavailable - analyze the image)\n`;
+      }
+      textContext += `\n`;
     });
 
     // Add SOP content if provided
@@ -36,20 +46,22 @@ serve(async (req) => {
       textContext += sopContent;
     }
 
-    const systemPrompt = `You are a medical diagnostic assessment specialist. Your task is to analyze the provided PDF content and create a comprehensive diagnostic assessment based on the specific instructions given.
+    const systemPrompt = `You are a medical diagnostic assessment specialist. Your task is to analyze the provided PDF page images and create a comprehensive diagnostic assessment based on the specific instructions given.
+
+CRITICAL: You have been provided with HIGH-RESOLUTION images of the selected PDF pages. These images are your PRIMARY source of information. Read and analyze ALL text, tables, and information visible in these images carefully.
 
 Follow the DIA (Diagnostic Instructions Assessment) provided exactly. Be thorough, accurate, and professional in your assessment.
 
 **IMPORTANT**: When analyzing SOP factors, reference the uploaded SOP documents provided below. All SOP information is sourced from rma.gov.au (Repatriation Medical Authority).
 
-You have been provided with page screenshots from the selected documents. Use these images along with the extracted text to provide a comprehensive analysis.`;
+Each page image contains the complete medical documentation you need to analyze. Read every detail in the images.`;
 
     const userPrompt = `DIA Instructions:
 ${instructions}
 
 ${textContext}
 
-Please generate a diagnostic assessment based on the above instructions and PDF content. The page screenshots are attached for visual reference.`;
+IMPORTANT: ${selectedContent.length} page image(s) are attached below. These contain the complete medical records you need to analyze. Please examine each image carefully and extract all relevant medical information to complete the diagnostic assessment as per the DIA instructions above.`;
 
     let response;
 
@@ -67,18 +79,28 @@ Please generate a diagnostic assessment based on the above instructions and PDF 
       ];
 
       // Add images from selected pages
-      selectedContent.forEach((page: any) => {
+      selectedContent.forEach((page: any, index: number) => {
         if (page.image) {
+          // Add a text label before each image
+          claudeContent.push({
+            type: "text",
+            text: `\n=== IMAGE ${index + 1}: ${page.fileName} - Page ${page.pageNum} ===`
+          });
+          
           // Claude expects base64 image data without the data URL prefix
           const base64Data = page.image.split(',')[1] || page.image;
+          const mediaType = page.image.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+          
           claudeContent.push({
             type: "image",
             source: {
               type: "base64",
-              media_type: "image/jpeg",
+              media_type: mediaType,
               data: base64Data
             }
           });
+        } else {
+          console.warn(`Page ${index + 1} (${page.fileName} p${page.pageNum}) has no image`);
         }
       });
 
@@ -141,17 +163,26 @@ Please generate a diagnostic assessment based on the above instructions and PDF 
         { text: userPrompt }
       ];
 
-      // Add images from selected pages
-      selectedContent.forEach((page: any) => {
+      // Add images from selected pages with labels
+      selectedContent.forEach((page: any, index: number) => {
         if (page.image) {
+          // Add a text label before each image
+          geminiParts.push({
+            text: `\n=== IMAGE ${index + 1}: ${page.fileName} - Page ${page.pageNum} ===`
+          });
+          
           // Gemini expects inline data with base64
           const base64Data = page.image.split(',')[1] || page.image;
+          const mimeType = page.image.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+          
           geminiParts.push({
             inlineData: {
-              mimeType: "image/jpeg",
+              mimeType: mimeType,
               data: base64Data
             }
           });
+        } else {
+          console.warn(`Page ${index + 1} (${page.fileName} p${page.pageNum}) has no image`);
         }
       });
 

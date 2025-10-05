@@ -121,8 +121,8 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
         }
       }
 
-      // Extract content and capture screenshots for selected pages
-      toast("Capturing page screenshots...");
+      // Extract content and capture HIGH QUALITY screenshots for selected pages
+      toast("Capturing high-resolution page screenshots...");
       const selectedContent = await Promise.all(
         Array.from(selectedPages).map(async (key) => {
           const [fileIndexStr, pageNumStr] = key.split('-');
@@ -134,7 +134,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
           
           let image: string | null = null;
           
-          // Render page to canvas to capture screenshot
+          // Render page to canvas to capture screenshot at HIGH RESOLUTION
           try {
             const file = pdfFiles[fileIndex];
             if (file) {
@@ -142,11 +142,12 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
               const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
               const pdfPage = await pdf.getPage(pageNum);
               
-              // Create a canvas to render the page
+              // Create a canvas to render the page at 2x scale for better quality
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
               if (context) {
-                const viewport = pdfPage.getViewport({ scale: 1.5 });
+                // Use 2.5x scale for very high quality screenshots
+                const viewport = pdfPage.getViewport({ scale: 2.5 });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 
@@ -156,8 +157,8 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
                   canvas: canvas,
                 }).promise;
                 
-                // Convert canvas to base64 image
-                image = canvas.toDataURL('image/jpeg', 0.85);
+                // Convert canvas to base64 PNG for lossless quality
+                image = canvas.toDataURL('image/png');
               }
             }
           } catch (error) {
@@ -173,6 +174,11 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
           };
         })
       );
+
+      // Log what we're sending to help debug
+      console.log(`Sending ${selectedContent.length} pages to AI`);
+      console.log(`Pages with images: ${selectedContent.filter(p => p.image).length}`);
+      console.log(`Pages with text: ${selectedContent.filter(p => p.text && p.text.trim()).length}`);
 
       const resp = await fetch(`${FUNCTIONS_BASE}/functions/v1/generate-diagnostic-assessment`, {
         method: "POST",
