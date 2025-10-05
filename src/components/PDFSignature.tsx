@@ -1904,18 +1904,24 @@ export const PDFSignature = () => {
                         <TabsTrigger value="categories">Search Categories</TabsTrigger>
                       </TabsList>
                       
-                      <TabsContent value="ai" className="flex-1 mt-0 p-4 overflow-auto">
-                        <AISearchAssistant 
-                          onKeywordSuggest={handleKeywordSuggest}
-                          onPagesSelected={handleAIPageSelection}
-                          currentKeywords={keywords}
-                          pdfContent={pdfContent}
-                          onTriggerAutoScan={handleAutoScanAllPDFs}
-                          isAutoScanning={isAutoScanningAll}
-                        />
+                      <TabsContent value="ai" className="flex-1 mt-0 p-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="p-4">
+                            <AISearchAssistant 
+                              onKeywordSuggest={handleKeywordSuggest}
+                              onPagesSelected={handleAIPageSelection}
+                              currentKeywords={keywords}
+                              pdfContent={pdfContent}
+                              onTriggerAutoScan={handleAutoScanAllPDFs}
+                              isAutoScanning={isAutoScanningAll}
+                            />
+                          </div>
+                        </ScrollArea>
                       </TabsContent>
                       
-                      <TabsContent value="categories" className="flex-1 mt-0 p-4 overflow-auto">
+                      <TabsContent value="categories" className="flex-1 mt-0 p-0 h-full">
+                        <ScrollArea className="h-full">
+                          <div className="p-4">
                         <div className="space-y-4">
                           <div className="grid grid-cols-1 gap-6">
                             {/* Body Parts */}
@@ -2040,7 +2046,9 @@ export const PDFSignature = () => {
                               Separate multiple keywords with commas
                             </p>
                           </div>
-                        </div>
+                          </div>
+                          </div>
+                        </ScrollArea>
                       </TabsContent>
                     </Tabs>
                   </Card>
