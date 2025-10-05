@@ -325,102 +325,123 @@ export const PDFSignature = () => {
 
             {/* Search Controls */}
             <Card className="p-4 shadow-medium">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex gap-2 mb-3">
-                    <Button
-                      variant={searchMode === "keyword" ? "default" : "outline"}
-                      onClick={() => setSearchMode("keyword")}
-                      size="sm"
-                      className="flex-1"
+              <div className="flex gap-2 mb-3">
+                <Button
+                  variant={searchMode === "keyword" ? "default" : "outline"}
+                  onClick={() => setSearchMode("keyword")}
+                  size="sm"
+                  className="flex-1"
+                >
+                  Keyword Search
+                </Button>
+                <Button
+                  variant={searchMode === "date" ? "default" : "outline"}
+                  onClick={() => setSearchMode("date")}
+                  size="sm"
+                  className="flex-1"
+                >
+                  Date Search
+                </Button>
+              </div>
+
+              {searchMode === "keyword" ? (
+                <>
+                  <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
+                    Search Keywords
+                  </Label>
+                  <Input
+                    id="keywords"
+                    placeholder="e.g., contract, invoice, report"
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="mb-2"
+                  />
+                  
+                  <div className="flex gap-2">
+                    {suggestedKeywords && (
+                      <Button 
+                        onClick={useSuggestedKeywords}
+                        variant="outline"
+                        className="gap-2"
+                        size="sm"
+                      >
+                        Use Keywords
+                      </Button>
+                    )}
+                    
+                    <Button 
+                      onClick={handleSearch} 
+                      className="gap-2"
+                      disabled={isSearching || !keywords.trim()}
                     >
-                      Keyword Search
-                    </Button>
-                    <Button
-                      variant={searchMode === "date" ? "default" : "outline"}
-                      onClick={() => setSearchMode("date")}
-                      size="sm"
-                      className="flex-1"
-                    >
-                      Date Search
+                      <Search className="w-4 h-4" />
+                      {isSearching ? "Searching..." : "Search PDF"}
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Separate multiple keywords with commas
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="dateSearch" className="text-sm font-medium mb-2 block">
+                    Search Date
+                  </Label>
+                  <Input
+                    id="dateSearch"
+                    placeholder="e.g., 01/15/2023 or January 15, 2023"
+                    value={dateSearch}
+                    onChange={(e) => setDateSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="mb-2"
+                  />
+                  
+                  <Button 
+                    onClick={handleSearch} 
+                    className="w-full gap-2"
+                    disabled={isSearching || !dateSearch.trim()}
+                  >
+                    <Search className="w-4 h-4" />
+                    {isSearching ? "Searching..." : "Search Dates"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Supports: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, Month DD YYYY, and more
+                  </p>
+                </>
+              )}
+            </Card>
 
-                  {searchMode === "keyword" ? (
-                    <>
-                      <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
-                        Search Keywords
-                      </Label>
-                      <Input
-                        id="keywords"
-                        placeholder="e.g., contract, invoice, report"
-                        value={keywords}
-                        onChange={(e) => setKeywords(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        className="mb-2"
-                      />
-                      
-                      <div className="flex gap-2">
-                        {suggestedKeywords && (
-                          <Button 
-                            onClick={useSuggestedKeywords}
-                            variant="outline"
-                            className="gap-2"
-                            size="sm"
-                          >
-                            Use Keywords
-                          </Button>
-                        )}
-                        
-                        <Button 
-                          onClick={handleSearch} 
-                          className="gap-2"
-                          disabled={isSearching || !keywords.trim()}
-                        >
-                          <Search className="w-4 h-4" />
-                          {isSearching ? "Searching..." : "Search PDF"}
-                        </Button>
+            {/* PDF Viewer and Matches Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* PDF Viewer - Takes up 2/3 of space */}
+              <div className="lg:col-span-2">
+                <Card className="shadow-medium overflow-hidden">
+                  <PDFViewer
+                    files={pdfFiles}
+                    currentFileIndex={currentPdfIndex}
+                    keywords={searchMode === "keyword" ? keywords : ""}
+                    dateSearch={searchMode === "date" ? dateSearch : ""}
+                    matchingPages={matchingPages}
+                    isSearching={isSearching}
+                    onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                    selectedPage={selectedPage}
+                    onPageChange={setSelectedPage}
+                  />
+                </Card>
+              </div>
+
+              {/* Matches Panel - Takes up 1/3 of space */}
+              {keywordMatches.length > 0 && (
+                <div className="lg:col-span-1">
+                  <Card className="p-4 shadow-medium h-full">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold">
+                          Matches Found ({selectedPagesForExtraction.size} selected)
+                        </h3>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Separate multiple keywords with commas
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <Label htmlFor="dateSearch" className="text-sm font-medium mb-2 block">
-                        Search Date
-                      </Label>
-                      <Input
-                        id="dateSearch"
-                        placeholder="e.g., 01/15/2023 or January 15, 2023"
-                        value={dateSearch}
-                        onChange={(e) => setDateSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        className="mb-2"
-                      />
-                      
-                      <Button 
-                        onClick={handleSearch} 
-                        className="w-full gap-2"
-                        disabled={isSearching || !dateSearch.trim()}
-                      >
-                        <Search className="w-4 h-4" />
-                        {isSearching ? "Searching..." : "Search Dates"}
-                      </Button>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Supports: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, Month DD YYYY, and more
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                {keywordMatches.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">
-                        Matches Found ({selectedPagesForExtraction.size} selected)
-                      </h3>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -447,84 +468,69 @@ export const PDFSignature = () => {
                           Auto-navigate
                         </label>
                       </div>
-                    </div>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {/* Group matches by file */}
-                      {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
-                        .filter(idx => !isNaN(idx) && idx >= 0)
-                        .sort((a, b) => a - b)
-                        .map((fileIndex) => {
-                          const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
-                          const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
-                          const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
-                          
-                          return (
-                            <div key={fileIndex} className="space-y-1">
-                              <div className="text-xs font-semibold text-primary sticky top-0 bg-background py-1">
-                                📄 {fileName}
-                              </div>
-                              {pages.map((page) => {
-                                const pageMatches = fileMatches.filter(m => m.page === page);
-                                const isSelected = selectedPagesForExtraction.has(page) && fileIndex === currentPdfIndex;
-                                const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
-                                
-                                return (
-                                  <div 
-                                    key={`${fileIndex}-${page}`}
-                                    className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
-                                      isCurrent ? 'ring-2 ring-primary' : ''
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => {
-                                        if (fileIndex === currentPdfIndex) {
-                                          togglePageSelection(page);
-                                        } else {
-                                          toast("Switch to this PDF first to select pages");
-                                        }
-                                      }}
-                                      className="mt-0.5 w-4 h-4 cursor-pointer"
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
+                      <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                        {/* Group matches by file */}
+                        {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
+                          .filter(idx => !isNaN(idx) && idx >= 0)
+                          .sort((a, b) => a - b)
+                          .map((fileIndex) => {
+                            const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
+                            const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
+                            const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
+                            
+                            return (
+                              <div key={fileIndex} className="space-y-1">
+                                <div className="text-xs font-semibold text-primary sticky top-0 bg-background py-1">
+                                  📄 {fileName}
+                                </div>
+                                {pages.map((page) => {
+                                  const pageMatches = fileMatches.filter(m => m.page === page);
+                                  const isSelected = selectedPagesForExtraction.has(page) && fileIndex === currentPdfIndex;
+                                  const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
+                                  
+                                  return (
                                     <div 
-                                      className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                                      onClick={() => handlePageClick(page, fileIndex)}
+                                      key={`${fileIndex}-${page}`}
+                                      className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
+                                        isCurrent ? 'ring-2 ring-primary' : ''
+                                      }`}
                                     >
-                                      <div className="font-medium">Page {page}</div>
-                                      {pageMatches.map((match, idx) => (
-                                        <div key={idx} className="text-muted-foreground">
-                                          "{match.keyword}" ({match.count}x)
-                                        </div>
-                                      ))}
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => {
+                                          if (fileIndex === currentPdfIndex) {
+                                            togglePageSelection(page);
+                                          } else {
+                                            toast("Switch to this PDF first to select pages");
+                                          }
+                                        }}
+                                        className="mt-0.5 w-4 h-4 cursor-pointer"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <div 
+                                        className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => handlePageClick(page, fileIndex)}
+                                      >
+                                        <div className="font-medium">Page {page}</div>
+                                        {pageMatches.map((match, idx) => (
+                                          <div key={idx} className="text-muted-foreground">
+                                            "{match.keyword}" ({match.count}x)
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* PDF Viewer */}
-            <Card className="shadow-medium overflow-hidden">
-              <PDFViewer
-                files={pdfFiles}
-                currentFileIndex={currentPdfIndex}
-                keywords={searchMode === "keyword" ? keywords : ""}
-                dateSearch={searchMode === "date" ? dateSearch : ""}
-                matchingPages={matchingPages}
-                isSearching={isSearching}
-                onKeywordMatchesDetected={handleKeywordMatchesDetected}
-                selectedPage={selectedPage}
-                onPageChange={setSelectedPage}
-              />
-            </Card>
+                  </Card>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
