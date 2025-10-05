@@ -1165,6 +1165,12 @@ export const PDFSignature = () => {
         </div>
 
         {/* Assessment Results */}
+        <DiagnosticAssessment 
+          pdfContent={pdfContent}
+          selectedPages={selectedPagesForExtraction}
+          pdfFiles={pdfFiles}
+          selectedModel={selectedModel as "gemini" | "claude"}
+        />
         <DiagnosticAssessmentResults 
           pdfContent={pdfContent}
           selectedPages={selectedPagesForExtraction}
