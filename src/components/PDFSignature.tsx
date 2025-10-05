@@ -12,12 +12,13 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2 } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
+import JSZip from "jszip";
 
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
@@ -614,140 +615,228 @@ export const PDFSignature = () => {
     try {
       toast("Capturing page screenshots and creating PDF...");
       
-      const selectedContent = await Promise.all(
-        Array.from(selectedPagesForExtraction).map(async (key) => {
-          const [fileIndexStr, pageNumStr] = key.split('-');
-          const fileIndex = parseInt(fileIndexStr);
-          const pageNum = parseInt(pageNumStr);
-          
-          const pdfDoc = pdfContent.find(p => p.fileIndex === fileIndex);
-          
-          let image: string | null = null;
-          
-          // Render page to canvas to capture screenshot
-          try {
-            const file = pdfFiles[fileIndex];
-            if (file) {
-              const arrayBuffer = await file.arrayBuffer();
-              const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-              const pdfPage = await pdf.getPage(pageNum);
-              
-              const canvas = document.createElement('canvas');
-              const context = canvas.getContext('2d');
-              if (context) {
-                const viewport = pdfPage.getViewport({ scale: 1.5 });
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                
-                await pdfPage.render({
-                  canvasContext: context,
-                  viewport: viewport,
-                  canvas: canvas,
-                }).promise;
-                
-                // Convert to JPEG with 85% quality
-                image = canvas.toDataURL('image/jpeg', 0.85);
-              }
-            }
-          } catch (error) {
-            console.error(`Failed to capture screenshot for page ${key}:`, error);
-          }
-          
-          return {
-            fileName: pdfDoc?.fileName || `Document ${fileIndex + 1}`,
-            fileIndex,
-            pageNum,
-            image
-          };
-        })
-      );
-
-      // Create PDF with screenshots
-      const pdfDoc = await PDFDocument.create();
+      const selectedContent = await captureSelectedPages(Array.from(selectedPagesForExtraction));
+      const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses);
       
-      for (const content of selectedContent) {
-        if (content.image) {
-          try {
-            const screenshotPage = pdfDoc.addPage([595, 842]);
-            
-            // Add header with page info
-            const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-            screenshotPage.drawText(`${content.fileName} - Page ${content.pageNum}`, {
-              x: 50,
-              y: 792,
-              size: 10,
-              font: boldFont,
-              color: rgb(0, 0, 0),
-            });
-            
-            // Add diagnosis if provided
-            const diagnosis = pageDiagnoses[`${content.fileIndex}-${content.pageNum}`];
-            if (diagnosis && diagnosis.trim()) {
-              screenshotPage.drawText(`Diagnosis: ${diagnosis}`, {
-                x: 50,
-                y: 775,
-                size: 9,
-                color: rgb(0.2, 0.2, 0.2),
-              });
-            }
-            
-            // Embed the image
-            const imageBytes = content.image.split(',')[1];
-            const imageData = Uint8Array.from(atob(imageBytes), c => c.charCodeAt(0));
-            
-            let embeddedImage;
-            if (content.image.includes('image/png')) {
-              embeddedImage = await pdfDoc.embedPng(imageData);
-            } else {
-              embeddedImage = await pdfDoc.embedJpg(imageData);
-            }
-            
-            // Calculate dimensions to fit on page
-            const imgWidth = embeddedImage.width;
-            const imgHeight = embeddedImage.height;
-            const maxImageWidth = 495;
-            const maxImageHeight = 700;
-            
-            let scaledWidth = imgWidth;
-            let scaledHeight = imgHeight;
-            
-            if (imgWidth > maxImageWidth || imgHeight > maxImageHeight) {
-              const widthRatio = maxImageWidth / imgWidth;
-              const heightRatio = maxImageHeight / imgHeight;
-              const scale = Math.min(widthRatio, heightRatio);
-              
-              scaledWidth = imgWidth * scale;
-              scaledHeight = imgHeight * scale;
-            }
-            
-            const x = (595 - scaledWidth) / 2;
-            const y = 762 - scaledHeight;
-            
-            screenshotPage.drawImage(embeddedImage, {
-              x,
-              y,
-              width: scaledWidth,
-              height: scaledHeight,
-            });
-          } catch (error) {
-            console.error(`Failed to add screenshot for page ${content.pageNum}:`, error);
-          }
-        }
-      }
-      
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `extracted-pages-${Date.now()}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadPDF(pdfBytes, `all-pages-${Date.now()}.pdf`);
       toast.success("PDF with screenshots created successfully!");
     } catch (error) {
       console.error("Error creating PDF:", error);
       toast.error("Failed to create PDF");
     }
+  };
+
+  const captureSelectedPages = async (pageKeys: string[]) => {
+    return await Promise.all(
+      pageKeys.map(async (key) => {
+        const [fileIndexStr, pageNumStr] = key.split('-');
+        const fileIndex = parseInt(fileIndexStr);
+        const pageNum = parseInt(pageNumStr);
+        
+        const pdfDoc = pdfContent.find(p => p.fileIndex === fileIndex);
+        
+        let image: string | null = null;
+        
+        try {
+          const file = pdfFiles[fileIndex];
+          if (file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+            const pdfPage = await pdf.getPage(pageNum);
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (context) {
+              const viewport = pdfPage.getViewport({ scale: 1.5 });
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              
+              await pdfPage.render({
+                canvasContext: context,
+                viewport: viewport,
+                canvas: canvas,
+              }).promise;
+              
+              image = canvas.toDataURL('image/jpeg', 0.85);
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to capture screenshot for page ${key}:`, error);
+        }
+        
+        return {
+          fileName: pdfDoc?.fileName || `Document ${fileIndex + 1}`,
+          fileIndex,
+          pageNum,
+          image
+        };
+      })
+    );
+  };
+
+  const createPDFWithPages = async (pages: any[], diagnoses: Record<string, string>) => {
+    const pdfDoc = await PDFDocument.create();
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    for (const content of pages) {
+      if (content.image) {
+        try {
+          const screenshotPage = pdfDoc.addPage([595, 842]);
+          
+          screenshotPage.drawText(`${content.fileName} - Page ${content.pageNum}`, {
+            x: 50,
+            y: 792,
+            size: 10,
+            font: boldFont,
+            color: rgb(0, 0, 0),
+          });
+          
+          const diagnosis = diagnoses[`${content.fileIndex}-${content.pageNum}`];
+          if (diagnosis && diagnosis.trim()) {
+            screenshotPage.drawText(`Diagnosis: ${diagnosis}`, {
+              x: 50,
+              y: 775,
+              size: 9,
+              color: rgb(0.2, 0.2, 0.2),
+            });
+          }
+          
+          const imageBytes = content.image.split(',')[1];
+          const imageData = Uint8Array.from(atob(imageBytes), c => c.charCodeAt(0));
+          
+          let embeddedImage;
+          if (content.image.includes('image/png')) {
+            embeddedImage = await pdfDoc.embedPng(imageData);
+          } else {
+            embeddedImage = await pdfDoc.embedJpg(imageData);
+          }
+          
+          const imgWidth = embeddedImage.width;
+          const imgHeight = embeddedImage.height;
+          const maxImageWidth = 495;
+          const maxImageHeight = 700;
+          
+          let scaledWidth = imgWidth;
+          let scaledHeight = imgHeight;
+          
+          if (imgWidth > maxImageWidth || imgHeight > maxImageHeight) {
+            const widthRatio = maxImageWidth / imgWidth;
+            const heightRatio = maxImageHeight / imgHeight;
+            const scale = Math.min(widthRatio, heightRatio);
+            
+            scaledWidth = imgWidth * scale;
+            scaledHeight = imgHeight * scale;
+          }
+          
+          const x = (595 - scaledWidth) / 2;
+          const y = 762 - scaledHeight;
+          
+          screenshotPage.drawImage(embeddedImage, {
+            x,
+            y,
+            width: scaledWidth,
+            height: scaledHeight,
+          });
+        } catch (error) {
+          console.error(`Failed to add screenshot for page ${content.pageNum}:`, error);
+        }
+      }
+    }
+    
+    return await pdfDoc.save();
+  };
+
+  const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadByDiagnosis = async (diagnosis: string) => {
+    const pagesForDiagnosis = Array.from(selectedPagesForExtraction).filter(
+      key => pageDiagnoses[key]?.trim().toLowerCase() === diagnosis.toLowerCase()
+    );
+
+    if (pagesForDiagnosis.length === 0) {
+      toast.error("No pages found for this diagnosis");
+      return;
+    }
+
+    try {
+      toast(`Creating PDF for ${diagnosis}...`);
+      const selectedContent = await captureSelectedPages(pagesForDiagnosis);
+      const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses);
+      
+      const safeFilename = diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      downloadPDF(pdfBytes, `${safeFilename}-${Date.now()}.pdf`);
+      toast.success(`PDF for ${diagnosis} created successfully!`);
+    } catch (error) {
+      console.error("Error creating diagnosis PDF:", error);
+      toast.error("Failed to create PDF");
+    }
+  };
+
+  const handleDownloadAllAsZip = async () => {
+    const diagnosisGroups = getDiagnosisGroups();
+    
+    if (diagnosisGroups.length === 0) {
+      toast.error("No diagnoses to download");
+      return;
+    }
+
+    try {
+      toast("Creating ZIP file with all diagnoses...");
+      const zip = new JSZip();
+
+      for (const group of diagnosisGroups) {
+        const pagesForDiagnosis = Array.from(selectedPagesForExtraction).filter(
+          key => pageDiagnoses[key]?.trim().toLowerCase() === group.diagnosis.toLowerCase()
+        );
+
+        const selectedContent = await captureSelectedPages(pagesForDiagnosis);
+        const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses);
+        
+        const safeFilename = group.diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+        zip.file(`${safeFilename}.pdf`, pdfBytes);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `all-diagnoses-${Date.now()}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success("ZIP file created successfully!");
+    } catch (error) {
+      console.error("Error creating ZIP:", error);
+      toast.error("Failed to create ZIP file");
+    }
+  };
+
+  const getDiagnosisGroups = () => {
+    const groups: Record<string, string[]> = {};
+    
+    Array.from(selectedPagesForExtraction).forEach(key => {
+      const diagnosis = pageDiagnoses[key]?.trim();
+      if (diagnosis) {
+        if (!groups[diagnosis]) {
+          groups[diagnosis] = [];
+        }
+        groups[diagnosis].push(key);
+      }
+    });
+
+    return Object.entries(groups).map(([diagnosis, pages]) => ({
+      diagnosis,
+      pageCount: pages.length,
+      pages
+    })).sort((a, b) => a.diagnosis.localeCompare(b.diagnosis));
   };
 
   return (
@@ -1227,6 +1316,47 @@ export const PDFSignature = () => {
                   </Card>
                 </ResizablePanel>
         </ResizablePanelGroup>
+
+        {/* Diagnosis Summary Section */}
+        {getDiagnosisGroups().length > 0 && (
+          <Card className="mt-4 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Diagnoses Summary</h3>
+              <Button
+                onClick={handleDownloadAllAsZip}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <FileArchive className="w-4 h-4" />
+                Download All as ZIP
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {getDiagnosisGroups().map((group, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-accent/10 rounded-lg border"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium">{group.diagnosis}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {group.pageCount} page{group.pageCount !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleDownloadByDiagnosis(group.diagnosis)}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Generate PDF Button - Full Width at Bottom */}
         <div className="mt-4">
