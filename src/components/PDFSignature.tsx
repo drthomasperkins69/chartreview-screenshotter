@@ -1949,7 +1949,7 @@ export const PDFSignature = () => {
                         </ScrollArea>
                       </>
                     ) : (
-                      <div className="h-full overflow-y-auto max-h-[600px]">
+                      <div className="flex-1 overflow-y-auto">
                         {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 ? (
                           <div className="p-4 h-full">
                             <div className="flex items-center justify-between mb-3">
