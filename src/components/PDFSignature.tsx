@@ -1949,9 +1949,9 @@ export const PDFSignature = () => {
                         </ScrollArea>
                       </>
                     ) : (
-                      <div className="flex-1 overflow-y-auto">
+                      <div className="flex-1 overflow-y-auto flex flex-col">
                         {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 ? (
-                          <div className="p-4 h-full">
+                          <div className="p-4">
                             <div className="flex items-center justify-between mb-3">
                               <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
                               <Button
