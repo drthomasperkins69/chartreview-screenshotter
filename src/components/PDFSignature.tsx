@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
+import { DiagnosticAssessment } from "./DiagnosticAssessment";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
@@ -736,9 +737,10 @@ export const PDFSignature = () => {
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
                   <Card className="h-full rounded-none border-0">
                     <Tabs defaultValue="ai" className="h-full flex flex-col">
-                      <TabsList className="w-full rounded-none border-b">
-                        <TabsTrigger value="ai" className="flex-1">AI Assistant</TabsTrigger>
-                        <TabsTrigger value="categories" className="flex-1">Search Categories</TabsTrigger>
+                      <TabsList className="w-full rounded-none border-b grid grid-cols-3">
+                        <TabsTrigger value="ai">AI Assistant</TabsTrigger>
+                        <TabsTrigger value="categories">Search Categories</TabsTrigger>
+                        <TabsTrigger value="assessment">Diagnostic Assessment</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="ai" className="flex-1 mt-0 p-4 overflow-auto">
@@ -747,6 +749,13 @@ export const PDFSignature = () => {
                           onPagesSelected={handleAIPageSelection}
                           currentKeywords={keywords}
                           pdfContent={pdfContent}
+                        />
+                      </TabsContent>
+                      
+                      <TabsContent value="assessment" className="flex-1 mt-0 overflow-auto">
+                        <DiagnosticAssessment 
+                          pdfContent={pdfContent}
+                          selectedPages={selectedPagesForExtraction}
                         />
                       </TabsContent>
                       

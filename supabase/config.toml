@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-pdf-content]
 verify_jwt = false
+
+[functions.generate-diagnostic-assessment]
+verify_jwt = false
