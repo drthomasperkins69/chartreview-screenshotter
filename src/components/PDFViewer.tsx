@@ -19,6 +19,7 @@ interface KeywordMatch {
 interface PDFViewerProps {
   file: File;
   keywords: string;
+  dateSearch: string;
   matchingPages: Set<number>;
   isSearching: boolean;
   onKeywordMatchesDetected: (matches: KeywordMatch[]) => void;
@@ -27,6 +28,7 @@ interface PDFViewerProps {
 export const PDFViewer = ({
   file,
   keywords,
+  dateSearch,
   matchingPages,
   isSearching,
   onKeywordMatchesDetected,
@@ -66,24 +68,32 @@ export const PDFViewer = ({
 
   useEffect(() => {
     const searchKeywords = async () => {
-      if (!pdf || !keywords.trim() || !isSearching) return;
+      if (!pdf || !isSearching) return;
+      if (!keywords.trim() && !dateSearch.trim()) return;
 
-      const keywordList = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
       const matches: KeywordMatch[] = [];
+
+      // Generate date format variations if searching by date
+      let searchTerms: string[] = [];
+      
+      if (dateSearch.trim()) {
+        searchTerms = generateDateFormats(dateSearch);
+      } else if (keywords.trim()) {
+        searchTerms = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
+      }
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
           .map((item: any) => item.str)
-          .join(' ')
-          .toLowerCase();
+          .join(' ');
 
-        for (const keyword of keywordList) {
-          const regex = new RegExp(keyword, 'gi');
+        for (const term of searchTerms) {
+          const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
           const count = (pageText.match(regex) || []).length;
           if (count > 0) {
-            matches.push({ page: pageNum, keyword, count });
+            matches.push({ page: pageNum, keyword: term, count });
           }
         }
       }
@@ -91,8 +101,89 @@ export const PDFViewer = ({
       onKeywordMatchesDetected(matches);
     };
 
+    // Function to generate multiple date format variations
+    const generateDateFormats = (dateInput: string): string[] => {
+      const formats: string[] = [];
+      
+      // Try to parse the date
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) {
+        // If can't parse, just search for the raw input
+        return [dateInput];
+      }
+
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const year = date.getFullYear();
+      
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      const monthName = monthNames[month - 1];
+      const monthNameShort = monthNamesShort[month - 1];
+      
+      const padZero = (num: number) => num.toString().padStart(2, '0');
+
+      // Generate all common date formats
+      formats.push(
+        // MM/DD/YYYY variations
+        `${padZero(month)}/${padZero(day)}/${year}`,
+        `${month}/${day}/${year}`,
+        `${padZero(month)}/${day}/${year}`,
+        `${month}/${padZero(day)}/${year}`,
+        
+        // DD/MM/YYYY variations
+        `${padZero(day)}/${padZero(month)}/${year}`,
+        `${day}/${month}/${year}`,
+        `${padZero(day)}/${month}/${year}`,
+        `${day}/${padZero(month)}/${year}`,
+        
+        // YYYY-MM-DD variations
+        `${year}-${padZero(month)}-${padZero(day)}`,
+        `${year}-${month}-${day}`,
+        
+        // Month DD, YYYY
+        `${monthName} ${padZero(day)}, ${year}`,
+        `${monthName} ${day}, ${year}`,
+        `${monthNameShort} ${padZero(day)}, ${year}`,
+        `${monthNameShort} ${day}, ${year}`,
+        
+        // DD Month YYYY
+        `${padZero(day)} ${monthName} ${year}`,
+        `${day} ${monthName} ${year}`,
+        `${padZero(day)} ${monthNameShort} ${year}`,
+        `${day} ${monthNameShort} ${year}`,
+        
+        // MM-DD-YYYY variations
+        `${padZero(month)}-${padZero(day)}-${year}`,
+        `${month}-${day}-${year}`,
+        
+        // DD-MM-YYYY variations
+        `${padZero(day)}-${padZero(month)}-${year}`,
+        `${day}-${month}-${year}`,
+        
+        // Month DD YYYY (no comma)
+        `${monthName} ${padZero(day)} ${year}`,
+        `${monthName} ${day} ${year}`,
+        `${monthNameShort} ${padZero(day)} ${year}`,
+        `${monthNameShort} ${day} ${year}`,
+        
+        // YYYY/MM/DD
+        `${year}/${padZero(month)}/${padZero(day)}`,
+        `${year}/${month}/${day}`,
+        
+        // DD.MM.YYYY (European)
+        `${padZero(day)}.${padZero(month)}.${year}`,
+        `${day}.${month}.${year}`
+      );
+
+      return [...new Set(formats)]; // Remove duplicates
+    };
+
     searchKeywords();
-  }, [pdf, keywords, isSearching, onKeywordMatchesDetected]);
+  }, [pdf, keywords, dateSearch, isSearching, onKeywordMatchesDetected]);
 
   const renderPage = useCallback(async () => {
     console.log("renderPage called, pdf:", !!pdf, "canvas:", !!canvasRef.current);
