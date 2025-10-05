@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import * as pdfjsLib from "pdfjs-dist";
 import { Loader2 } from "lucide-react";
 
@@ -75,6 +75,9 @@ export const PDFPageDialog = ({ open, onOpenChange, pdfDocument, file, pageNumbe
       <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>{title || `Page ${pageNumber}`}</DialogTitle>
+          <DialogDescription>
+            Enlarged view of the PDF page
+          </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-center min-h-[400px]">
           {loading ? (
