@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
+import { PDFPageDialog } from "./PDFPageDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit, ZoomIn } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
@@ -114,6 +115,11 @@ export const PDFSignature = () => {
     dateOfOnset: string;
     firstConsultation: string;
   }>>({});
+  const [enlargedPageDialog, setEnlargedPageDialog] = useState<{
+    open: boolean;
+    fileIndex: number;
+    pageNum: number;
+  }>({ open: false, fileIndex: 0, pageNum: 1 });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfFilesRef = useRef<File[]>(pdfFiles);
@@ -2358,15 +2364,33 @@ export const PDFSignature = () => {
                             <div
                               key={page.key}
                               className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/10 cursor-pointer"
-                              onClick={() => {
-                                setCurrentPdfIndex(page.fileIndex);
-                                setSelectedPage(page.pageNum);
-                              }}
                             >
-                              <div className="flex items-center gap-2 text-sm">
+                              <div 
+                                className="flex items-center gap-2 text-sm flex-1"
+                                onClick={() => {
+                                  setCurrentPdfIndex(page.fileIndex);
+                                  setSelectedPage(page.pageNum);
+                                }}
+                              >
                                 <FileText className="w-4 h-4 text-muted-foreground" />
                                 <span>{page.fileName}</span>
                                 <span className="text-muted-foreground">- Page {page.pageNum}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEnlargedPageDialog({
+                                      open: true,
+                                      fileIndex: page.fileIndex,
+                                      pageNum: page.pageNum,
+                                    });
+                                  }}
+                                  className="h-7 w-7 p-0 hover:text-primary"
+                                  title="View enlarged"
+                                >
+                                  <ZoomIn className="h-3 w-3" />
+                                </Button>
                               </div>
                               <Button
                                 variant="ghost"
@@ -2480,6 +2504,17 @@ export const PDFSignature = () => {
         }}
         className="hidden"
       />
+
+      {/* Enlarged Page Dialog */}
+      {enlargedPageDialog.open && pdfFiles[enlargedPageDialog.fileIndex] && (
+        <PDFPageDialog
+          open={enlargedPageDialog.open}
+          onOpenChange={(open) => setEnlargedPageDialog({ ...enlargedPageDialog, open })}
+          file={pdfFiles[enlargedPageDialog.fileIndex]}
+          pageNumber={enlargedPageDialog.pageNum}
+          title={`${pdfFiles[enlargedPageDialog.fileIndex].name} - Page ${enlargedPageDialog.pageNum}`}
+        />
+      )}
     </div>
   );
 };

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles, Search } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
+import { PDFPageDialog } from "./PDFPageDialog";
 // Use Vite worker for pdf.js to avoid CORS/version issues
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - Vite ?worker returns a Worker constructor
@@ -76,12 +77,7 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
-  // Magnifier constants
-  const MAGNIFIER_RADIUS = 360;
-  const MAGNIFICATION = 2.5;
-  // Magnifier state for zoom effect on hover
-  const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null);
-  const magnifierCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [showEnlargedPage, setShowEnlargedPage] = useState(false);
 
   const currentFile = files[currentFileIndex] || null;
 
@@ -377,75 +373,8 @@ export const PDFViewer = ({
     }
   }, [pdf, currentPage, scale, rotation, matchingPages]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !containerRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const containerRect = containerRef.current.getBoundingClientRect();
-
-    // Mouse position relative to canvas (CSS pixels)
-    const cssX = e.clientX - rect.left;
-    const cssY = e.clientY - rect.top;
-
-    // Map CSS pixels to canvas internal pixel coordinates
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = cssX * scaleX;
-    const y = cssY * scaleY;
-
-    // Position magnifier relative to container and its scroll
-    const posX = e.clientX - containerRect.left + containerRef.current.scrollLeft;
-    const posY = e.clientY - containerRect.top + containerRef.current.scrollTop;
-    setMagnifierPos({ x: posX, y: posY });
-    
-    // Draw magnified area if overlay canvas exists
-    if (!magnifierCanvasRef.current) return;
-    const magnifierCanvas = magnifierCanvasRef.current;
-    const magnifierCtx = magnifierCanvas.getContext("2d");
-    if (!magnifierCtx) return;
-    
-    magnifierCanvas.width = MAGNIFIER_RADIUS * 2;
-    magnifierCanvas.height = MAGNIFIER_RADIUS * 2;
-
-    // Improve text crispness
-    magnifierCtx.imageSmoothingEnabled = false;
-    
-    // Clear magnifier
-    magnifierCtx.clearRect(0, 0, magnifierCanvas.width, magnifierCanvas.height);
-    
-    // Draw circular clip
-    magnifierCtx.save();
-    magnifierCtx.beginPath();
-    magnifierCtx.arc(MAGNIFIER_RADIUS, MAGNIFIER_RADIUS, MAGNIFIER_RADIUS, 0, Math.PI * 2);
-    magnifierCtx.closePath();
-    magnifierCtx.clip();
-    
-    // Compute source window on the main canvas
-    const sourceWidth = (MAGNIFIER_RADIUS * 2) / MAGNIFICATION;
-    const sourceHeight = (MAGNIFIER_RADIUS * 2) / MAGNIFICATION;
-    const sourceX = Math.max(0, Math.min(canvas.width - sourceWidth, x - sourceWidth / 2));
-    const sourceY = Math.max(0, Math.min(canvas.height - sourceHeight, y - sourceHeight / 2));
-    
-    // Draw magnified content
-    magnifierCtx.drawImage(
-      canvas,
-      sourceX, sourceY, sourceWidth, sourceHeight,
-      0, 0, MAGNIFIER_RADIUS * 2, MAGNIFIER_RADIUS * 2
-    );
-    
-    magnifierCtx.restore();
-    
-    // Draw border
-    magnifierCtx.strokeStyle = "rgba(0,0,0,0.6)";
-    magnifierCtx.lineWidth = 3;
-    magnifierCtx.beginPath();
-    magnifierCtx.arc(MAGNIFIER_RADIUS, MAGNIFIER_RADIUS, MAGNIFIER_RADIUS - 1.5, 0, Math.PI * 2);
-    magnifierCtx.stroke();
-  };
-
-  const handleMouseLeave = () => {
-    setMagnifierPos(null);
+  const handleCanvasClick = () => {
+    setShowEnlargedPage(true);
   };
 
   useEffect(() => {
@@ -798,27 +727,26 @@ export const PDFViewer = ({
           <>
             <canvas
               ref={canvasRef}
-              className="shadow-medium border"
+              className="shadow-medium border cursor-pointer hover:shadow-lg transition-shadow"
               style={{
                 maxWidth: "100%",
                 height: "auto",
               }}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
+              onClick={handleCanvasClick}
             />
-            {magnifierPos && (
-              <canvas
-                ref={magnifierCanvasRef}
-                className="pointer-events-none absolute rounded-full shadow-lg z-20"
-                style={{
-                  left: magnifierPos.x - MAGNIFIER_RADIUS,
-                  top: magnifierPos.y - MAGNIFIER_RADIUS,
-                }}
-              />
-            )}
           </>
         )}
       </div>
+
+      {currentFile && (
+        <PDFPageDialog
+          open={showEnlargedPage}
+          onOpenChange={setShowEnlargedPage}
+          file={currentFile}
+          pageNumber={currentPage}
+          title={`${currentFile.name} - Page ${currentPage}`}
+        />
+      )}
 
       {matchingPages.size > 0 && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-medium text-sm">
