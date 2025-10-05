@@ -26,6 +26,7 @@ interface PDFViewerProps {
   matchingPages: Set<number>;
   isSearching: boolean;
   onKeywordMatchesDetected: (matches: KeywordMatch[]) => void;
+  onTextExtracted?: (fileIndex: number, fileName: string, pageTexts: Array<{ pageNum: number; text: string }>) => void;
   selectedPage: number | null;
   onPageChange: (page: number) => void;
 }
@@ -38,6 +39,7 @@ export const PDFViewer = ({
   matchingPages,
   isSearching,
   onKeywordMatchesDetected,
+  onTextExtracted,
   selectedPage,
   onPageChange,
 }: PDFViewerProps) => {
@@ -83,6 +85,35 @@ export const PDFViewer = ({
 
     loadPdf();
   }, [currentFile]);
+
+  // Extract text from all pages for AI analysis
+  useEffect(() => {
+    const extractText = async () => {
+      if (!currentFile || !onTextExtracted) return;
+
+      try {
+        const arrayBuffer = await currentFile.arrayBuffer();
+        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+        const pageTexts: Array<{ pageNum: number; text: string }> = [];
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          const page = await pdfDoc.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          
+          pageTexts.push({ pageNum, text: pageText });
+        }
+
+        onTextExtracted(currentFileIndex, currentFile.name, pageTexts);
+      } catch (error) {
+        console.error("Error extracting text from PDF:", error);
+      }
+    };
+
+    extractText();
+  }, [currentFile, currentFileIndex, onTextExtracted]);
 
   useEffect(() => {
     const searchKeywords = async () => {

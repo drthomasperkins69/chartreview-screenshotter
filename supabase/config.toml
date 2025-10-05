@@ -2,3 +2,6 @@ project_id = "hpclzzykgxolszduecqa"
 
 [functions.pdf-search-assistant]
 verify_jwt = false
+
+[functions.analyze-pdf-content]
+verify_jwt = false

@@ -58,11 +58,18 @@ interface KeywordMatch {
   fileIndex: number;
 }
 
+interface PDFContent {
+  fileName: string;
+  fileIndex: number;
+  pages: Array<{ pageNum: number; text: string }>;
+}
+
 export const PDFSignature = () => {
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
+  const [pdfContent, setPdfContent] = useState<PDFContent[]>([]);
   const [searchCategories, setSearchCategories] = useState<Array<{
     id: number;
     label: string;
@@ -368,6 +375,18 @@ export const PDFSignature = () => {
     }
   }, [searchCategories]);
 
+  const handleAIPageSelection = useCallback((pages: Array<{ fileIndex: number; pageNum: number }>) => {
+    const pageKeys = new Set(pages.map(p => `${p.fileIndex}-${p.pageNum}`));
+    setSelectedPagesForExtraction(pageKeys);
+  }, []);
+
+  const handlePDFTextExtracted = useCallback((fileIndex: number, fileName: string, pageTexts: Array<{ pageNum: number; text: string }>) => {
+    setPdfContent(prev => {
+      const existing = prev.filter(p => p.fileIndex !== fileIndex);
+      return [...existing, { fileName, fileIndex, pages: pageTexts }];
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="border-b bg-card shadow-soft">
@@ -427,7 +446,9 @@ export const PDFSignature = () => {
           <div className="h-[400px]">
             <AISearchAssistant 
               onKeywordSuggest={handleKeywordSuggest}
+              onPagesSelected={handleAIPageSelection}
               currentKeywords={keywords}
+              pdfContent={pdfContent}
             />
           </div>
 
@@ -627,6 +648,7 @@ export const PDFSignature = () => {
                       matchingPages={matchingPages}
                       isSearching={isSearching}
                       onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                      onTextExtracted={handlePDFTextExtracted}
                       selectedPage={selectedPage}
                       onPageChange={setSelectedPage}
                     />
