@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
@@ -444,26 +444,26 @@ export const PDFViewer = ({
             <ChevronRight className="w-4 h-4" />
           </Button>
           {onTogglePageSelection && (
-            <>
+            <div className="flex items-center gap-1 ml-2">
               <Button
                 variant={isCurrentPageSelected ? "default" : "outline"}
                 size="sm"
                 onClick={handleAddCurrentPage}
-                className="ml-2"
               >
                 {isCurrentPageSelected ? "✓ Added" : "+ Add Page"}
               </Button>
-              {isCurrentPageSelected && onDeletePage && (
+              {onDeletePage && (
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={handleDeleteCurrentPage}
-                  className="ml-1"
+                  disabled={!isCurrentPageSelected}
+                  title={!isCurrentPageSelected ? "Add page first to delete" : "Delete this page"}
                 >
-                  🗑️ Delete
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               )}
-            </>
+            </div>
           )}
         </div>
 
