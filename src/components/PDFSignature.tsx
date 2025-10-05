@@ -311,13 +311,21 @@ export const PDFSignature = () => {
   const handlePageClick = useCallback((pageNum: number, fileIndex: number) => {
     if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < pdfFiles.length) {
       if (fileIndex !== currentPdfIndex) {
+        // Switch to new file first
         setCurrentPdfIndex(fileIndex);
         const newMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
         const pages = new Set(newMatches.map(m => m.page));
         setMatchingPages(pages);
-      }
-      if (autoNavigate) {
-        setSelectedPage(pageNum);
+        
+        // Set page for the new file
+        if (autoNavigate) {
+          setSelectedPage(pageNum);
+        }
+      } else {
+        // Same file, just navigate to page
+        if (autoNavigate) {
+          setSelectedPage(pageNum);
+        }
       }
     }
   }, [autoNavigate, currentPdfIndex, pdfFiles.length, keywordMatches]);

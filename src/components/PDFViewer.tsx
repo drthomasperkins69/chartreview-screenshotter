@@ -84,8 +84,10 @@ export const PDFViewer = ({
         // Only reset to page 1 if there's no selectedPage, otherwise keep the selection
         if (selectedPage === null || selectedPage > pdfDoc.numPages) {
           setCurrentPage(1);
+          onPageChange(1);
         } else {
           setCurrentPage(selectedPage);
+          onPageChange(selectedPage);
         }
         setLoading(false);
         console.log("PDF load complete");
@@ -96,7 +98,7 @@ export const PDFViewer = ({
     };
 
     loadPdf();
-  }, [currentFile, selectedPage]);
+  }, [currentFile, selectedPage, onPageChange]);
 
   // Manual OCR scan function exposed to parent
   useEffect(() => {
