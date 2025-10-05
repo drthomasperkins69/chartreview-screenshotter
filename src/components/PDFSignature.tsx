@@ -375,35 +375,128 @@ export const PDFSignature = () => {
     setSelectedPagesForExtraction(new Set());
   }, []);
 
-  const removeMatchFromList = useCallback((fileIndex: number, pageNum: number) => {
-    // Remove from keyword matches
-    setKeywordMatches(prev => prev.filter(m => !(m.fileIndex === fileIndex && m.page === pageNum)));
-    
-    // Remove from selected pages
-    setSelectedPagesForExtraction(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(`${fileIndex}-${pageNum}`);
-      return newSet;
-    });
-    
-    // Remove diagnosis for this page
-    setPageDiagnoses(prev => {
-      const newDiagnoses = { ...prev };
-      delete newDiagnoses[`${fileIndex}-${pageNum}`];
-      return newDiagnoses;
-    });
-    
-    // Remove from matching pages if it's the current PDF
-    if (fileIndex === currentPdfIndex) {
-      setMatchingPages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(pageNum);
+  const removeMatchFromList = useCallback(async (fileIndex: number, pageNum: number) => {
+    try {
+      // Load the original PDF
+      const file = pdfFiles[fileIndex];
+      if (!file) return;
+      
+      toast("Removing page from PDF file...");
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      
+      // Create new PDF without the deleted page
+      const newPdfDoc = await PDFDocument.create();
+      const totalPages = pdfDoc.getPageCount();
+      
+      for (let i = 0; i < totalPages; i++) {
+        if (i + 1 !== pageNum) { // Skip the page to delete (convert 0-indexed to 1-indexed)
+          const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i]);
+          newPdfDoc.addPage(copiedPage);
+        }
+      }
+      
+      // Save the new PDF
+      const pdfBytes = await newPdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const newFile = new File([blob], file.name, { type: 'application/pdf' });
+      
+      // Update the files array
+      setPdfFiles(prev => {
+        const newFiles = [...prev];
+        newFiles[fileIndex] = newFile;
+        return newFiles;
+      });
+      
+      // Update all page references for this file (shift down page numbers after deleted page)
+      setKeywordMatches(prev => prev
+        .filter(m => !(m.fileIndex === fileIndex && m.page === pageNum))
+        .map(m => {
+          if (m.fileIndex === fileIndex && m.page > pageNum) {
+            return { ...m, page: m.page - 1 };
+          }
+          return m;
+        })
+      );
+      
+      // Update selected pages
+      setSelectedPagesForExtraction(prev => {
+        const newSet = new Set<string>();
+        prev.forEach(key => {
+          const [fIdx, pNum] = key.split('-').map(Number);
+          if (fIdx === fileIndex) {
+            if (pNum !== pageNum) {
+              // Shift page numbers down for pages after the deleted one
+              const newPageNum = pNum > pageNum ? pNum - 1 : pNum;
+              newSet.add(`${fIdx}-${newPageNum}`);
+            }
+          } else {
+            newSet.add(key);
+          }
+        });
         return newSet;
       });
+      
+      // Update diagnoses
+      setPageDiagnoses(prev => {
+        const newDiagnoses: Record<string, string> = {};
+        Object.entries(prev).forEach(([key, value]) => {
+          const [fIdx, pNum] = key.split('-').map(Number);
+          if (fIdx === fileIndex) {
+            if (pNum !== pageNum) {
+              const newPageNum = pNum > pageNum ? pNum - 1 : pNum;
+              newDiagnoses[`${fIdx}-${newPageNum}`] = value;
+            }
+          } else {
+            newDiagnoses[key] = value;
+          }
+        });
+        return newDiagnoses;
+      });
+      
+      // Update PDF content
+      setPdfContent(prev => prev.map(content => {
+        if (content.fileIndex === fileIndex) {
+          return {
+            ...content,
+            pages: content.pages
+              .filter(p => p.pageNum !== pageNum)
+              .map(p => ({
+                ...p,
+                pageNum: p.pageNum > pageNum ? p.pageNum - 1 : p.pageNum
+              }))
+          };
+        }
+        return content;
+      }));
+      
+      // Remove from matching pages if it's the current PDF
+      if (fileIndex === currentPdfIndex) {
+        setMatchingPages(prev => {
+          const newSet = new Set<number>();
+          prev.forEach(p => {
+            if (p !== pageNum) {
+              newSet.add(p > pageNum ? p - 1 : p);
+            }
+          });
+          return newSet;
+        });
+        
+        // Navigate to previous page if we deleted the current page
+        if (selectedPage === pageNum) {
+          setSelectedPage(Math.max(1, pageNum - 1));
+        } else if (selectedPage && selectedPage > pageNum) {
+          setSelectedPage(selectedPage - 1);
+        }
+      }
+      
+      toast.success("Page removed from PDF file");
+    } catch (error) {
+      console.error("Error removing page from PDF:", error);
+      toast.error("Failed to remove page from PDF");
     }
-    
-    toast.success("Page removed from matches");
-  }, [currentPdfIndex]);
+  }, [pdfFiles, currentPdfIndex, selectedPage]);
 
   const handleCategoryCheckbox = useCallback((categoryId: number, checked: boolean) => {
     setSearchCategories(prev => 
