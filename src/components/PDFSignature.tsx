@@ -72,7 +72,7 @@ export const PDFSignature = () => {
     DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
   );
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
-  const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set()); // Format: "fileIndex-pageNumber"
+  const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set());
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
@@ -145,7 +145,6 @@ export const PDFSignature = () => {
   }, []);
 
   const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
-    // Filter out any invalid matches
     const validMatches = matches.filter(m => 
       !isNaN(m.fileIndex) && 
       m.fileIndex >= 0 && 
@@ -158,7 +157,6 @@ export const PDFSignature = () => {
     const pages = new Set(validMatches.filter(m => m.fileIndex === currentPdfIndex).map(m => m.page));
     setMatchingPages(pages);
     
-    // Auto-select all matching pages across all documents
     const allMatchingPages = new Set(validMatches.map(m => `${m.fileIndex}-${m.page}`));
     setSelectedPagesForExtraction(allMatchingPages);
     
@@ -191,7 +189,6 @@ export const PDFSignature = () => {
       
       const newPdfDoc = await PDFDocument.create();
       
-      // Group selections by file index
       const pagesByFile = new Map<number, number[]>();
       Array.from(selectedPagesForExtraction).forEach(key => {
         const [fileIndexStr, pageStr] = key.split('-');
@@ -204,7 +201,6 @@ export const PDFSignature = () => {
         pagesByFile.get(fileIndex)!.push(page);
       });
       
-      // Sort file indices and process in order
       const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
       
       for (const fileIndex of sortedFileIndices) {
@@ -276,7 +272,6 @@ export const PDFSignature = () => {
     if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < pdfFiles.length) {
       if (fileIndex !== currentPdfIndex) {
         setCurrentPdfIndex(fileIndex);
-        // Update matches for the new PDF
         const newMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
         const pages = new Set(newMatches.map(m => m.page));
         setMatchingPages(pages);
@@ -316,7 +311,6 @@ export const PDFSignature = () => {
       )
     );
     
-    // Auto-populate keywords when checked
     if (checked) {
       const category = searchCategories.find(cat => cat.id === categoryId);
       if (category?.terms.trim()) {
@@ -328,7 +322,6 @@ export const PDFSignature = () => {
         });
       }
     } else {
-      // Remove terms when unchecked
       const category = searchCategories.find(cat => cat.id === categoryId);
       if (category?.terms.trim()) {
         setKeywords(prev => {
@@ -342,7 +335,6 @@ export const PDFSignature = () => {
   }, [searchCategories]);
 
   const updateCategoryTerms = useCallback((categoryId: number, terms: string) => {
-    // Update local state only
     setSearchCategories(prev => 
       prev.map(cat => 
         cat.id === categoryId ? { ...cat, terms } : cat
@@ -375,7 +367,6 @@ export const PDFSignature = () => {
       toast.error('Failed to save keywords');
     }
   }, [searchCategories]);
-
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -431,313 +422,328 @@ export const PDFSignature = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {pdfFiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <FileUpload onFileSelect={handleFileSelect} />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              multiple
-              onChange={(e) => {
-                const files = e.target.files;
-                if (files && files.length > 0) {
-                  handleMultipleFileSelect(files);
-                }
-              }}
-              className="hidden"
+        <div className="space-y-6">
+          {/* AI Assistant - Always visible */}
+          <div className="h-[400px]">
+            <AISearchAssistant 
+              onKeywordSuggest={handleKeywordSuggest}
+              currentKeywords={keywords}
             />
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* PDF File Selector */}
-            {pdfFiles.length > 1 && (
-              <Card className="p-4 shadow-medium">
-                <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
-                <div className="flex flex-wrap gap-2">
-                  {pdfFiles.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Button
-                        variant={currentPdfIndex === index ? "default" : "outline"}
-                        onClick={() => {
-                          setCurrentPdfIndex(index);
-                          setMatchingPages(new Set());
-                          setKeywordMatches([]);
-                          setSelectedPagesForExtraction(new Set());
-                          setSelectedPage(null);
-                        }}
-                        className="gap-2"
-                        size="sm"
-                      >
-                        <FileText className="w-4 h-4" />
-                        {file.name || `PDF ${index + 1}`}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemovePdf(index)}
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      >
-                        ×
-                      </Button>
+
+          {/* Search Controls - Always visible */}
+          <Card className="p-4 shadow-medium">
+            <Label className="text-sm font-medium mb-3 block">
+              Quick Search Categories
+            </Label>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Body Parts Column */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Body Regions</h3>
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {searchCategories.filter(cat => BODY_PART_IDS.includes(cat.id)).map((category) => (
+                    <div key={category.id} className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id={`category-${category.id}`}
+                        checked={category.checked}
+                        onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                        className="mt-1 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <Label 
+                          htmlFor={`category-${category.id}`} 
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          {category.label}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter keywords (comma separated)"
+                            value={category.terms}
+                            onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                            className="text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => saveCategoryTerms(category.id)}
+                            className="whitespace-nowrap"
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </Card>
-            )}
-
-            {/* AI Assistant */}
-            <div className="h-[400px]">
-              <AISearchAssistant 
-                onKeywordSuggest={handleKeywordSuggest}
-                currentKeywords={keywords}
-              />
-            </div>
-
-            {/* Search Controls */}
-            <Card className="p-4 shadow-medium">
-              <Label className="text-sm font-medium mb-3 block">
-                Quick Search Categories
-              </Label>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Body Parts Column */}
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 text-primary">Body Regions</h3>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                    {searchCategories.filter(cat => BODY_PART_IDS.includes(cat.id)).map((category) => (
-                      <div key={category.id} className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id={`category-${category.id}`}
-                          checked={category.checked}
-                          onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
-                          className="mt-1 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="flex-1 space-y-2">
-                          <Label 
-                            htmlFor={`category-${category.id}`} 
-                            className="text-sm font-medium cursor-pointer"
-                          >
-                            {category.label}
-                          </Label>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Enter keywords (comma separated)"
-                              value={category.terms}
-                              onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                              className="text-sm"
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => saveCategoryTerms(category.id)}
-                              className="whitespace-nowrap"
-                            >
-                              Save
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Conditions Column */}
-                <div>
-                  <h3 className="text-sm font-semibold mb-3 text-primary">Conditions</h3>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                    {searchCategories.filter(cat => CONDITION_IDS.includes(cat.id)).map((category) => (
-                      <div key={category.id} className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id={`category-${category.id}`}
-                          checked={category.checked}
-                          onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
-                          className="mt-1 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="flex-1 space-y-2">
-                          <Label 
-                            htmlFor={`category-${category.id}`} 
-                            className="text-sm font-medium cursor-pointer"
-                          >
-                            {category.label}
-                          </Label>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Enter keywords (comma separated)"
-                              value={category.terms}
-                              onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
-                              className="text-sm"
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => saveCategoryTerms(category.id)}
-                              className="whitespace-nowrap"
-                            >
-                              Save
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
 
-              <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
-                Search Keywords
-              </Label>
-              <Input
-                id="keywords"
-                placeholder="e.g., contract, invoice, report"
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="mb-2"
-              />
-              
-              <div className="flex gap-2">
-                {suggestedKeywords && (
-                  <Button 
-                    onClick={useSuggestedKeywords}
-                    variant="outline"
-                    className="gap-2"
-                    size="sm"
-                  >
-                    Use Keywords
-                  </Button>
-                )}
-                
-                <Button 
-                  onClick={handleSearch} 
-                  className="gap-2"
-                  disabled={isSearching || !keywords.trim()}
-                >
-                  <Search className="w-4 h-4" />
-                  {isSearching ? "Searching..." : "Search PDF"}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Separate multiple keywords with commas
-              </p>
-            </Card>
-
-            {/* PDF Viewer and Matches Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* PDF Viewer - Takes up 2/3 of space */}
-              <div className="lg:col-span-2">
-                <Card className="shadow-medium overflow-hidden">
-                  <PDFViewer
-                    files={pdfFiles}
-                    currentFileIndex={currentPdfIndex}
-                    keywords={keywords}
-                    dateSearch=""
-                    matchingPages={matchingPages}
-                    isSearching={isSearching}
-                    onKeywordMatchesDetected={handleKeywordMatchesDetected}
-                    selectedPage={selectedPage}
-                    onPageChange={setSelectedPage}
-                  />
-                </Card>
-              </div>
-
-              {/* Matches Panel - Takes up 1/3 of space */}
-              {keywordMatches.length > 0 && (
-                <div className="lg:col-span-1">
-                  <Card className="p-4 shadow-medium h-full">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">
-                          Matches Found ({selectedPagesForExtraction.size} selected)
-                        </h3>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={selectAllPages}
-                          className="h-7 text-xs"
+              {/* Conditions Column */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Conditions</h3>
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {searchCategories.filter(cat => CONDITION_IDS.includes(cat.id)).map((category) => (
+                    <div key={category.id} className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id={`category-${category.id}`}
+                        checked={category.checked}
+                        onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                        className="mt-1 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <Label 
+                          htmlFor={`category-${category.id}`} 
+                          className="text-sm font-medium cursor-pointer"
                         >
-                          Select All
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={deselectAllPages}
-                          className="h-7 text-xs"
-                        >
-                          Clear
-                        </Button>
-                        <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
-                          <input
-                            type="checkbox"
-                            checked={autoNavigate}
-                            onChange={(e) => setAutoNavigate(e.target.checked)}
-                            className="w-3 h-3"
+                          {category.label}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter keywords (comma separated)"
+                            value={category.terms}
+                            onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                            className="text-sm"
                           />
-                          Auto-navigate
-                        </label>
-                      </div>
-                      <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                        {/* Group matches by file */}
-                        {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
-                          .filter(idx => !isNaN(idx) && idx >= 0)
-                          .sort((a, b) => a - b)
-                          .map((fileIndex) => {
-                            const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
-                            const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
-                            const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
-                            
-                            return (
-                              <div key={fileIndex} className="space-y-1">
-                                <div className="text-xs font-semibold text-primary sticky top-0 bg-background py-1">
-                                  📄 {fileName}
-                                </div>
-                                {pages.map((page) => {
-                                  const pageMatches = fileMatches.filter(m => m.page === page);
-                                  const selectionKey = `${fileIndex}-${page}`;
-                                  const isSelected = selectedPagesForExtraction.has(selectionKey);
-                                  const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
-                                  
-                                  return (
-                                    <div 
-                                      key={`${fileIndex}-${page}`}
-                                      className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
-                                        isCurrent ? 'ring-2 ring-primary' : ''
-                                      }`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => togglePageSelection(page, fileIndex)}
-                                        className="mt-0.5 w-4 h-4 cursor-pointer"
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                      <div 
-                                        className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={() => handlePageClick(page, fileIndex)}
-                                      >
-                                        <div className="font-medium">Page {page}</div>
-                                        {pageMatches.map((match, idx) => (
-                                          <div key={idx} className="text-muted-foreground">
-                                            "{match.keyword}" ({match.count}x)
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
+                          <Button
+                            size="sm"
+                            onClick={() => saveCategoryTerms(category.id)}
+                            className="whitespace-nowrap"
+                          >
+                            Save
+                          </Button>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <Label htmlFor="keywords" className="text-sm font-medium mb-2 block mt-6">
+              Search Keywords
+            </Label>
+            <Input
+              id="keywords"
+              placeholder="e.g., contract, invoice, report"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="mb-2"
+            />
+            
+            <div className="flex gap-2">
+              {suggestedKeywords && (
+                <Button 
+                  onClick={useSuggestedKeywords}
+                  variant="outline"
+                  className="gap-2"
+                  size="sm"
+                >
+                  Use Keywords
+                </Button>
+              )}
+              
+              <Button 
+                onClick={handleSearch} 
+                className="gap-2"
+                disabled={isSearching || !keywords.trim() || pdfFiles.length === 0}
+              >
+                <Search className="w-4 h-4" />
+                {isSearching ? "Searching..." : "Search PDF"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {pdfFiles.length === 0 ? "Upload a PDF to start searching" : "Separate multiple keywords with commas"}
+            </p>
+          </Card>
+
+          {pdfFiles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[40vh]">
+              <FileUpload onFileSelect={handleFileSelect} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                multiple
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files && files.length > 0) {
+                    handleMultipleFileSelect(files);
+                  }
+                }}
+                className="hidden"
+              />
+            </div>
+          ) : (
+            <>
+              {/* PDF File Selector */}
+              {pdfFiles.length > 1 && (
+                <Card className="p-4 shadow-medium">
+                  <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {pdfFiles.map((file, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Button
+                          variant={currentPdfIndex === index ? "default" : "outline"}
+                          onClick={() => {
+                            setCurrentPdfIndex(index);
+                            setMatchingPages(new Set());
+                            setKeywordMatches([]);
+                            setSelectedPagesForExtraction(new Set());
+                            setSelectedPage(null);
+                          }}
+                          className="gap-2"
+                          size="sm"
+                        >
+                          <FileText className="w-4 h-4" />
+                          {file.name || `PDF ${index + 1}`}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemovePdf(index)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* PDF Viewer and Matches Side by Side */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* PDF Viewer - Takes up 2/3 of space */}
+                <div className="lg:col-span-2">
+                  <Card className="shadow-medium overflow-hidden">
+                    <PDFViewer
+                      files={pdfFiles}
+                      currentFileIndex={currentPdfIndex}
+                      keywords={keywords}
+                      dateSearch=""
+                      matchingPages={matchingPages}
+                      isSearching={isSearching}
+                      onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                      selectedPage={selectedPage}
+                      onPageChange={setSelectedPage}
+                    />
                   </Card>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+
+                {/* Matches Panel - Takes up 1/3 of space */}
+                {keywordMatches.length > 0 && (
+                  <div className="lg:col-span-1">
+                    <Card className="p-4 shadow-medium h-full">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold">
+                            Matches Found ({selectedPagesForExtraction.size} selected)
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={selectAllPages}
+                            className="h-7 text-xs"
+                          >
+                            Select All
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={deselectAllPages}
+                            className="h-7 text-xs"
+                          >
+                            Clear
+                          </Button>
+                          <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={autoNavigate}
+                              onChange={(e) => setAutoNavigate(e.target.checked)}
+                              className="w-3 h-3"
+                            />
+                            Auto-navigate
+                          </label>
+                        </div>
+                        <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                          {/* Group matches by file */}
+                          {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
+                            .filter(idx => !isNaN(idx) && idx >= 0)
+                            .sort((a, b) => a - b)
+                            .map((fileIndex) => {
+                              const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
+                              const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
+                              const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
+                              
+                              return (
+                                <div key={fileIndex} className="space-y-1">
+                                  <div className="text-xs font-semibold text-primary sticky top-0 bg-background py-1">
+                                    📄 {fileName}
+                                  </div>
+                                  {pages.map((page) => {
+                                    const pageMatches = fileMatches.filter(m => m.page === page);
+                                    const selectionKey = `${fileIndex}-${page}`;
+                                    const isSelected = selectedPagesForExtraction.has(selectionKey);
+                                    const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
+                                    
+                                    return (
+                                      <div 
+                                        key={`${fileIndex}-${page}`}
+                                        className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
+                                          isCurrent ? 'ring-2 ring-primary' : ''
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => togglePageSelection(page, fileIndex)}
+                                          className="mt-0.5 w-4 h-4 cursor-pointer"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <div 
+                                          className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                          onClick={() => handlePageClick(page, fileIndex)}
+                                        >
+                                          <div className="font-medium">Page {page}</div>
+                                          {pageMatches.map((match, idx) => (
+                                            <div key={idx} className="text-muted-foreground">
+                                              "{match.keyword}" ({match.count}x)
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf"
+          multiple
+          onChange={(e) => {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              handleMultipleFileSelect(files);
+            }
+          }}
+          className="hidden"
+        />
       </main>
     </div>
   );
