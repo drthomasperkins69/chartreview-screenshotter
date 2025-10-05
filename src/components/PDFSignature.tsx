@@ -676,29 +676,27 @@ export const PDFSignature = () => {
       )}
 
       <main className="container mx-auto px-4 py-6">
-        {pdfFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-6">
-              <Card className="p-6 max-w-2xl bg-accent/20 border-accent">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent/30 flex items-center justify-center">
-                    🔒
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-foreground">Your Privacy is Protected</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      All PDF processing happens entirely in your browser. Your documents are never uploaded to any server, 
-                      and no data is stored or transmitted. When you close this tab, everything is automatically cleared from memory. 
-                      Your sensitive documents remain completely private and secure on your device.
-                    </p>
-                  </div>
-                </div>
-              </Card>
-              <FileUpload onFileSelect={handleFileSelect} />
+        {/* Privacy Notice - Show when no PDFs */}
+        {pdfFiles.length === 0 && (
+          <Card className="p-6 mb-4 bg-accent/20 border-accent">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-accent/30 flex items-center justify-center">
+                🔒
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-foreground">Your Privacy is Protected</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  All PDF processing happens entirely in your browser. Your documents are never uploaded to any server, 
+                  and no data is stored or transmitted. When you close this tab, everything is automatically cleared from memory. 
+                  Your sensitive documents remain completely private and secure on your device.
+                </p>
+              </div>
             </div>
-          ) : (
-            <>
-              {/* PDF File Selector */}
-              {pdfFiles.length > 1 && (
+          </Card>
+        )}
+
+        {/* PDF File Selector */}
+        {pdfFiles.length > 1 && (
                 <Card className="p-4 shadow-medium mb-4">
                   <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
                   <div className="flex flex-wrap gap-2">
@@ -760,8 +758,8 @@ export const PDFSignature = () => {
                 </Card>
               )}
 
-              {/* 3-Panel Layout: Search Controls | PDF Viewer + Assessment | Matches */}
-              <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-300px)] rounded-lg border">
+        {/* 3-Panel Layout: Search Controls | PDF Viewer + Assessment | Matches */}
+        <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-300px)] rounded-lg border">
                 {/* Left Panel: AI Assistant & Search Categories in Tabs */}
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
                   <Card className="h-full rounded-none border-0">
@@ -918,20 +916,26 @@ export const PDFSignature = () => {
                   <ResizablePanelGroup direction="vertical">
                     <ResizablePanel defaultSize={40} minSize={20}>
                       <Card className="h-full rounded-none border-0 overflow-hidden">
-                        <PDFViewer
-                          files={pdfFiles}
-                          currentFileIndex={currentPdfIndex}
-                          keywords={keywords}
-                          dateSearch=""
-                          matchingPages={matchingPages}
-                          isSearching={isSearching}
-                          onKeywordMatchesDetected={handleKeywordMatchesDetected}
-                          onTextExtracted={handlePDFTextExtracted}
-                          onOCRProgress={handleOCRProgress}
-                          selectedPage={selectedPage}
-                          onPageChange={setSelectedPage}
-                          triggerScan={handleScanFile}
-                        />
+                        {pdfFiles.length === 0 ? (
+                          <div className="h-full flex items-center justify-center p-6">
+                            <FileUpload onFileSelect={handleFileSelect} />
+                          </div>
+                        ) : (
+                          <PDFViewer
+                            files={pdfFiles}
+                            currentFileIndex={currentPdfIndex}
+                            keywords={keywords}
+                            dateSearch=""
+                            matchingPages={matchingPages}
+                            isSearching={isSearching}
+                            onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                            onTextExtracted={handlePDFTextExtracted}
+                            onOCRProgress={handleOCRProgress}
+                            selectedPage={selectedPage}
+                            onPageChange={setSelectedPage}
+                            triggerScan={handleScanFile}
+                          />
+                        )}
                       </Card>
                     </ResizablePanel>
                     
@@ -1055,10 +1059,10 @@ export const PDFSignature = () => {
                     )}
                   </Card>
                 </ResizablePanel>
-              </ResizablePanelGroup>
+        </ResizablePanelGroup>
 
-              {/* Settings Row: Generate Settings, DIA Settings, AI Model */}
-              <Card className="mt-4 p-4">
+        {/* Settings Row: Generate Settings, DIA Settings, AI Model */}
+        <Card className="mt-4 p-4">
                 <div className="flex items-center gap-6 flex-wrap">
                   <div className="flex items-center gap-2">
                     <Label className="text-sm font-medium whitespace-nowrap">Generate Settings</Label>
@@ -1090,10 +1094,10 @@ export const PDFSignature = () => {
                     </Select>
                   </div>
                 </div>
-              </Card>
+        </Card>
 
-              {/* SOP Upload Section */}
-              <Card className="mt-4 p-4">
+        {/* SOP Upload Section */}
+        <Card className="mt-4 p-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Upload SOP Documents (Optional)</Label>
@@ -1126,10 +1130,10 @@ export const PDFSignature = () => {
                     </div>
                   )}
                 </div>
-              </Card>
+        </Card>
 
-              {/* Generate Button - Full Width at Bottom */}
-              <div className="mt-4">
+        {/* Generate Button - Full Width at Bottom */}
+        <div className="mt-4">
                 <Button 
                   onClick={() => {
                     // Trigger generation in DiagnosticAssessment component
@@ -1145,38 +1149,37 @@ export const PDFSignature = () => {
                   <FileText className="w-4 h-4" />
                   Generate Diagnostic Assessment ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
                 </Button>
-              </div>
+        </div>
 
-              {/* Assessment Results Section */}
-              <DiagnosticAssessmentResults 
-                pdfContent={pdfContent}
-                selectedPages={selectedPagesForExtraction}
-                pdfFiles={pdfFiles}
-              />
-            </>
-          )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,application/pdf"
-          multiple
-          onChange={(e) => {
-            const files = e.target.files;
-            if (files && files.length > 0) {
-              handleMultipleFileSelect(files);
-            }
-          }}
-          className="hidden"
-        />
-        <input
-          ref={sopFileInputRef}
-          type="file"
-          accept=".pdf,application/pdf"
-          multiple
-          onChange={handleSopUpload}
-          className="hidden"
+        {/* Assessment Results */}
+        <DiagnosticAssessmentResults 
+          pdfContent={pdfContent}
+          selectedPages={selectedPagesForExtraction}
+          pdfFiles={pdfFiles}
         />
       </main>
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        multiple
+        onChange={(e) => {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            handleMultipleFileSelect(files);
+          }
+        }}
+        className="hidden"
+      />
+      <input
+        ref={sopFileInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        multiple
+        onChange={handleSopUpload}
+        className="hidden"
+      />
     </div>
   );
 };
