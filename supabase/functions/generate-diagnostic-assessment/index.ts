@@ -20,31 +20,36 @@ serve(async (req) => {
       );
     }
 
-    // Build context from selected pages
-    let context = "Selected PDF Content:\n\n";
+    // Build context from selected pages with images
+    const contentParts: any[] = [];
+    
+    // Add text context
+    let textContext = "Selected PDF Content:\n\n";
     selectedContent.forEach((page: any) => {
-      context += `--- ${page.fileName} (Page ${page.pageNum}) ---\n`;
-      context += `${page.text}\n\n`;
+      textContext += `--- ${page.fileName} (Page ${page.pageNum}) ---\n`;
+      textContext += `${page.text}\n\n`;
     });
 
     // Add SOP content if provided
     if (sopContent) {
-      context += "\n\n=== UPLOADED SOP DOCUMENTS (from rma.gov.au) ===\n";
-      context += sopContent;
+      textContext += "\n\n=== UPLOADED SOP DOCUMENTS (from rma.gov.au) ===\n";
+      textContext += sopContent;
     }
 
     const systemPrompt = `You are a medical diagnostic assessment specialist. Your task is to analyze the provided PDF content and create a comprehensive diagnostic assessment based on the specific instructions given.
 
 Follow the DIA (Diagnostic Instructions Assessment) provided exactly. Be thorough, accurate, and professional in your assessment.
 
-**IMPORTANT**: When analyzing SOP factors, reference the uploaded SOP documents provided below. All SOP information is sourced from rma.gov.au (Repatriation Medical Authority).`;
+**IMPORTANT**: When analyzing SOP factors, reference the uploaded SOP documents provided below. All SOP information is sourced from rma.gov.au (Repatriation Medical Authority).
+
+You have been provided with page screenshots from the selected documents. Use these images along with the extracted text to provide a comprehensive analysis.`;
 
     const userPrompt = `DIA Instructions:
 ${instructions}
 
-${context}
+${textContext}
 
-Please generate a diagnostic assessment based on the above instructions and PDF content.`;
+Please generate a diagnostic assessment based on the above instructions and PDF content. The page screenshots are attached for visual reference.`;
 
     let response;
 
@@ -55,6 +60,27 @@ Please generate a diagnostic assessment based on the above instructions and PDF 
       }
 
       console.log("Calling Claude API for diagnostic assessment");
+
+      // Build content array with text and images for Claude
+      const claudeContent: any[] = [
+        { type: "text", text: `${systemPrompt}\n\n${userPrompt}` }
+      ];
+
+      // Add images from selected pages
+      selectedContent.forEach((page: any) => {
+        if (page.image) {
+          // Claude expects base64 image data without the data URL prefix
+          const base64Data = page.image.split(',')[1] || page.image;
+          claudeContent.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: "image/jpeg",
+              data: base64Data
+            }
+          });
+        }
+      });
 
       response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -69,7 +95,7 @@ Please generate a diagnostic assessment based on the above instructions and PDF 
           messages: [
             {
               role: "user",
-              content: `${systemPrompt}\n\n${userPrompt}`
+              content: claudeContent
             }
           ],
         }),
@@ -109,6 +135,26 @@ Please generate a diagnostic assessment based on the above instructions and PDF 
 
       console.log("Calling Gemini API for diagnostic assessment");
 
+      // Build content parts with text and images for Gemini
+      const geminiParts: any[] = [
+        { text: systemPrompt },
+        { text: userPrompt }
+      ];
+
+      // Add images from selected pages
+      selectedContent.forEach((page: any) => {
+        if (page.image) {
+          // Gemini expects inline data with base64
+          const base64Data = page.image.split(',')[1] || page.image;
+          geminiParts.push({
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Data
+            }
+          });
+        }
+      });
+
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_API_KEY}`,
         {
@@ -117,10 +163,7 @@ Please generate a diagnostic assessment based on the above instructions and PDF 
           body: JSON.stringify({
             contents: [
               {
-                parts: [
-                  { text: systemPrompt },
-                  { text: userPrompt }
-                ],
+                parts: geminiParts,
               },
             ],
             generationConfig: {

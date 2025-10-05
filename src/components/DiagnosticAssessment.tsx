@@ -24,9 +24,10 @@ interface PDFContent {
 interface DiagnosticAssessmentProps {
   pdfContent: PDFContent[];
   selectedPages: Set<string>; // Format: "fileIndex-pageNum"
+  pdfFiles: File[]; // Add PDF files to capture screenshots
 }
 
-export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAssessmentProps) => {
+export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: DiagnosticAssessmentProps) => {
   const { diaInstructions } = useDIA();
   const [localInstructions, setLocalInstructions] = useState(diaInstructions);
   const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
@@ -99,22 +100,58 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages }: DiagnosticAs
         }
       }
 
-      // Extract content for selected pages
-      const selectedContent = Array.from(selectedPages).map(key => {
-        const [fileIndexStr, pageNumStr] = key.split('-');
-        const fileIndex = parseInt(fileIndexStr);
-        const pageNum = parseInt(pageNumStr);
-        
-        const pdfDoc = pdfContent.find(p => p.fileIndex === fileIndex);
-        const page = pdfDoc?.pages.find(p => p.pageNum === pageNum);
-        
-        return {
-          fileName: pdfDoc?.fileName || `Document ${fileIndex + 1}`,
-          fileIndex,
-          pageNum,
-          text: page?.text || ""
-        };
-      });
+      // Extract content and capture screenshots for selected pages
+      toast("Capturing page screenshots...");
+      const selectedContent = await Promise.all(
+        Array.from(selectedPages).map(async (key) => {
+          const [fileIndexStr, pageNumStr] = key.split('-');
+          const fileIndex = parseInt(fileIndexStr);
+          const pageNum = parseInt(pageNumStr);
+          
+          const pdfDoc = pdfContent.find(p => p.fileIndex === fileIndex);
+          const page = pdfDoc?.pages.find(p => p.pageNum === pageNum);
+          
+          let image: string | null = null;
+          
+          // Render page to canvas to capture screenshot
+          try {
+            const file = pdfFiles[fileIndex];
+            if (file) {
+              const arrayBuffer = await file.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+              const pdfPage = await pdf.getPage(pageNum);
+              
+              // Create a canvas to render the page
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              if (context) {
+                const viewport = pdfPage.getViewport({ scale: 1.5 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                await pdfPage.render({
+                  canvasContext: context,
+                  viewport: viewport,
+                  canvas: canvas,
+                }).promise;
+                
+                // Convert canvas to base64 image
+                image = canvas.toDataURL('image/jpeg', 0.85);
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to capture screenshot for page ${key}:`, error);
+          }
+          
+          return {
+            fileName: pdfDoc?.fileName || `Document ${fileIndex + 1}`,
+            fileIndex,
+            pageNum,
+            text: page?.text || "",
+            image
+          };
+        })
+      );
 
       const resp = await fetch(`${FUNCTIONS_BASE}/functions/v1/generate-diagnostic-assessment`, {
         method: "POST",

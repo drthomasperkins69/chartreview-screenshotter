@@ -758,6 +758,7 @@ export const PDFSignature = () => {
                         <DiagnosticAssessment 
                           pdfContent={pdfContent}
                           selectedPages={selectedPagesForExtraction}
+                          pdfFiles={pdfFiles}
                         />
                       </TabsContent>
                       
