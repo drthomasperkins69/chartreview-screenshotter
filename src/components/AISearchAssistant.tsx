@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Send, Bot, User } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+// Avoid importing supabase client at module load to prevent crashes if env isn't ready
+const FUNCTIONS_BASE = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
+  "https://hpclzzykgxolszduecqa.supabase.co";
 import { toast } from "sonner";
 
 interface Message {
@@ -43,11 +45,20 @@ export const AISearchAssistant = ({ onKeywordSuggest }: AISearchAssistantProps) 
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("pdf-search-assistant", {
-        body: { messages: updatedMessages },
+      const resp = await fetch(`${FUNCTIONS_BASE}/functions/v1/pdf-search-assistant`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: updatedMessages }),
       });
 
-      if (error) throw error;
+      if (!resp.ok) {
+        if (resp.status === 429) throw new Error("Rate limits exceeded, please try again later.");
+        if (resp.status === 402) throw new Error("Payment required, please add credits to your workspace.");
+        const t = await resp.text();
+        throw new Error(`AI function error: ${t}`);
+      }
+
+      const data = await resp.json();
 
       const assistantMessage: Message = {
         role: "assistant",
