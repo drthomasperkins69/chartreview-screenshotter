@@ -342,14 +342,6 @@ export const PDFSignature = () => {
     const category = searchCategories.find(cat => cat.id === categoryId);
     if (!category) return;
 
-    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-
-    if (!url || !key) {
-      toast.error('Backend not available');
-      return;
-    }
-
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       const { error } = await supabase
@@ -365,7 +357,7 @@ export const PDFSignature = () => {
       }
     } catch (e) {
       console.error('Failed to update category', e);
-      toast.error('Failed to save keywords');
+      toast.error('Backend not available - changes saved locally only');
     }
   }, [searchCategories]);
 
