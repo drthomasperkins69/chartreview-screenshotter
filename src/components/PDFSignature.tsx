@@ -376,9 +376,29 @@ export const PDFSignature = () => {
   }, [searchCategories]);
 
   const handleAIPageSelection = useCallback((pages: Array<{ fileIndex: number; pageNum: number }>) => {
+    // Create keyword matches for display in the Matches Found panel
+    const matches: KeywordMatch[] = pages.map(p => ({
+      page: p.pageNum,
+      keyword: "AI Selected",
+      count: 1,
+      fileName: pdfFiles[p.fileIndex]?.name || `Document ${p.fileIndex + 1}`,
+      fileIndex: p.fileIndex
+    }));
+    
+    setKeywordMatches(matches);
+    
+    // Update matching pages for current PDF
+    const currentPdfPages = new Set(
+      matches
+        .filter(m => m.fileIndex === currentPdfIndex)
+        .map(m => m.page)
+    );
+    setMatchingPages(currentPdfPages);
+    
+    // Select all AI-selected pages for extraction
     const pageKeys = new Set(pages.map(p => `${p.fileIndex}-${p.pageNum}`));
     setSelectedPagesForExtraction(pageKeys);
-  }, []);
+  }, [pdfFiles, currentPdfIndex]);
 
   const handlePDFTextExtracted = useCallback((fileIndex: number, fileName: string, pageTexts: Array<{ pageNum: number; text: string }>) => {
     setPdfContent(prev => {
