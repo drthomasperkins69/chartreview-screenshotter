@@ -301,6 +301,7 @@ export type Database = {
           file_path: string
           file_size: number | null
           id: string
+          ocr_completed: boolean | null
           page_count: number | null
           uploaded_by: string | null
           workspace_id: string
@@ -311,6 +312,7 @@ export type Database = {
           file_path: string
           file_size?: number | null
           id?: string
+          ocr_completed?: boolean | null
           page_count?: number | null
           uploaded_by?: string | null
           workspace_id: string
@@ -321,6 +323,7 @@ export type Database = {
           file_path?: string
           file_size?: number | null
           id?: string
+          ocr_completed?: boolean | null
           page_count?: number | null
           uploaded_by?: string | null
           workspace_id?: string

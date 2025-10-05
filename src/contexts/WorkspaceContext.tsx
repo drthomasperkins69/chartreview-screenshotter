@@ -104,25 +104,13 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         const filesMap: Record<string, WorkspaceFile[]> = {};
         const diagnosesMap: Record<string, WorkspaceDiagnosis[]> = {};
         
-        // Fetch OCR status for all files
+        // Process files for all workspaces
         for (let index = 0; index < data.length; index++) {
           const workspace = data[index];
           const files = filesResults[index].data || [];
           
-          const filesWithOcrStatus = await Promise.all(
-            files.map(async (file) => {
-              const { data: pages, error: pagesError } = await supabase
-                .from("file_pages")
-                .select("ocr_completed")
-                .eq("file_id", file.id)
-                .limit(1);
-              
-              const ocr_completed = !pagesError && pages && pages.length > 0 && pages[0].ocr_completed;
-              return { ...file, ocr_completed };
-            })
-          );
-          
-          filesMap[workspace.id] = filesWithOcrStatus;
+          // OCR status is now directly on workspace_files
+          filesMap[workspace.id] = files;
           diagnosesMap[workspace.id] = (diagnosesResults[index].data || []).map(d => ({
             ...d,
             pages: d.pages as any as Array<{ fileId: string; fileName: string; pageNum: number; key: string }>
@@ -149,25 +137,12 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error fetching files:", error);
       toast.error("Failed to load files");
     } else {
-      // Check OCR status for each file
-      const filesWithOcrStatus = await Promise.all(
-        (data || []).map(async (file) => {
-          const { data: pages, error: pagesError } = await supabase
-            .from("file_pages")
-            .select("ocr_completed")
-            .eq("file_id", file.id)
-            .limit(1);
-          
-          const ocr_completed = !pagesError && pages && pages.length > 0 && pages[0].ocr_completed;
-          return { ...file, ocr_completed };
-        })
-      );
-      
-      setWorkspaceFiles(filesWithOcrStatus);
+      // OCR status is now directly on workspace_files
+      setWorkspaceFiles(data || []);
       // Also update the all files map
       setAllWorkspaceFiles(prev => ({
         ...prev,
-        [selectedWorkspace.id]: filesWithOcrStatus
+        [selectedWorkspace.id]: data || []
       }));
     }
   };

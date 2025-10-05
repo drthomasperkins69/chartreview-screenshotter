@@ -956,14 +956,17 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         const metadata = fileMetadata.get(file.name);
         if (metadata) {
           try {
-            // Update file_pages table with OCR completion status
+            // Update workspace_files table with OCR completion status
             const { error: updateError } = await supabase
-              .from('file_pages')
+              .from('workspace_files')
               .update({ ocr_completed: true })
-              .eq('file_id', metadata.id);
+              .eq('id', metadata.id);
             
             if (updateError) {
               console.error('Error updating OCR status:', updateError);
+            } else {
+              // Refresh files to update the workspace sidebar
+              await refreshFiles();
             }
 
             // Generate embeddings for each page in the background
