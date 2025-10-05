@@ -36,7 +36,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
   const [assessment, setAssessment] = useState<string>("");
   const [editableAssessment, setEditableAssessment] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [sopFiles, setSopFiles] = useState<File[]>([]);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string>("");
   const [capturedPages, setCapturedPages] = useState<any[]>([]);
 
@@ -58,29 +57,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     return () => window.removeEventListener('generate-assessment', handleGenerate);
   }, [selectedPages, localInstructions]);
 
-  const handleSopUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const newFiles = Array.from(files).filter(file => 
-      file.type === "application/pdf" || 
-      file.name.toLowerCase().endsWith('.pdf')
-    );
-
-    if (newFiles.length === 0) {
-      toast.error("Please upload PDF files only");
-      return;
-    }
-
-    setSopFiles(prev => [...prev, ...newFiles]);
-    toast.success(`${newFiles.length} SOP file(s) added`);
-  };
-
-  const removeSopFile = (index: number) => {
-    setSopFiles(prev => prev.filter((_, i) => i !== index));
-    toast.success("SOP file removed");
-  };
-
   const handleGenerateAssessment = async (sopFilesFromEvent: File[] = []) => {
     if (!localInstructions.trim()) {
       toast.error("Please enter DIA instructions");
@@ -96,16 +72,13 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     setAssessment("");
     setEditableAssessment("");
 
-    // Use SOP files from event if provided, otherwise use local state
-    const filesToUse = sopFilesFromEvent.length > 0 ? sopFilesFromEvent : sopFiles;
-
     try {
       // Parse SOP files if any
       let sopContent = "";
-      if (filesToUse.length > 0) {
+      if (sopFilesFromEvent.length > 0) {
         toast("Extracting SOP content...");
         
-        for (const file of filesToUse) {
+        for (const file of sopFilesFromEvent) {
           const arrayBuffer = await file.arrayBuffer();
           const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
           let fileText = `\n\n--- SOP Document: ${file.name} ---\n\n`;
@@ -523,50 +496,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
-
-        <div>
-          <Label className="text-sm font-medium mb-2 block">
-            Upload SOP Documents (from rma.gov.au)
-          </Label>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => document.getElementById('sop-upload')?.click()}
-                className="w-full gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Upload SOP PDFs
-              </Button>
-              <input
-                id="sop-upload"
-                type="file"
-                accept=".pdf"
-                multiple
-                onChange={handleSopUpload}
-                className="hidden"
-              />
-            </div>
-            {sopFiles.length > 0 && (
-              <div className="space-y-1">
-                {sopFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
-                    <span className="truncate flex-1">{file.name}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSopFile(index)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
