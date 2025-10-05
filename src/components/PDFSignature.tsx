@@ -85,13 +85,55 @@ interface PDFContent {
 
 export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; path: string; name: string } | null }) => {
   const { user } = useAuth();
-  const { selectedWorkspace, refreshFiles } = useWorkspace();
+  const { selectedWorkspace, refreshFiles, workspaceFiles } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [fileMetadata, setFileMetadata] = useState<Map<string, { id: string; path: string }>>(new Map());
   
-  // Load selected file from storage
+  // Load all workspace files into PDF viewer
+  useEffect(() => {
+    const loadWorkspaceFiles = async () => {
+      if (!selectedWorkspace || !workspaceFiles.length) return;
+      
+      try {
+        const loadedFiles: File[] = [];
+        const metadata = new Map<string, { id: string; path: string }>();
+        
+        for (const wFile of workspaceFiles) {
+          const { data, error } = await supabase.storage
+            .from('pdf-files')
+            .download(wFile.file_path);
+          
+          if (error) throw error;
+          
+          const file = new File([data], wFile.file_name, { type: 'application/pdf' });
+          loadedFiles.push(file);
+          metadata.set(wFile.file_name, { id: wFile.id, path: wFile.file_path });
+        }
+        
+        setPdfFiles(loadedFiles);
+        setFileMetadata(metadata);
+      } catch (error) {
+        console.error('Error loading workspace files:', error);
+        toast.error('Failed to load some workspace files');
+      }
+    };
+    
+    loadWorkspaceFiles();
+  }, [selectedWorkspace, workspaceFiles]);
+  
+  // Load selected file from storage (when clicking from sidebar)
   useEffect(() => {
     const loadFileFromStorage = async () => {
       if (!selectedFile) return;
+      
+      // Check if file is already loaded
+      if (fileMetadata.has(selectedFile.name)) {
+        const index = pdfFiles.findIndex(f => f.name === selectedFile.name);
+        if (index >= 0) {
+          setCurrentPdfIndex(index);
+          return;
+        }
+      }
       
       try {
         const { data, error } = await supabase.storage
@@ -101,7 +143,9 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         if (error) throw error;
         
         const file = new File([data], selectedFile.name, { type: 'application/pdf' });
-        setPdfFiles([file]);
+        setPdfFiles(prev => [...prev, file]);
+        setFileMetadata(prev => new Map(prev).set(selectedFile.name, { id: selectedFile.id, path: selectedFile.path }));
+        setCurrentPdfIndex(pdfFiles.length);
       } catch (error) {
         console.error('Error loading file:', error);
         toast.error('Failed to load file');
@@ -287,12 +331,33 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       return;
     }
     
+    // If workspace is selected, upload all files to storage
+    if (selectedWorkspace && user) {
+      try {
+        toast.info('Uploading files to workspace...');
+        
+        for (const file of processedFiles) {
+          await uploadPdfToStorage(file, file.name, selectedWorkspace.id, user.id);
+        }
+        
+        toast.success(`${processedFiles.length} file(s) uploaded to workspace!`);
+        await refreshFiles();
+        // Files will be loaded via the workspace files effect
+        return;
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast.error('Failed to upload some files to workspace');
+        // Fall through to local add
+      }
+    }
+    
+    // Local-only add (no workspace selected)
     setPdfFiles(prev => [...prev, ...processedFiles]);
     setMatchingPages(new Set());
     setKeywordMatches([]);
     setSelectedPagesForExtraction(new Set());
     toast.success(`${processedFiles.length} file(s) added successfully!`);
-  }, []);
+  }, [selectedWorkspace, user, refreshFiles]);
 
   const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
     const validMatches = matches.filter(m => 
