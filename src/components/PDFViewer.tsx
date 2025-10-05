@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save } from "lucide-react";
 import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
@@ -407,6 +407,12 @@ export const PDFViewer = ({
 
   const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
   const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
+  const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
+
+  // Update local input when page changes
+  useEffect(() => {
+    setDiagnosisInput(currentDiagnosis);
+  }, [currentDiagnosis, currentPage, currentFileIndex]);
 
   if (loading) {
     return (
@@ -488,14 +494,30 @@ export const PDFViewer = ({
           <label htmlFor="diagnosis-input" className="block text-sm font-medium mb-2">
             Diagnosis for Page {currentPage}:
           </label>
-          <input
-            id="diagnosis-input"
-            type="text"
-            value={currentDiagnosis}
-            onChange={(e) => onDiagnosisChange(currentFileIndex, currentPage, e.target.value)}
-            placeholder="Enter diagnosis..."
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-          />
+          <div className="flex gap-2">
+            <input
+              id="diagnosis-input"
+              type="text"
+              value={diagnosisInput}
+              onChange={(e) => setDiagnosisInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput);
+                }
+              }}
+              placeholder="Enter diagnosis..."
+              className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+            />
+            <Button
+              onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
+              disabled={diagnosisInput === currentDiagnosis}
+              size="default"
+              className="gap-2"
+            >
+              <Save className="w-4 h-4" />
+              Save
+            </Button>
+          </div>
         </div>
       )}
 
