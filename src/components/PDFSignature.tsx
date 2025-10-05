@@ -86,7 +86,7 @@ interface PDFContent {
 
 export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; path: string; name: string } | null }) => {
   const { user } = useAuth();
-  const { selectedWorkspace, refreshFiles, workspaceFiles } = useWorkspace();
+  const { selectedWorkspace, refreshFiles, workspaceFiles, saveDiagnosis } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [fileMetadata, setFileMetadata] = useState<Map<string, { id: string; path: string }>>(new Map());
   
@@ -199,6 +199,54 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   useEffect(() => {
     pdfFilesRef.current = pdfFiles;
   }, [pdfFiles]);
+
+  // Auto-save diagnoses to Supabase whenever they change
+  useEffect(() => {
+    const saveDiagnosesToDB = async () => {
+      if (!selectedWorkspace || Object.keys(pageDiagnoses).length === 0) return;
+
+      // Group pages by diagnosis
+      const diagnosisGroups: Record<string, Array<{ fileId: string; fileName: string; pageNum: number; key: string }>> = {};
+      
+      Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
+        if (!diagnosisString?.trim()) return;
+        
+        const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
+        
+        individualDiagnoses.forEach(diagnosis => {
+          if (!diagnosisGroups[diagnosis]) {
+            diagnosisGroups[diagnosis] = [];
+          }
+          
+          const [fileIndex, pageNum] = key.split('-').map(Number);
+          const fileName = pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`;
+          
+          diagnosisGroups[diagnosis].push({
+            fileId: key,
+            fileName,
+            pageNum,
+            key
+          });
+        });
+      });
+
+      // Save each diagnosis group to Supabase
+      for (const [diagnosis, pages] of Object.entries(diagnosisGroups)) {
+        try {
+          await saveDiagnosis(diagnosis, pages);
+        } catch (error) {
+          console.error(`Error saving diagnosis "${diagnosis}":`, error);
+        }
+      }
+    };
+
+    // Debounce the save operation
+    const timeoutId = setTimeout(() => {
+      saveDiagnosesToDB();
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [pageDiagnoses, selectedWorkspace, pdfFiles, saveDiagnosis]);
 
   const currentPdf = pdfFiles[currentPdfIndex] || null;
 

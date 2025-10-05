@@ -30,7 +30,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload } from "lucide-react";
+import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload, Sparkles } from "lucide-react";
 import dvaLogo from "@/assets/dva-logo.png";
 import { uploadPdfToStorage } from "@/utils/supabaseStorage";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ interface WorkspaceSidebarProps {
 }
 
 export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
-  const { workspaces, selectedWorkspace, allWorkspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace, refreshFiles } =
+  const { workspaces, selectedWorkspace, allWorkspaceFiles, allWorkspaceDiagnoses, selectWorkspace, createWorkspace, deleteWorkspace, refreshFiles } =
     useWorkspace();
   const { user, signOut } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -276,6 +276,7 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                   const isExpanded = expandedWorkspaces.has(workspace.id);
                   const isSelected = selectedWorkspace?.id === workspace.id;
                   const filesForWorkspace = allWorkspaceFiles[workspace.id] || [];
+                  const diagnosesForWorkspace = allWorkspaceDiagnoses[workspace.id] || [];
                   
                   return (
                     <Collapsible key={workspace.id} open={isExpanded} onOpenChange={() => toggleWorkspace(workspace.id)}>
@@ -314,52 +315,93 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
-                        
                         <CollapsibleContent>
-                          <div className="ml-8 mt-1 space-y-1">
-                            {/* Hidden file input */}
-                            <input
-                              ref={(el) => (fileInputRefs.current[workspace.id] = el)}
-                              type="file"
-                              accept=".pdf,.html,.htm,.docx,.doc"
-                              multiple
-                              onChange={(e) => handleFileUpload(workspace.id, e.target.files)}
-                              className="hidden"
-                            />
-                            
-                            {/* Upload button */}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full justify-start text-xs h-8 mb-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerFileUpload(workspace.id);
-                              }}
-                              disabled={uploadingForWorkspace === workspace.id}
-                            >
-                              <Upload className="h-3 w-3 mr-2" />
-                              {uploadingForWorkspace === workspace.id ? 'Uploading...' : 'Upload Files'}
-                            </Button>
-
-                            {filesForWorkspace.length === 0 ? (
-                              <div className="text-xs text-muted-foreground py-2 px-2">
-                                No files yet
+                          <div className="ml-8 mt-1 space-y-3">
+                            {/* Files Section */}
+                            <div>
+                              <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
+                                Files
                               </div>
-                            ) : (
-                              filesForWorkspace.map((file) => (
-                                <Button
-                                  key={file.id}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full justify-start text-xs h-8"
-                                  onClick={() => onFileSelect?.(file.id, file.file_path, file.file_name)}
-                                >
-                                  <FileText className="h-3 w-3 mr-2" />
-                                  <span className="truncate">{file.file_name}</span>
-                                </Button>
-                              ))
-                            )}
+                              
+                              {/* Hidden file input */}
+                              <input
+                                ref={(el) => (fileInputRefs.current[workspace.id] = el)}
+                                type="file"
+                                accept=".pdf,.html,.htm,.docx,.doc"
+                                multiple
+                                onChange={(e) => handleFileUpload(workspace.id, e.target.files)}
+                                className="hidden"
+                              />
+                              
+                              {/* Upload button */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full justify-start text-xs h-8 mb-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  triggerFileUpload(workspace.id);
+                                }}
+                                disabled={uploadingForWorkspace === workspace.id}
+                              >
+                                <Upload className="h-3 w-3 mr-2" />
+                                {uploadingForWorkspace === workspace.id ? 'Uploading...' : 'Upload Files'}
+                              </Button>
+
+                              {filesForWorkspace.length === 0 ? (
+                                <div className="text-xs text-muted-foreground py-2 px-2">
+                                  No files yet
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  {filesForWorkspace.map((file) => (
+                                    <Button
+                                      key={file.id}
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-start text-xs h-8"
+                                      onClick={() => onFileSelect?.(file.id, file.file_path, file.file_name)}
+                                    >
+                                      <FileText className="h-3 w-3 mr-2" />
+                                      <span className="truncate">{file.file_name}</span>
+                                    </Button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Diagnoses Section */}
+                            <div>
+                              <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
+                                Diagnoses
+                              </div>
+                              
+                              {diagnosesForWorkspace.length === 0 ? (
+                                <div className="text-xs text-muted-foreground py-2 px-2">
+                                  No diagnoses yet
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  {diagnosesForWorkspace.map((diagnosis) => (
+                                    <Button
+                                      key={diagnosis.id}
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-start text-xs h-8"
+                                      title={diagnosis.diagnosis_name}
+                                    >
+                                      <Sparkles className="h-3 w-3 mr-2 text-primary" />
+                                      <span className="truncate flex-1 text-left">
+                                        {diagnosis.diagnosis_name}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        ({diagnosis.page_count})
+                                      </span>
+                                    </Button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </CollapsibleContent>
                       </SidebarMenuItem>

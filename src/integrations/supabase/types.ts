@@ -215,6 +215,47 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_diagnoses: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          diagnosis_name: string
+          id: string
+          page_count: number
+          pages: Json
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          diagnosis_name: string
+          id?: string
+          page_count?: number
+          pages?: Json
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          diagnosis_name?: string
+          id?: string
+          page_count?: number
+          pages?: Json
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_diagnoses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "patient_workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_files: {
         Row: {
           created_at: string | null
