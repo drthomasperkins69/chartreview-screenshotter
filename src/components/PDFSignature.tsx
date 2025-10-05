@@ -288,7 +288,10 @@ export const PDFSignature = () => {
   }, [suggestedKeywords]);
 
   const triggerFileUpload = () => {
-    fileInputRef.current?.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
   };
 
   const handlePageClick = useCallback((pageNum: number, fileIndex: number) => {
@@ -836,7 +839,7 @@ export const PDFSignature = () => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,application/pdf"
           multiple
           onChange={(e) => {
             const files = e.target.files;
