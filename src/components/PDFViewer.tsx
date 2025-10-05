@@ -33,6 +33,8 @@ interface PDFViewerProps {
   selectedPage: number | null;
   onPageChange: (page: number) => void;
   triggerScan?: (fileIndex: number) => void;
+  onTogglePageSelection?: (fileIndex: number, pageNum: number) => void;
+  selectedPagesForExtraction?: Set<string>;
 }
 
 export const PDFViewer = ({
@@ -48,6 +50,8 @@ export const PDFViewer = ({
   selectedPage,
   onPageChange,
   triggerScan,
+  onTogglePageSelection,
+  selectedPagesForExtraction,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -380,6 +384,16 @@ export const PDFViewer = ({
     setRotation(prev => (prev + 90) % 360);
   };
 
+  const handleAddCurrentPage = () => {
+    if (onTogglePageSelection) {
+      onTogglePageSelection(currentFileIndex, currentPage);
+      const isSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`);
+      toast.success(isSelected ? "Page removed from selection" : "Page added to selection");
+    }
+  };
+
+  const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96 bg-pdf-background">
@@ -415,6 +429,16 @@ export const PDFViewer = ({
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
+          {onTogglePageSelection && (
+            <Button
+              variant={isCurrentPageSelected ? "default" : "outline"}
+              size="sm"
+              onClick={handleAddCurrentPage}
+              className="ml-2"
+            >
+              {isCurrentPageSelected ? "✓ Added" : "+ Add Page"}
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

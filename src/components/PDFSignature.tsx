@@ -12,12 +12,9 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
-import { DiagnosticAssessment } from "./DiagnosticAssessment";
-import { DiagnosticAssessmentResults } from "./DiagnosticAssessmentResults";
-import { DIASettings } from "./DIASettings";
-import { useDIA } from "@/contexts/DIAContext";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2 } from "lucide-react";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
@@ -76,7 +73,6 @@ interface PDFContent {
 }
 
 export const PDFSignature = () => {
-  const { diaInstructions, setDiaInstructions } = useDIA();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
@@ -99,11 +95,8 @@ export const PDFSignature = () => {
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
-  const [sopFiles, setSopFiles] = useState<File[]>([]);
-  const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const sopFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentPdf = pdfFiles[currentPdfIndex] || null;
 
@@ -500,9 +493,8 @@ export const PDFSignature = () => {
     }
   }, []);
 
-  const handleSopUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleAddFiles = useCallback((files: FileList | null) => {
+    if (!files) return;
     
     const pdfFiles = Array.from(files).filter(file => file.type === "application/pdf");
     if (pdfFiles.length === 0) {
@@ -510,13 +502,8 @@ export const PDFSignature = () => {
       return;
     }
     
-    setSopFiles(prev => [...prev, ...pdfFiles]);
-    toast.success(`${pdfFiles.length} SOP file(s) added`);
-  }, []);
-
-  const removeSopFile = useCallback((index: number) => {
-    setSopFiles(prev => prev.filter((_, i) => i !== index));
-    toast.success("SOP file removed");
+    setPdfFiles(prev => [...prev, ...pdfFiles]);
+    toast.success(`${pdfFiles.length} PDF file(s) added`);
   }, []);
 
   const handleScanFile = useCallback(async (fileIndex: number) => {
@@ -601,6 +588,138 @@ export const PDFSignature = () => {
     }
   }, [pdfFiles, ocrCompletedFiles, handlePDFTextExtracted]);
 
+  const handleGeneratePDF = async () => {
+    if (selectedPagesForExtraction.size === 0) {
+      toast.error("Please select at least one page");
+      return;
+    }
+
+    try {
+      toast("Capturing page screenshots and creating PDF...");
+      
+      const selectedContent = await Promise.all(
+        Array.from(selectedPagesForExtraction).map(async (key) => {
+          const [fileIndexStr, pageNumStr] = key.split('-');
+          const fileIndex = parseInt(fileIndexStr);
+          const pageNum = parseInt(pageNumStr);
+          
+          const pdfDoc = pdfContent.find(p => p.fileIndex === fileIndex);
+          
+          let image: string | null = null;
+          
+          // Render page to canvas to capture screenshot
+          try {
+            const file = pdfFiles[fileIndex];
+            if (file) {
+              const arrayBuffer = await file.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+              const pdfPage = await pdf.getPage(pageNum);
+              
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              if (context) {
+                const viewport = pdfPage.getViewport({ scale: 1.5 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                await pdfPage.render({
+                  canvasContext: context,
+                  viewport: viewport,
+                  canvas: canvas,
+                }).promise;
+                
+                // Convert to JPEG with 85% quality
+                image = canvas.toDataURL('image/jpeg', 0.85);
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to capture screenshot for page ${key}:`, error);
+          }
+          
+          return {
+            fileName: pdfDoc?.fileName || `Document ${fileIndex + 1}`,
+            fileIndex,
+            pageNum,
+            image
+          };
+        })
+      );
+
+      // Create PDF with screenshots
+      const pdfDoc = await PDFDocument.create();
+      
+      for (const content of selectedContent) {
+        if (content.image) {
+          try {
+            const screenshotPage = pdfDoc.addPage([595, 842]);
+            
+            // Add header with page info
+            screenshotPage.drawText(`${content.fileName} - Page ${content.pageNum}`, {
+              x: 50,
+              y: 792,
+              size: 10,
+              color: rgb(0, 0, 0),
+            });
+            
+            // Embed the image
+            const imageBytes = content.image.split(',')[1];
+            const imageData = Uint8Array.from(atob(imageBytes), c => c.charCodeAt(0));
+            
+            let embeddedImage;
+            if (content.image.includes('image/png')) {
+              embeddedImage = await pdfDoc.embedPng(imageData);
+            } else {
+              embeddedImage = await pdfDoc.embedJpg(imageData);
+            }
+            
+            // Calculate dimensions to fit on page
+            const imgWidth = embeddedImage.width;
+            const imgHeight = embeddedImage.height;
+            const maxImageWidth = 495;
+            const maxImageHeight = 700;
+            
+            let scaledWidth = imgWidth;
+            let scaledHeight = imgHeight;
+            
+            if (imgWidth > maxImageWidth || imgHeight > maxImageHeight) {
+              const widthRatio = maxImageWidth / imgWidth;
+              const heightRatio = maxImageHeight / imgHeight;
+              const scale = Math.min(widthRatio, heightRatio);
+              
+              scaledWidth = imgWidth * scale;
+              scaledHeight = imgHeight * scale;
+            }
+            
+            const x = (595 - scaledWidth) / 2;
+            const y = 762 - scaledHeight;
+            
+            screenshotPage.drawImage(embeddedImage, {
+              x,
+              y,
+              width: scaledWidth,
+              height: scaledHeight,
+            });
+          } catch (error) {
+            console.error(`Failed to add screenshot for page ${content.pageNum}:`, error);
+          }
+        }
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `extracted-pages-${Date.now()}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF with screenshots created successfully!");
+    } catch (error) {
+      console.error("Error creating PDF:", error);
+      toast.error("Failed to create PDF");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="border-b bg-card shadow-soft">
@@ -620,42 +739,38 @@ export const PDFSignature = () => {
                 </p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <DIASettings />
-              {pdfFiles.length === 0 ? (
-                <Button onClick={triggerFileUpload} className="gap-2">
+            {pdfFiles.length === 0 ? (
+              <Button onClick={triggerFileUpload} className="gap-2">
+                <Upload className="w-4 h-4" />
+                Upload PDF(s)
+              </Button>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={triggerFileUpload}
+                  className="gap-2"
+                >
                   <Upload className="w-4 h-4" />
-                  Upload PDF(s)
+                  Add More PDFs
                 </Button>
-              ) : (
-                <>
-                  <Button 
-                    variant="outline" 
-                    onClick={triggerFileUpload}
-                    className="gap-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Add More PDFs
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleRemoveAllPdfs}
-                    className="gap-2"
-                  >
-                    Remove All
-                  </Button>
-                  <Button 
-                    onClick={handleDownload}
-                    disabled={selectedPagesForExtraction.size === 0}
-                    className="gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download {selectedPagesForExtraction.size > 0 ? `(${selectedPagesForExtraction.size})` : 'Extracted Pages'}
-                  </Button>
-                </>
-              )}
-            </div>
+                <Button 
+                  variant="outline" 
+                  onClick={handleRemoveAllPdfs}
+                  className="gap-2"
+                >
+                  Remove All
+                </Button>
+                <Button 
+                  onClick={handleDownload}
+                  disabled={selectedPagesForExtraction.size === 0}
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download {selectedPagesForExtraction.size > 0 ? `(${selectedPagesForExtraction.size})` : 'Extracted Pages'}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -935,7 +1050,7 @@ export const PDFSignature = () => {
                 {/* Middle Panel: PDF Viewer Only */}
                 <ResizablePanel defaultSize={50} minSize={30}>
                   <Card className="h-full rounded-none border-0 overflow-hidden">
-                    {pdfFiles.length === 0 ? (
+            {pdfFiles.length === 0 ? (
                       <div className="h-full flex items-center justify-center p-6">
                         <FileUpload onFileSelect={handleFileSelect} />
                       </div>
@@ -953,6 +1068,8 @@ export const PDFSignature = () => {
                         selectedPage={selectedPage}
                         onPageChange={setSelectedPage}
                         triggerScan={handleScanFile}
+                        onTogglePageSelection={togglePageSelection}
+                        selectedPagesForExtraction={selectedPagesForExtraction}
                       />
                     )}
                   </Card>
@@ -1074,108 +1191,18 @@ export const PDFSignature = () => {
                 </ResizablePanel>
         </ResizablePanelGroup>
 
-        {/* Settings Row: Generate Settings, DIA Settings, AI Model */}
-        <Card className="mt-4 p-4">
-                <div className="flex items-center gap-6 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm font-medium whitespace-nowrap">Generate Settings</Label>
-                    <DIASettings />
-                  </div>
-                  
-                  <div className="flex-1 min-w-[200px]">
-                    <Label htmlFor="model-select" className="text-sm font-medium mb-2 block">
-                      AI Model
-                    </Label>
-                    <Select value={selectedModel} onValueChange={(value: "gemini" | "claude") => setSelectedModel(value)}>
-                      <SelectTrigger id="model-select" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="gemini">
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4" />
-                            Google Gemini (Free)
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="claude">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            Claude (Paid)
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-        </Card>
-
-        {/* SOP Upload Section */}
-        <Card className="mt-4 p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Upload SOP Documents (Optional)</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => sopFileInputRef.current?.click()}
-                      className="gap-2"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Add SOP
-                    </Button>
-                  </div>
-                  
-                  {sopFiles.length > 0 && (
-                    <div className="space-y-2">
-                      {sopFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-accent/10 rounded border">
-                          <span className="text-sm truncate flex-1">{file.name}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeSopFile(index)}
-                            className="h-6 px-2 text-destructive"
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-        </Card>
-
-        {/* Generate Button - Full Width at Bottom */}
+        {/* Generate PDF Button - Full Width at Bottom */}
         <div className="mt-4">
-                <Button 
-                  onClick={() => {
-                    // Trigger generation in DiagnosticAssessment component
-                    const event = new CustomEvent('generate-assessment', {
-                      detail: { sopFiles }
-                    });
-                    window.dispatchEvent(event);
-                  }}
-                  disabled={selectedPagesForExtraction.size === 0}
-                  className="w-full gap-2"
-                  size="lg"
-                >
-                  <FileText className="w-4 h-4" />
-                  Generate Diagnostic Assessment ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
-                </Button>
+          <Button 
+            onClick={handleGeneratePDF}
+            disabled={selectedPagesForExtraction.size === 0}
+            className="w-full gap-2"
+            size="lg"
+          >
+            <Download className="w-4 h-4" />
+            Generate PDF with Screenshots ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
+          </Button>
         </div>
-
-        {/* Assessment Results */}
-        <DiagnosticAssessment 
-          pdfContent={pdfContent}
-          selectedPages={selectedPagesForExtraction}
-          pdfFiles={pdfFiles}
-          selectedModel={selectedModel as "gemini" | "claude"}
-        />
-        <DiagnosticAssessmentResults 
-          pdfContent={pdfContent}
-          selectedPages={selectedPagesForExtraction}
-          pdfFiles={pdfFiles}
-        />
       </main>
       
       <input
@@ -1189,14 +1216,6 @@ export const PDFSignature = () => {
             handleMultipleFileSelect(files);
           }
         }}
-        className="hidden"
-      />
-      <input
-        ref={sopFileInputRef}
-        type="file"
-        accept=".pdf,application/pdf"
-        multiple
-        onChange={handleSopUpload}
         className="hidden"
       />
     </div>
