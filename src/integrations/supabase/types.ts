@@ -14,6 +14,162 @@ export type Database = {
   }
   public: {
     Tables: {
+      file_pages: {
+        Row: {
+          created_at: string | null
+          extracted_text: string | null
+          file_id: string
+          id: string
+          ocr_completed: boolean | null
+          page_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          extracted_text?: string | null
+          file_id: string
+          id?: string
+          ocr_completed?: boolean | null
+          page_number: number
+        }
+        Update: {
+          created_at?: string | null
+          extracted_text?: string | null
+          file_id?: string
+          id?: string
+          ocr_completed?: boolean | null
+          page_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_pages_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      keyword_matches: {
+        Row: {
+          created_at: string | null
+          id: string
+          keyword: string
+          match_count: number | null
+          page_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          keyword: string
+          match_count?: number | null
+          page_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          keyword?: string
+          match_count?: number | null
+          page_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keyword_matches_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "file_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      page_diagnoses: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          diagnosis_text: string
+          id: string
+          page_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          diagnosis_text: string
+          id?: string
+          page_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          diagnosis_text?: string
+          id?: string
+          page_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_diagnoses_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "file_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_workspaces: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          patient_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          patient_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          patient_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       search_categories: {
         Row: {
           created_at: string | null
@@ -38,15 +194,83 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workspace_files: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          page_count: number | null
+          uploaded_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          page_count?: number | null
+          uploaded_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          page_count?: number | null
+          uploaded_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_files_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "patient_workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -173,6 +397,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
