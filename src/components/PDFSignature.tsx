@@ -607,6 +607,27 @@ export const PDFSignature = () => {
         </div>
       </header>
 
+      {/* Veterans Health Centre Banner */}
+      <div className="bg-primary/10 border-b border-primary/20">
+        <div className="container mx-auto px-4 py-2">
+          <p className="text-center text-sm text-foreground">
+            Brought to you by <span className="font-semibold">Veterans Health Centre</span> 
+            {" • "}
+            <a href="https://vhc.org.au" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              vhc.org.au
+            </a>
+            {" • "}
+            <a href="tel:1300838372" className="text-primary hover:underline">
+              1300 VETERAN
+            </a>
+            {" • "}
+            <a href="mailto:reception@vhc.org.au" className="text-primary hover:underline">
+              reception@vhc.org.au
+            </a>
+          </p>
+        </div>
+      </div>
+
       {/* OCR Progress Bar */}
       {ocrProgress && (
         <div className="bg-card border-b shadow-soft">
