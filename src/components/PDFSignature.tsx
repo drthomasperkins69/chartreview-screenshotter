@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
@@ -15,7 +16,7 @@ import { DiagnosticAssessment } from "./DiagnosticAssessment";
 import { DiagnosticAssessmentResults } from "./DiagnosticAssessmentResults";
 import { DIASettings } from "./DIASettings";
 import { useDIA } from "@/contexts/DIAContext";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
@@ -99,6 +100,7 @@ export const PDFSignature = () => {
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   const [sopFiles, setSopFiles] = useState<File[]>([]);
+  const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sopFileInputRef = useRef<HTMLInputElement>(null);
@@ -942,6 +944,7 @@ export const PDFSignature = () => {
                             pdfContent={pdfContent}
                             selectedPages={selectedPagesForExtraction}
                             pdfFiles={pdfFiles}
+                            selectedModel={selectedModel}
                           />
                         </div>
                       </Card>
@@ -1053,6 +1056,41 @@ export const PDFSignature = () => {
                   </Card>
                 </ResizablePanel>
               </ResizablePanelGroup>
+
+              {/* Settings Row: Generate Settings, DIA Settings, AI Model */}
+              <Card className="mt-4 p-4">
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium whitespace-nowrap">Generate Settings</Label>
+                    <DIASettings />
+                  </div>
+                  
+                  <div className="flex-1 min-w-[200px]">
+                    <Label htmlFor="model-select" className="text-sm font-medium mb-2 block">
+                      AI Model
+                    </Label>
+                    <Select value={selectedModel} onValueChange={(value: "gemini" | "claude") => setSelectedModel(value)}>
+                      <SelectTrigger id="model-select" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gemini">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            Google Gemini (Free)
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="claude">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Claude (Paid)
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </Card>
 
               {/* SOP Upload Section */}
               <Card className="mt-4 p-4">

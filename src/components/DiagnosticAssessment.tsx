@@ -26,12 +26,12 @@ interface DiagnosticAssessmentProps {
   pdfContent: PDFContent[];
   selectedPages: Set<string>; // Format: "fileIndex-pageNum"
   pdfFiles: File[]; // Add PDF files to capture screenshots
+  selectedModel: "gemini" | "claude";
 }
 
-export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: DiagnosticAssessmentProps) => {
+export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles, selectedModel }: DiagnosticAssessmentProps) => {
   const { diaInstructions } = useDIA();
   const [localInstructions, setLocalInstructions] = useState(diaInstructions);
-  const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
   const [isGenerating, setIsGenerating] = useState(false);
   const [assessment, setAssessment] = useState<string>("");
   const [editableAssessment, setEditableAssessment] = useState<string>("");
@@ -357,40 +357,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
 
   return (
     <div className="h-full flex flex-col gap-4 p-4">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Generate Settings</Label>
-          <DIASettings />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <Label htmlFor="model-select" className="text-sm font-medium mb-2 block">
-              AI Model
-            </Label>
-            <Select value={selectedModel} onValueChange={(value: "gemini" | "claude") => setSelectedModel(value)}>
-              <SelectTrigger id="model-select" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gemini">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Google Gemini (Free)
-                  </div>
-                </SelectItem>
-                <SelectItem value="claude">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    Claude (Paid)
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
       {isGenerating && (
         <Card className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-2">
