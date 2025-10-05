@@ -12,6 +12,7 @@ import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { DiagnosticAssessment } from "./DiagnosticAssessment";
+import { DIASettings } from "./DIASettings";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
@@ -571,6 +572,7 @@ export const PDFSignature = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <DIASettings />
               {pdfFiles.length === 0 ? (
                 <Button onClick={triggerFileUpload} className="gap-2">
                   <Upload className="w-4 h-4" />
