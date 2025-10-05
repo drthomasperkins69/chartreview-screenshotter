@@ -62,19 +62,28 @@ export const PDFSignature = () => {
   }, []);
 
   const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
-    setKeywordMatches(matches);
-    const pages = new Set(matches.filter(m => m.fileIndex === currentPdfIndex).map(m => m.page));
+    // Filter out any invalid matches
+    const validMatches = matches.filter(m => 
+      !isNaN(m.fileIndex) && 
+      m.fileIndex >= 0 && 
+      m.fileIndex < pdfFiles.length &&
+      !isNaN(m.page) &&
+      m.page > 0
+    );
+    
+    setKeywordMatches(validMatches);
+    const pages = new Set(validMatches.filter(m => m.fileIndex === currentPdfIndex).map(m => m.page));
     setMatchingPages(pages);
     setSelectedPagesForExtraction(pages);
     
-    if (matches.length > 0) {
-      const totalPages = new Set(matches.map(m => `${m.fileIndex}-${m.page}`)).size;
-      toast(`Found keywords on ${totalPages} page(s) across ${new Set(matches.map(m => m.fileIndex)).size} PDF(s)!`);
+    if (validMatches.length > 0) {
+      const totalPages = new Set(validMatches.map(m => `${m.fileIndex}-${m.page}`)).size;
+      toast(`Found keywords on ${totalPages} page(s) across ${new Set(validMatches.map(m => m.fileIndex)).size} PDF(s)!`);
     } else {
       toast("No matching keywords found");
     }
     setIsSearching(false);
-  }, [currentPdfIndex]);
+  }, [currentPdfIndex, pdfFiles.length]);
 
   const handleSearch = useCallback(() => {
     if (searchMode === "keyword" && !keywords.trim()) {
@@ -162,13 +171,20 @@ export const PDFSignature = () => {
   };
 
   const handlePageClick = useCallback((pageNum: number, fileIndex: number) => {
-    if (fileIndex !== currentPdfIndex) {
-      setCurrentPdfIndex(fileIndex);
+    if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < pdfFiles.length) {
+      if (fileIndex !== currentPdfIndex) {
+        setCurrentPdfIndex(fileIndex);
+        // Reset matches when switching PDFs
+        const newMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
+        const pages = new Set(newMatches.map(m => m.page));
+        setMatchingPages(pages);
+        setSelectedPagesForExtraction(pages);
+      }
+      if (autoNavigate) {
+        setSelectedPage(pageNum);
+      }
     }
-    if (autoNavigate) {
-      setSelectedPage(pageNum);
-    }
-  }, [autoNavigate, currentPdfIndex]);
+  }, [autoNavigate, currentPdfIndex, pdfFiles.length, keywordMatches]);
 
   const togglePageSelection = useCallback((pageNum: number) => {
     setSelectedPagesForExtraction(prev => {
@@ -277,12 +293,13 @@ export const PDFSignature = () => {
                           setMatchingPages(new Set());
                           setKeywordMatches([]);
                           setSelectedPagesForExtraction(new Set());
+                          setSelectedPage(null);
                         }}
                         className="gap-2"
                         size="sm"
                       >
                         <FileText className="w-4 h-4" />
-                        {file.name}
+                        {file.name || `PDF ${index + 1}`}
                       </Button>
                       <Button
                         variant="ghost"
@@ -434,10 +451,11 @@ export const PDFSignature = () => {
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {/* Group matches by file */}
                       {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
+                        .filter(idx => !isNaN(idx) && idx >= 0)
                         .sort((a, b) => a - b)
                         .map((fileIndex) => {
                           const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
-                          const fileName = fileMatches[0]?.fileName || `PDF ${fileIndex + 1}`;
+                          const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
                           const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
                           
                           return (
