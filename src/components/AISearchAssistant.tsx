@@ -56,6 +56,8 @@ export const AISearchAssistant = ({
   const analyzeWithAI = async () => {
     if (!input.trim() || isAnalyzing || pdfContent.length === 0) return;
 
+    const isDateQuery = /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|between .* and .*|from .* to .*|on \d{1,2}|before|after|since)\b/i.test(input);
+
     const userMessage: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
@@ -103,8 +105,8 @@ export const AISearchAssistant = ({
           responseContent += `📄 ${doc?.fileName || `Document ${p.fileIndex + 1}`} - Page ${p.pageNum}\n${p.reason}\n\n`;
         });
         
-        // Only suggest keywords if they exist and aren't empty
-        if (data.keywords && data.keywords.length > 0) {
+        // Only suggest keywords for non-date queries
+        if (!isDateQuery && data.keywords && data.keywords.length > 0) {
           responseContent += `\nSuggested keywords: ${data.keywords.join(', ')}`;
           onKeywordSuggest(data.keywords.join(', '));
         }
