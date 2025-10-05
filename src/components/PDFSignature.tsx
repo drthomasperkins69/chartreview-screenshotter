@@ -520,19 +520,6 @@ export const PDFSignature = () => {
         {pdfFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[40vh]">
               <FileUpload onFileSelect={handleFileSelect} />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                multiple
-                onChange={(e) => {
-                  const files = e.target.files;
-                  if (files && files.length > 0) {
-                    handleMultipleFileSelect(files);
-                  }
-                }}
-                className="hidden"
-              />
             </div>
           ) : (
             <>
