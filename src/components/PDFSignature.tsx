@@ -735,12 +735,18 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         }
       }
       
+      // Update database: delete diagnosis for this page and refresh
+      if (selectedWorkspace) {
+        // The diagnoses will be auto-saved by the useEffect hook that watches pageDiagnoses
+        toast.info("Updating database...");
+      }
+      
       toast.success("Page removed from PDF file");
     } catch (error) {
       console.error("Error removing page from PDF:", error);
       toast.error("Failed to remove page from PDF");
     }
-  }, [pdfFiles, currentPdfIndex, selectedPage]);
+  }, [pdfFiles, currentPdfIndex, selectedPage, selectedWorkspace]);
 
   const handleCategoryCheckbox = useCallback((categoryId: number, checked: boolean) => {
     setSearchCategories(prev => 
@@ -935,6 +941,26 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       await worker.terminate();
       handlePDFTextExtracted(fileIndex, file.name, pageTexts);
       
+      // Save OCR completion status to database
+      if (selectedWorkspace && fileMetadata.has(file.name)) {
+        const metadata = fileMetadata.get(file.name);
+        if (metadata) {
+          try {
+            // Update file_pages table with OCR completion status
+            const { error: updateError } = await supabase
+              .from('file_pages')
+              .update({ ocr_completed: true })
+              .eq('file_id', metadata.id);
+            
+            if (updateError) {
+              console.error('Error updating OCR status:', updateError);
+            }
+          } catch (dbError) {
+            console.error('Error saving OCR status to database:', dbError);
+          }
+        }
+      }
+      
       setOcrProgress(null);
       toast.success(`Scan complete for ${file.name}`);
     } catch (error) {
@@ -948,7 +974,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         return newSet;
       });
     }
-  }, [pdfFiles, ocrCompletedFiles, handlePDFTextExtracted]);
+  }, [pdfFiles, ocrCompletedFiles, handlePDFTextExtracted, selectedWorkspace, fileMetadata]);
 
   const handleDiagnosisChange = useCallback(async (fileIndex: number, pageNum: number, diagnosis: string) => {
     // Update state immediately for UI responsiveness
@@ -1508,13 +1534,19 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       }
 
       toast.success(`Auto-scan complete! Scanned ${totalScanned} pages across ${pdfFiles.length} PDF(s).`);
+      
+      // Auto-save diagnoses to database after scan completes
+      if (selectedWorkspace) {
+        toast.info("Saving diagnoses to database...");
+        // The diagnoses are already saved by the useEffect hook that watches pageDiagnoses
+      }
     } catch (error) {
       console.error("Error in auto-scan all:", error);
       toast.error("Auto-scan failed");
     } finally {
       setIsAutoScanningAll(false);
     }
-  }, [pdfFiles, pdfContent, handleDiagnosisChange]);
+  }, [pdfFiles, pdfContent, handleDiagnosisChange, selectedWorkspace]);
 
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -2364,11 +2396,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                  </ResizablePanel>
         </ResizablePanelGroup>
 
-        {/* Diagnosis Tracker and AI Chat Section */}
-        {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 && (
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left Column: Diagnosis Tracker */}
-            <Card className="p-4">
+        {/* Diagnosis Tracker and AI Chat Section - Always Visible */}
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Column: Diagnosis Tracker */}
+          <Card className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
                 <Button
@@ -2590,7 +2621,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             <AIChat />
           </div>
         </div>
-        )}
 
         {/* Diagnosis Summary Section */}
         {getDiagnosisGroups.length > 0 && (
