@@ -95,60 +95,66 @@ export const PDFViewer = ({
     loadPdf();
   }, [currentFile, selectedPage]);
 
-  // Extract text from all pages for AI analysis with OCR
+  // Extract text from all files for AI analysis with OCR
   useEffect(() => {
-    const extractTextWithOCR = async () => {
-      if (!currentFile || !onTextExtracted) return;
+    const extractAllFilesText = async () => {
+      if (files.length === 0 || !onTextExtracted) return;
 
       try {
-        setOcrProgress("Initializing OCR...");
+        setOcrProgress("Initializing OCR for all files...");
         const worker = await createWorker('eng');
-        
-        const arrayBuffer = await currentFile.arrayBuffer();
-        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-        const pageTexts: Array<{ pageNum: number; text: string }> = [];
 
-        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-          setOcrProgress(`Processing page ${pageNum} of ${pdfDoc.numPages}...`);
+        for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+          const file = files[fileIndex];
+          setOcrProgress(`Processing ${file.name} (${fileIndex + 1}/${files.length})...`);
           
-          const page = await pdfDoc.getPage(pageNum);
-          
-          // Extract existing text layer
-          const textContent = await page.getTextContent();
-          const extractedText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-          
-          // Render page to canvas for OCR
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          
-          if (context) {
-            await page.render({
-              canvasContext: context,
-              viewport: viewport,
-              canvas: canvas,
-            }).promise;
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+          const pageTexts: Array<{ pageNum: number; text: string }> = [];
+
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            setOcrProgress(`Processing ${file.name} - page ${pageNum}/${pdfDoc.numPages}...`);
             
-            // Perform OCR on the rendered page
-            const { data: { text: ocrText } } = await worker.recognize(canvas);
+            const page = await pdfDoc.getPage(pageNum);
             
-            // Combine extracted text and OCR text
-            const combinedText = `${extractedText} ${ocrText}`.trim();
-            pageTexts.push({ pageNum, text: combinedText });
-          } else {
-            // Fallback to just extracted text if canvas fails
-            pageTexts.push({ pageNum, text: extractedText });
+            // Extract existing text layer
+            const textContent = await page.getTextContent();
+            const extractedText = textContent.items
+              .map((item: any) => item.str)
+              .join(' ');
+            
+            // Render page to canvas for OCR
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            if (context) {
+              await page.render({
+                canvasContext: context,
+                viewport: viewport,
+                canvas: canvas,
+              }).promise;
+              
+              // Perform OCR on the rendered page
+              const { data: { text: ocrText } } = await worker.recognize(canvas);
+              
+              // Combine extracted text and OCR text
+              const combinedText = `${extractedText} ${ocrText}`.trim();
+              pageTexts.push({ pageNum, text: combinedText });
+            } else {
+              // Fallback to just extracted text if canvas fails
+              pageTexts.push({ pageNum, text: extractedText });
+            }
           }
+
+          onTextExtracted(fileIndex, file.name, pageTexts);
         }
 
         await worker.terminate();
         setOcrProgress("");
-        onTextExtracted(currentFileIndex, currentFile.name, pageTexts);
-        toast.success(`OCR completed for ${currentFile.name}`);
+        toast.success(`OCR completed for ${files.length} file(s)`);
       } catch (error) {
         console.error("Error extracting text with OCR:", error);
         setOcrProgress("");
@@ -156,8 +162,8 @@ export const PDFViewer = ({
       }
     };
 
-    extractTextWithOCR();
-  }, [currentFile, currentFileIndex, onTextExtracted]);
+    extractAllFilesText();
+  }, [files, onTextExtracted]);
 
   useEffect(() => {
     const searchKeywords = async () => {
