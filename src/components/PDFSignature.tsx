@@ -104,6 +104,8 @@ export const PDFSignature = () => {
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
   const [isAutoScanningAll, setIsAutoScanningAll] = useState(false);
+  const [editingDiagnosis, setEditingDiagnosis] = useState<string | null>(null);
+  const [editDiagnosisValue, setEditDiagnosisValue] = useState<string>("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfFilesRef = useRef<File[]>(pdfFiles);
@@ -894,6 +896,56 @@ export const PDFSignature = () => {
       throw error; // Re-throw to handle in auto-scan
     }
   }, [pdfFiles]);
+
+  const handleRenameDiagnosis = useCallback((oldDiagnosis: string, newDiagnosis: string) => {
+    if (!newDiagnosis.trim() || oldDiagnosis === newDiagnosis) {
+      setEditingDiagnosis(null);
+      return;
+    }
+
+    setPageDiagnoses(prev => {
+      const updated = { ...prev };
+      
+      Object.keys(updated).forEach(key => {
+        const diagnoses = updated[key].split(',').map(d => d.trim());
+        const hasOldDiagnosis = diagnoses.includes(oldDiagnosis);
+        
+        if (hasOldDiagnosis) {
+          // Replace old diagnosis with new one
+          const updatedDiagnoses = diagnoses.map(d => 
+            d === oldDiagnosis ? newDiagnosis.trim() : d
+          );
+          updated[key] = updatedDiagnoses.join(', ');
+        }
+      });
+      
+      return updated;
+    });
+
+    setEditingDiagnosis(null);
+    toast.success(`Renamed "${oldDiagnosis}" to "${newDiagnosis}"`);
+  }, []);
+
+  const handleDeleteDiagnosis = useCallback((diagnosisToDelete: string) => {
+    setPageDiagnoses(prev => {
+      const updated = { ...prev };
+      
+      Object.keys(updated).forEach(key => {
+        const diagnoses = updated[key].split(',').map(d => d.trim()).filter(d => d);
+        const filtered = diagnoses.filter(d => d !== diagnosisToDelete);
+        
+        if (filtered.length > 0) {
+          updated[key] = filtered.join(', ');
+        } else {
+          delete updated[key];
+        }
+      });
+      
+      return updated;
+    });
+
+    toast.success(`Deleted diagnosis "${diagnosisToDelete}"`);
+  }, []);
 
   const handleScanAllFiles = useCallback(async () => {
     if (pdfFiles.length === 0) {
@@ -2092,23 +2144,66 @@ export const PDFSignature = () => {
                           <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
                             <div className="flex items-center gap-2 flex-1">
                               <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
-                              <span className="font-medium">{diagnosis}</span>
+                              {editingDiagnosis === diagnosis ? (
+                                <Input
+                                  value={editDiagnosisValue}
+                                  onChange={(e) => setEditDiagnosisValue(e.target.value)}
+                                  onBlur={() => handleRenameDiagnosis(diagnosis, editDiagnosisValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleRenameDiagnosis(diagnosis, editDiagnosisValue);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingDiagnosis(null);
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
+                                  className="h-8 font-medium"
+                                />
+                              ) : (
+                                <span 
+                                  className="font-medium cursor-pointer hover:text-primary transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingDiagnosis(diagnosis);
+                                    setEditDiagnosisValue(diagnosis);
+                                  }}
+                                >
+                                  {diagnosis}
+                                </span>
+                              )}
                               <span className="text-sm text-muted-foreground">
                                 ({sortedPages.length} page{sortedPages.length !== 1 ? 's' : ''})
                               </span>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownloadByDiagnosis(diagnosis);
-                              }}
-                              className="ml-2 h-8 w-8 p-0"
-                              aria-label="Download PDF"
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Delete all instances of "${diagnosis}"?`)) {
+                                    handleDeleteDiagnosis(diagnosis);
+                                  }
+                                }}
+                                className="h-8 w-8 p-0 hover:text-destructive"
+                                aria-label="Delete diagnosis"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadByDiagnosis(diagnosis);
+                                }}
+                                className="ml-1 h-8 w-8 p-0"
+                                aria-label="Download PDF"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="px-3 pb-3 space-y-1">
