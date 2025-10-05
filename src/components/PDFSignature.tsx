@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
@@ -84,6 +85,7 @@ export const PDFSignature = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
+  const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -424,6 +426,15 @@ export const PDFSignature = () => {
     });
   }, []);
 
+  const handleOCRProgress = useCallback((current: number, total: number, message: string) => {
+    setOcrProgress({ current, total, message });
+    
+    // Clear progress when complete
+    if (current >= total) {
+      setTimeout(() => setOcrProgress(null), 2000);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="border-b bg-card shadow-soft">
@@ -485,6 +496,23 @@ export const PDFSignature = () => {
           </div>
         </div>
       </header>
+
+      {/* OCR Progress Bar */}
+      {ocrProgress && (
+        <div className="bg-card border-b shadow-soft">
+          <div className="container mx-auto px-4 py-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{ocrProgress.message}</span>
+                <span className="text-muted-foreground font-medium">
+                  {Math.round((ocrProgress.current / ocrProgress.total) * 100)}%
+                </span>
+              </div>
+              <Progress value={(ocrProgress.current / ocrProgress.total) * 100} className="h-2" />
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="container mx-auto px-4 py-6">
         <div className="space-y-6">
@@ -695,6 +723,7 @@ export const PDFSignature = () => {
                       isSearching={isSearching}
                       onKeywordMatchesDetected={handleKeywordMatchesDetected}
                       onTextExtracted={handlePDFTextExtracted}
+                      onOCRProgress={handleOCRProgress}
                       selectedPage={selectedPage}
                       onPageChange={setSelectedPage}
                     />

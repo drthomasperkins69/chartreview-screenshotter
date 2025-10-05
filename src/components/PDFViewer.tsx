@@ -29,6 +29,7 @@ interface PDFViewerProps {
   isSearching: boolean;
   onKeywordMatchesDetected: (matches: KeywordMatch[]) => void;
   onTextExtracted?: (fileIndex: number, fileName: string, pageTexts: Array<{ pageNum: number; text: string }>) => void;
+  onOCRProgress?: (current: number, total: number, message: string) => void;
   selectedPage: number | null;
   onPageChange: (page: number) => void;
 }
@@ -42,6 +43,7 @@ export const PDFViewer = ({
   isSearching,
   onKeywordMatchesDetected,
   onTextExtracted,
+  onOCRProgress,
   selectedPage,
   onPageChange,
 }: PDFViewerProps) => {
@@ -53,7 +55,6 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [ocrProgress, setOcrProgress] = useState<string>("");
 
   const currentFile = files[currentFileIndex] || null;
 
@@ -101,19 +102,36 @@ export const PDFViewer = ({
       if (files.length === 0 || !onTextExtracted) return;
 
       try {
-        setOcrProgress("Initializing OCR for all files...");
+        // Calculate total pages across all files
+        let totalPages = 0;
+        const filePagesMap = new Map<number, number>();
+        
+        for (let i = 0; i < files.length; i++) {
+          const arrayBuffer = await files[i].arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+          filePagesMap.set(i, pdfDoc.numPages);
+          totalPages += pdfDoc.numPages;
+        }
+
+        let processedPages = 0;
+        onOCRProgress?.(0, totalPages, "Initializing OCR for all files...");
+        
         const worker = await createWorker('eng');
 
         for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
           const file = files[fileIndex];
-          setOcrProgress(`Processing ${file.name} (${fileIndex + 1}/${files.length})...`);
+          onOCRProgress?.(processedPages, totalPages, `Processing ${file.name}...`);
           
           const arrayBuffer = await file.arrayBuffer();
           const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
           const pageTexts: Array<{ pageNum: number; text: string }> = [];
 
           for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-            setOcrProgress(`Processing ${file.name} - page ${pageNum}/${pdfDoc.numPages}...`);
+            onOCRProgress?.(
+              processedPages + pageNum, 
+              totalPages, 
+              `Processing ${file.name} - page ${pageNum}/${pdfDoc.numPages}...`
+            );
             
             const page = await pdfDoc.getPage(pageNum);
             
@@ -149,21 +167,21 @@ export const PDFViewer = ({
             }
           }
 
+          processedPages += pdfDoc.numPages;
           onTextExtracted(fileIndex, file.name, pageTexts);
         }
 
         await worker.terminate();
-        setOcrProgress("");
+        onOCRProgress?.(totalPages, totalPages, "OCR complete!");
         toast.success(`OCR completed for ${files.length} file(s)`);
       } catch (error) {
         console.error("Error extracting text with OCR:", error);
-        setOcrProgress("");
         toast.error("OCR processing failed");
       }
     };
 
     extractAllFilesText();
-  }, [files, onTextExtracted]);
+  }, [files, onTextExtracted, onOCRProgress]);
 
   useEffect(() => {
     const searchKeywords = async () => {
@@ -435,13 +453,6 @@ export const PDFViewer = ({
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-sm text-muted-foreground">Loading PDF...</p>
-            </div>
-          </div>
-        ) : ocrProgress ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-sm text-muted-foreground">{ocrProgress}</p>
             </div>
           </div>
         ) : (
