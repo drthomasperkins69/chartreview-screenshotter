@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -30,15 +30,17 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown } from "lucide-react";
+import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload } from "lucide-react";
 import dvaLogo from "@/assets/dva-logo.png";
+import { uploadPdfToStorage } from "@/utils/supabaseStorage";
+import { toast } from "sonner";
 
 interface WorkspaceSidebarProps {
   onFileSelect?: (fileId: string, filePath: string, fileName: string) => void;
 }
 
 export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
-  const { workspaces, selectedWorkspace, allWorkspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace } =
+  const { workspaces, selectedWorkspace, allWorkspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace, refreshFiles } =
     useWorkspace();
   const { user, signOut } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -47,6 +49,8 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
   const [newNotes, setNewNotes] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(new Set([selectedWorkspace?.id || ""]));
+  const [uploadingForWorkspace, setUploadingForWorkspace] = useState<string | null>(null);
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   const handleCreateWorkspace = async () => {
     if (!newName.trim()) return;
@@ -84,6 +88,38 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
   const handleWorkspaceClick = (workspaceId: string) => {
     selectWorkspace(workspaceId);
     setExpandedWorkspaces(new Set([workspaceId]));
+  };
+
+  const handleFileUpload = async (workspaceId: string, files: FileList | null) => {
+    if (!files || files.length === 0 || !user) return;
+
+    setUploadingForWorkspace(workspaceId);
+    try {
+      const file = files[0];
+      
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        toast.error('Only PDF files are supported');
+        return;
+      }
+
+      // Upload to storage
+      const filePath = await uploadPdfToStorage(file, file.name, workspaceId, user.id);
+      
+      if (filePath) {
+        toast.success('File uploaded successfully');
+        await refreshFiles();
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload file');
+    } finally {
+      setUploadingForWorkspace(null);
+    }
+  };
+
+  const triggerFileUpload = (workspaceId: string) => {
+    fileInputRefs.current[workspaceId]?.click();
   };
 
   return (
@@ -197,6 +233,30 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                         
                         <CollapsibleContent>
                           <div className="ml-8 mt-1 space-y-1">
+                            {/* Hidden file input */}
+                            <input
+                              ref={(el) => (fileInputRefs.current[workspace.id] = el)}
+                              type="file"
+                              accept=".pdf"
+                              onChange={(e) => handleFileUpload(workspace.id, e.target.files)}
+                              className="hidden"
+                            />
+                            
+                            {/* Upload button */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-start text-xs h-8 mb-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                triggerFileUpload(workspace.id);
+                              }}
+                              disabled={uploadingForWorkspace === workspace.id}
+                            >
+                              <Upload className="h-3 w-3 mr-2" />
+                              {uploadingForWorkspace === workspace.id ? 'Uploading...' : 'Upload PDF'}
+                            </Button>
+
                             {filesForWorkspace.length === 0 ? (
                               <div className="text-xs text-muted-foreground py-2 px-2">
                                 No files yet
