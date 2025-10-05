@@ -2017,10 +2017,10 @@ export const PDFSignature = () => {
                                                 e.stopPropagation();
                                                 handleDownloadByDiagnosis(diagnosis);
                                               }}
-                                              className="gap-2 ml-2"
+                                              className="ml-2 h-8 w-8 p-0"
+                                              aria-label="Download PDF"
                                             >
                                               <Download className="w-4 h-4" />
-                                              Download PDF
                                             </Button>
                                           </CollapsibleTrigger>
                                           <CollapsibleContent>
