@@ -35,17 +35,23 @@ serve(async (req) => {
       ).join('\n\n')}`
     ).join('\n\n=== NEXT DOCUMENT ===\n\n');
 
-    const systemPrompt = `You are a medical document analyzer. Your job is to find pages in medical documents that match the user's query.
+    const systemPrompt = `You are a medical document analyzer specialized in extracting pages relevant to specific dates and medical conditions from medical timelines.
 
-IMPORTANT: Be generous in your matches - if a page has ANY relevance to the query, include it.
+PRIMARY TASK: When given a query with dates and/or medical conditions, find ALL pages that contain information about those dates or conditions.
 
-Analyze the PDF content carefully and return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
+KEY INSTRUCTIONS:
+- Look for exact date matches, date ranges, and approximate dates (e.g., "around March 2023", "early 2024")
+- Match medical conditions, symptoms, diagnoses, treatments, and procedures
+- Be generous in matches - if a page has ANY relevance to the date range or condition, include it
+- Extract the specific reasons why each page is relevant (e.g., "Contains visit from March 15, 2023 regarding chest pain")
+
+Return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
 {
   "relevantPages": [
     {
       "fileIndex": 0,
       "pageNum": 1,
-      "reason": "Brief explanation"
+      "reason": "Brief explanation of why this page matches (include dates/conditions found)"
     }
   ],
   "keywords": ["keyword1", "keyword2"]
