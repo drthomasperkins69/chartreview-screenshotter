@@ -895,6 +895,111 @@ export const PDFSignature = () => {
     }
   }, [pdfFiles]);
 
+  const handleScanAllFiles = useCallback(async () => {
+    if (pdfFiles.length === 0) {
+      toast.error("No PDFs to scan");
+      return;
+    }
+
+    // Filter out already scanned files
+    const filesToScan = pdfFiles
+      .map((file, index) => ({ file, index }))
+      .filter(({ index }) => !ocrCompletedFiles.has(index));
+
+    if (filesToScan.length === 0) {
+      toast("All files have already been scanned");
+      return;
+    }
+
+    setIsAutoScanningAll(true);
+    toast(`Starting OCR scan of ${filesToScan.length} PDF(s)...`);
+
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const pdfjsLib = await import("pdfjs-dist");
+
+      // Create a shared worker for all files
+      const worker = await createWorker('eng');
+
+      for (const { file, index } of filesToScan) {
+        setScanningFiles(prev => new Set(prev).add(index));
+        
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+          const totalPages = pdfDoc.numPages;
+          
+          setOcrProgress({ current: 0, total: totalPages, message: `Scanning ${file.name}...` });
+          
+          const pageTexts: Array<{ pageNum: number; text: string }> = [];
+
+          for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            setOcrProgress({
+              current: pageNum,
+              total: totalPages,
+              message: `Scanning ${file.name} - page ${pageNum}/${totalPages}...`
+            });
+            
+            const page = await pdfDoc.getPage(pageNum);
+            
+            // Extract existing text layer
+            const textContent = await page.getTextContent();
+            const extractedText = textContent.items
+              .map((item: any) => item.str)
+              .join(' ');
+            
+            // Render page to canvas for OCR
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            if (context) {
+              await page.render({
+                canvasContext: context,
+                viewport: viewport,
+                canvas: canvas,
+              }).promise;
+              
+              // Perform OCR on the rendered page
+              const { data: { text: ocrText } } = await worker.recognize(canvas);
+              
+              // Combine extracted text and OCR text
+              const combinedText = `${extractedText} ${ocrText}`.trim();
+              pageTexts.push({ pageNum, text: combinedText });
+            } else {
+              // Fallback to just extracted text if canvas fails
+              pageTexts.push({ pageNum, text: extractedText });
+            }
+          }
+
+          handlePDFTextExtracted(index, file.name, pageTexts);
+          toast.success(`Scan complete for ${file.name}`);
+        } catch (error) {
+          console.error(`Error scanning ${file.name}:`, error);
+          toast.error(`Scan failed for ${file.name}`);
+        } finally {
+          setScanningFiles(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(index);
+            return newSet;
+          });
+        }
+      }
+
+      await worker.terminate();
+      setOcrProgress(null);
+      toast.success(`All scans complete!`);
+    } catch (error) {
+      console.error("Error in batch scan:", error);
+      toast.error("Batch scan failed");
+      setOcrProgress(null);
+    } finally {
+      setIsAutoScanningAll(false);
+    }
+  }, [pdfFiles, ocrCompletedFiles, handlePDFTextExtracted]);
+
   const handleAutoScanAllPDFs = useCallback(async (model: "gemini" | "claude") => {
     if (pdfFiles.length === 0) {
       toast.error("No PDFs to scan");
@@ -1442,7 +1547,7 @@ export const PDFSignature = () => {
                   <div className="flex items-center justify-between mb-3">
                     <Label className="text-sm font-medium">Select PDF to View</Label>
                     <Button
-                      onClick={() => handleAutoScanAllPDFs("gemini")}
+                      onClick={handleScanAllFiles}
                       disabled={isAutoScanningAll}
                       variant="secondary"
                       size="sm"
@@ -1455,7 +1560,7 @@ export const PDFSignature = () => {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-4 h-4" />
+                          <Search className="w-4 h-4" />
                           Scan All Files
                         </>
                       )}
