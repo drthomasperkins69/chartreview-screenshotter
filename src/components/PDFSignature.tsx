@@ -1724,6 +1724,11 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
               />
               <div>
                 <h1 className="text-xl font-semibold text-foreground">dr.advocate.ai (Beta)</h1>
+                {selectedWorkspace && (
+                  <p className="text-sm font-medium text-primary mt-1">
+                    Workspace: {selectedWorkspace.name}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground">Extract pages by keywords with AI</p>
                 <p className="text-xs text-muted-foreground/70 mt-0.5">
                   🔒 All data stays in your browser - nothing stored or transmitted
