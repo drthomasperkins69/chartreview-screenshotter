@@ -82,14 +82,28 @@ export const AISearchAssistant = ({
 
       const data = await resp.json();
 
-      let responseContent = `Found ${data.relevantPages?.length || 0} relevant pages:\n\n`;
-      
-      if (data.relevantPages && data.relevantPages.length > 0) {
+      // Deduplicate pages - keep only one entry per unique page
+      const uniquePages = new Map();
+      if (data.relevantPages && Array.isArray(data.relevantPages)) {
         data.relevantPages.forEach((p: any) => {
+          const key = `${p.fileIndex}-${p.pageNum}`;
+          if (!uniquePages.has(key)) {
+            uniquePages.set(key, p);
+          }
+        });
+      }
+      
+      const deduplicatedPages = Array.from(uniquePages.values());
+
+      let responseContent = `Found ${deduplicatedPages.length} relevant page${deduplicatedPages.length !== 1 ? 's' : ''}:\n\n`;
+      
+      if (deduplicatedPages.length > 0) {
+        deduplicatedPages.forEach((p: any) => {
           const doc = pdfContent[p.fileIndex];
           responseContent += `📄 ${doc?.fileName || `Document ${p.fileIndex + 1}`} - Page ${p.pageNum}\n${p.reason}\n\n`;
         });
         
+        // Only suggest keywords if they exist and aren't empty
         if (data.keywords && data.keywords.length > 0) {
           responseContent += `\nSuggested keywords: ${data.keywords.join(', ')}`;
           onKeywordSuggest(data.keywords.join(', '));
@@ -101,19 +115,19 @@ export const AISearchAssistant = ({
       const assistantMessage: Message = {
         role: "assistant",
         content: responseContent,
-        pages: data.relevantPages
+        pages: deduplicatedPages
       };
 
       setMessages([...updatedMessages, assistantMessage]);
 
       // Auto-select pages if handler provided
-      if (data.relevantPages && data.relevantPages.length > 0 && onPagesSelected) {
-        onPagesSelected(data.relevantPages.map((p: any) => ({
+      if (deduplicatedPages.length > 0 && onPagesSelected) {
+        onPagesSelected(deduplicatedPages.map((p: any) => ({
           fileIndex: p.fileIndex,
           pageNum: p.pageNum,
           reason: p.reason
         })));
-        toast.success(`Selected ${data.relevantPages.length} relevant pages for extraction`);
+        toast.success(`Selected ${deduplicatedPages.length} relevant page${deduplicatedPages.length !== 1 ? 's' : ''} for extraction`);
       }
 
     } catch (error) {

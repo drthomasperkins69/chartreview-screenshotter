@@ -27,15 +27,21 @@ serve(async (req) => {
       ).join('\n\n')}`
     ).join('\n\n=== NEXT DOCUMENT ===\n\n');
 
-    const systemPrompt = `You are a medical document analyzer specialized in extracting pages relevant to specific dates and medical conditions from medical timelines.
+    // Detect if this is a date-based query
+    const isDateQuery = /\b(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(query);
 
-PRIMARY TASK: When given a query with dates and/or medical conditions, find ALL pages that contain information about those dates or conditions.
+    const systemPrompt = isDateQuery 
+      ? `You are a medical document analyzer specialized in finding pages with specific dates.
 
-KEY INSTRUCTIONS:
-- Look for exact date matches, date ranges, and approximate dates (e.g., "around March 2023", "early 2024")
-- Match medical conditions, symptoms, diagnoses, treatments, and procedures
-- Be generous in matches - if a page has ANY relevance to the date range or condition, include it
-- Extract the specific reasons why each page is relevant (e.g., "Contains visit from March 15, 2023 regarding chest pain")
+PRIMARY TASK: Find ALL pages that contain the dates or date ranges mentioned in the query.
+
+CRITICAL INSTRUCTIONS:
+- Look for exact date matches (e.g., "15/03/2023", "March 15, 2023", "15 Mar 23")
+- Look for date ranges and approximate dates (e.g., "March 2023", "2023", "early 2024")
+- Include ANY page that has a date matching or within the requested time period
+- For each matching page, extract the SPECIFIC DATE(S) found and include them in the reason
+- Return ONE entry per page (do NOT duplicate pages even if multiple dates are found)
+- Do NOT return keywords for date queries - leave the keywords array empty
 
 Return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
 {
@@ -43,7 +49,31 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this exact st
     {
       "fileIndex": 0,
       "pageNum": 1,
-      "reason": "Brief explanation of why this page matches (include dates/conditions found)"
+      "reason": "Date: 15/03/2023 - Brief description of what happened on this date"
+    }
+  ],
+  "keywords": []
+}
+
+IMPORTANT: Each page should appear only ONCE in the results, even if it contains multiple matching dates. Include the most significant date in the reason.`
+      : `You are a medical document analyzer specialized in extracting pages relevant to medical conditions and topics.
+
+PRIMARY TASK: Find ALL pages that contain information about the conditions, symptoms, or medical topics mentioned in the query.
+
+KEY INSTRUCTIONS:
+- Match medical conditions, symptoms, diagnoses, treatments, and procedures
+- Be generous in matches - if a page has ANY relevance to the query, include it
+- Extract the specific reasons why each page is relevant
+- Suggest relevant search keywords based on the query
+- Return ONE entry per page (do NOT duplicate pages)
+
+Return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
+{
+  "relevantPages": [
+    {
+      "fileIndex": 0,
+      "pageNum": 1,
+      "reason": "Brief explanation of why this page matches"
     }
   ],
   "keywords": ["keyword1", "keyword2"]
