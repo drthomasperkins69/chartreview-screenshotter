@@ -22,9 +22,10 @@ export const PDFSignature = () => {
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
-  const [dateSearch, setDateSearch] = useState<string>("");
-  const [searchMode, setSearchMode] = useState<"keyword" | "date">("keyword");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
+  const [searchCategories, setSearchCategories] = useState([
+    { id: 1, label: "Lumbar", terms: "", checked: false }
+  ]);
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
   const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set()); // Format: "fileIndex-pageNumber"
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
@@ -89,17 +90,13 @@ export const PDFSignature = () => {
   }, [currentPdfIndex, pdfFiles.length]);
 
   const handleSearch = useCallback(() => {
-    if (searchMode === "keyword" && !keywords.trim()) {
+    if (!keywords.trim()) {
       toast("Please enter keywords to search");
       return;
     }
-    if (searchMode === "date" && !dateSearch.trim()) {
-      toast("Please enter a date to search");
-      return;
-    }
     setIsSearching(true);
-    toast(searchMode === "keyword" ? "Searching for keywords..." : "Searching for dates...");
-  }, [keywords, dateSearch, searchMode]);
+    toast("Searching for keywords...");
+  }, [keywords]);
 
   const handleDownload = useCallback(async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -175,8 +172,8 @@ export const PDFSignature = () => {
     setSelectedPagesForExtraction(new Set());
     setKeywordMatches([]);
     setKeywords("");
-    setDateSearch("");
     setSuggestedKeywords("");
+    setSearchCategories(prev => prev.map(cat => ({ ...cat, checked: false })));
     toast("All PDFs removed");
   }, []);
 
@@ -228,6 +225,46 @@ export const PDFSignature = () => {
 
   const deselectAllPages = useCallback(() => {
     setSelectedPagesForExtraction(new Set());
+  }, []);
+
+  const handleCategoryCheckbox = useCallback((categoryId: number, checked: boolean) => {
+    setSearchCategories(prev => 
+      prev.map(cat => 
+        cat.id === categoryId ? { ...cat, checked } : cat
+      )
+    );
+    
+    // Auto-populate keywords when checked
+    if (checked) {
+      const category = searchCategories.find(cat => cat.id === categoryId);
+      if (category?.terms.trim()) {
+        setKeywords(prev => {
+          const existing = prev.split(',').map(k => k.trim()).filter(k => k);
+          const newTerms = category.terms.split(',').map(t => t.trim()).filter(t => t);
+          const combined = [...new Set([...existing, ...newTerms])];
+          return combined.join(', ');
+        });
+      }
+    } else {
+      // Remove terms when unchecked
+      const category = searchCategories.find(cat => cat.id === categoryId);
+      if (category?.terms.trim()) {
+        setKeywords(prev => {
+          const existing = prev.split(',').map(k => k.trim()).filter(k => k);
+          const termsToRemove = category.terms.split(',').map(t => t.trim());
+          const filtered = existing.filter(k => !termsToRemove.includes(k));
+          return filtered.join(', ');
+        });
+      }
+    }
+  }, [searchCategories]);
+
+  const updateCategoryTerms = useCallback((categoryId: number, terms: string) => {
+    setSearchCategories(prev => 
+      prev.map(cat => 
+        cat.id === categoryId ? { ...cat, terms } : cat
+      )
+    );
   }, []);
 
   return (
@@ -349,91 +386,74 @@ export const PDFSignature = () => {
 
             {/* Search Controls */}
             <Card className="p-4 shadow-medium">
-              <div className="flex gap-2 mb-3">
-                <Button
-                  variant={searchMode === "keyword" ? "default" : "outline"}
-                  onClick={() => setSearchMode("keyword")}
-                  size="sm"
-                  className="flex-1"
-                >
-                  Keyword Search
-                </Button>
-                <Button
-                  variant={searchMode === "date" ? "default" : "outline"}
-                  onClick={() => setSearchMode("date")}
-                  size="sm"
-                  className="flex-1"
-                >
-                  Date Search
-                </Button>
+              <Label className="text-sm font-medium mb-3 block">
+                Quick Search Categories
+              </Label>
+              
+              <div className="space-y-3 mb-4">
+                {searchCategories.map((category) => (
+                  <div key={category.id} className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id={`category-${category.id}`}
+                      checked={category.checked}
+                      onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                      className="mt-1 w-4 h-4 cursor-pointer"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <Label 
+                        htmlFor={`category-${category.id}`} 
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {category.label}
+                      </Label>
+                      <Input
+                        placeholder="Enter keywords (comma separated)"
+                        value={category.terms}
+                        onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {searchMode === "keyword" ? (
-                <>
-                  <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
-                    Search Keywords
-                  </Label>
-                  <Input
-                    id="keywords"
-                    placeholder="e.g., contract, invoice, report"
-                    value={keywords}
-                    onChange={(e) => setKeywords(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="mb-2"
-                  />
-                  
-                  <div className="flex gap-2">
-                    {suggestedKeywords && (
-                      <Button 
-                        onClick={useSuggestedKeywords}
-                        variant="outline"
-                        className="gap-2"
-                        size="sm"
-                      >
-                        Use Keywords
-                      </Button>
-                    )}
-                    
-                    <Button 
-                      onClick={handleSearch} 
-                      className="gap-2"
-                      disabled={isSearching || !keywords.trim()}
-                    >
-                      <Search className="w-4 h-4" />
-                      {isSearching ? "Searching..." : "Search PDF"}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Separate multiple keywords with commas
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Label htmlFor="dateSearch" className="text-sm font-medium mb-2 block">
-                    Search Date
-                  </Label>
-                  <Input
-                    id="dateSearch"
-                    placeholder="e.g., 01/15/2023 or January 15, 2023"
-                    value={dateSearch}
-                    onChange={(e) => setDateSearch(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="mb-2"
-                  />
-                  
+              <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
+                Search Keywords
+              </Label>
+              <Input
+                id="keywords"
+                placeholder="e.g., contract, invoice, report"
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="mb-2"
+              />
+              
+              <div className="flex gap-2">
+                {suggestedKeywords && (
                   <Button 
-                    onClick={handleSearch} 
-                    className="w-full gap-2"
-                    disabled={isSearching || !dateSearch.trim()}
+                    onClick={useSuggestedKeywords}
+                    variant="outline"
+                    className="gap-2"
+                    size="sm"
                   >
-                    <Search className="w-4 h-4" />
-                    {isSearching ? "Searching..." : "Search Dates"}
+                    Use Keywords
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Supports: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, Month DD YYYY, and more
-                  </p>
-                </>
-              )}
+                )}
+                
+                <Button 
+                  onClick={handleSearch} 
+                  className="gap-2"
+                  disabled={isSearching || !keywords.trim()}
+                >
+                  <Search className="w-4 h-4" />
+                  {isSearching ? "Searching..." : "Search PDF"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Separate multiple keywords with commas
+              </p>
             </Card>
 
             {/* PDF Viewer and Matches Side by Side */}
@@ -444,8 +464,8 @@ export const PDFSignature = () => {
                   <PDFViewer
                     files={pdfFiles}
                     currentFileIndex={currentPdfIndex}
-                    keywords={searchMode === "keyword" ? keywords : ""}
-                    dateSearch={searchMode === "date" ? dateSearch : ""}
+                    keywords={keywords}
+                    dateSearch=""
                     matchingPages={matchingPages}
                     isSearching={isSearching}
                     onKeywordMatchesDetected={handleKeywordMatchesDetected}
