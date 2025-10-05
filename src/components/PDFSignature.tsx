@@ -160,12 +160,24 @@ export const PDFSignature = () => {
       m.page > 0
     );
     
-    setKeywordMatches(validMatches);
-    const pages = new Set(validMatches.filter(m => m.fileIndex === currentPdfIndex).map(m => m.page));
-    setMatchingPages(pages);
+    // Add to existing matches instead of replacing
+    setKeywordMatches(prev => [...prev, ...validMatches]);
     
-    const allMatchingPages = new Set(validMatches.map(m => `${m.fileIndex}-${m.page}`));
-    setSelectedPagesForExtraction(allMatchingPages);
+    // Add pages to existing matching pages for current PDF
+    setMatchingPages(prev => {
+      const newPages = new Set(prev);
+      validMatches
+        .filter(m => m.fileIndex === currentPdfIndex)
+        .forEach(m => newPages.add(m.page));
+      return newPages;
+    });
+    
+    // Add matching pages to existing selections
+    setSelectedPagesForExtraction(prev => {
+      const newSet = new Set(prev);
+      validMatches.forEach(m => newSet.add(`${m.fileIndex}-${m.page}`));
+      return newSet;
+    });
     
     if (validMatches.length > 0) {
       const totalPages = new Set(validMatches.map(m => `${m.fileIndex}-${m.page}`)).size;
