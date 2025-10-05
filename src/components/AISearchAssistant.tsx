@@ -47,6 +47,33 @@ export const AISearchAssistant = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
 
+  // Extract explicit dates from user input (e.g., "20 March 1989", "05/04/1989")
+  const extractRequestedDates = (text: string): string[] => {
+    const results = new Set<string>();
+    const monthNamePattern = /(\b\d{1,2}\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t)?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{2,4}\b)/gi;
+    const numericPattern = /(\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b)/g;
+
+    let m;
+    while ((m = monthNamePattern.exec(text)) !== null) {
+      results.add(m[1].trim());
+    }
+    while ((m = numericPattern.exec(text)) !== null) {
+      results.add(m[1].trim());
+    }
+    return Array.from(results);
+  };
+
+  const dateVariants = (s: string): string[] => {
+    const v: string[] = [];
+    const lower = s.toLowerCase();
+    v.push(lower);
+    // Try simple transforms
+    v.push(lower.replace(/\s+/g, " "));
+    v.push(lower.replace(/\s+/g, "/"));
+    v.push(lower.replace(/\s+/g, "-"));
+    return Array.from(new Set(v));
+  };
+
   const extractKeywords = (text: string): string | null => {
     const keywordPattern = /\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*(?:,\s*[a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*)+)\b/;
     const match = text.match(keywordPattern);
@@ -98,14 +125,41 @@ export const AISearchAssistant = ({
       const deduplicatedPages = Array.from(uniquePages.values());
 
       let responseContent = `Found ${deduplicatedPages.length} relevant page${deduplicatedPages.length !== 1 ? 's' : ''}:\n\n`;
-      
-      if (deduplicatedPages.length > 0) {
-        deduplicatedPages.forEach((p: any) => {
+
+      // If it's a date query, select at most ONE page per requested date
+      let pagesForMatches = deduplicatedPages as any[];
+      if (isDateQuery) {
+        const requestedDates = extractRequestedDates(input);
+        if (requestedDates.length > 0) {
+          const usedPageKeys = new Set<string>();
+          const perDate: any[] = [];
+          for (const dateStr of requestedDates) {
+            const variants = dateVariants(dateStr);
+            const match = deduplicatedPages.find((p: any) => {
+              const pageDate = (p.matchedDate || "").toString().toLowerCase();
+              const reason = (p.reason || "").toLowerCase();
+              const key = `${p.fileIndex}-${p.pageNum}`;
+              if (usedPageKeys.has(key)) return false;
+              return variants.some(v => pageDate.includes(v) || reason.includes(v));
+            });
+            if (match) {
+              const key = `${match.fileIndex}-${match.pageNum}`;
+              usedPageKeys.add(key);
+              perDate.push(match);
+            }
+          }
+          if (perDate.length > 0) pagesForMatches = perDate;
+        }
+      }
+
+      if (pagesForMatches.length > 0) {
+        responseContent = `Found ${pagesForMatches.length} relevant page${pagesForMatches.length !== 1 ? 's' : ''}:\n\n`;
+        pagesForMatches.forEach((p: any) => {
           const doc = pdfContent[p.fileIndex];
-          responseContent += `📄 ${doc?.fileName || `Document ${p.fileIndex + 1}`} - Page ${p.pageNum}\n${p.reason}\n\n`;
+          const datePart = p.matchedDate ? `Date: ${p.matchedDate} - ` : "";
+          responseContent += `📄 ${doc?.fileName || `Document ${p.fileIndex + 1}`} - Page ${p.pageNum}\n${datePart}${p.reason}\n\n`;
         });
         
-        // Only suggest keywords for non-date queries
         if (!isDateQuery && data.keywords && data.keywords.length > 0) {
           responseContent += `\nSuggested keywords: ${data.keywords.join(', ')}`;
           onKeywordSuggest(data.keywords.join(', '));
@@ -118,19 +172,18 @@ export const AISearchAssistant = ({
       const assistantMessage: Message = {
         role: "assistant",
         content: responseContent,
-        pages: deduplicatedPages
+        pages: pagesForMatches
       };
 
       setMessages([...updatedMessages, assistantMessage]);
 
-      // Auto-select pages if handler provided
-      if (deduplicatedPages.length > 0 && onPagesSelected) {
-        onPagesSelected(deduplicatedPages.map((p: any) => ({
+      if (pagesForMatches.length > 0 && onPagesSelected) {
+        onPagesSelected(pagesForMatches.map((p: any) => ({
           fileIndex: p.fileIndex,
           pageNum: p.pageNum,
           reason: p.reason
         })));
-        toast.success(`Selected ${deduplicatedPages.length} relevant page${deduplicatedPages.length !== 1 ? 's' : ''} for extraction`);
+        toast.success(`Selected ${pagesForMatches.length} relevant page${pagesForMatches.length !== 1 ? 's' : ''} for extraction`);
       }
 
     } catch (error) {

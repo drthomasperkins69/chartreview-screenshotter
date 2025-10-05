@@ -33,29 +33,23 @@ serve(async (req) => {
     const systemPrompt = isDateQuery 
       ? `You are a medical document analyzer specialized in finding pages with specific dates.
 
-PRIMARY TASK: Find ALL pages that contain the dates or date ranges mentioned in the query.
+PRIMARY TASK: Extract dates from the user's query and, for EACH DATE, choose the SINGLE MOST RELEVANT PAGE that contains that date (or an equivalent format). Do not return multiple pages for the same date.
 
 CRITICAL INSTRUCTIONS:
-- Look for exact date matches (e.g., "15/03/2023", "March 15, 2023", "15 Mar 23")
-- Look for date ranges and approximate dates (e.g., "March 2023", "2023", "early 2024")
-- Include ANY page that has a date matching or within the requested time period
-- For each matching page, extract the SPECIFIC DATE(S) found and include them in the reason
-- Return ONE entry per page (do NOT duplicate pages even if multiple dates are found)
-- Do NOT return keywords for date queries - leave the keywords array empty
+- Identify explicit dates in the user's query (e.g., "20 March 1989")
+- Consider equivalent formats (e.g., 20/03/1989, 1989-03-20, 20 Mar 89)
+- For each query date, pick ONE best page only. If several pages mention it, choose the one that most clearly references that date and context.
+- Include the matched date for that page as a separate field: matchedDate
+- Do NOT include keyword suggestions for date queries; return an empty array for keywords
+- Do NOT duplicate the same page across multiple entries
 
-Return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
+Return ONLY valid JSON (no markdown) with this exact structure:
 {
   "relevantPages": [
-    {
-      "fileIndex": 0,
-      "pageNum": 1,
-      "reason": "Date: 15/03/2023 - Brief description of what happened on this date"
-    }
+    { "fileIndex": 0, "pageNum": 1, "matchedDate": "1989-03-20 or '20 March 1989'", "reason": "Date: 20/03/1989 - brief description" }
   ],
   "keywords": []
-}
-
-IMPORTANT: Each page should appear only ONCE in the results, even if it contains multiple matching dates. Include the most significant date in the reason.`
+}`
       : `You are a medical document analyzer specialized in extracting pages relevant to medical conditions and topics.
 
 PRIMARY TASK: Find ALL pages that contain information about the conditions, symptoms, or medical topics mentioned in the query.
