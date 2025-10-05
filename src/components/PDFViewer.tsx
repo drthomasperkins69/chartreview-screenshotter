@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
@@ -76,6 +76,7 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
 
   const currentFile = files[currentFileIndex] || null;
 
@@ -708,7 +709,9 @@ export const PDFViewer = ({
       {/* PDF Canvas */}
       <div
         ref={containerRef}
-        className="flex-1 flex justify-center p-6 overflow-auto"
+        className="flex-1 flex justify-center p-6 overflow-auto relative"
+        onMouseEnter={() => setIsHoveringCanvas(true)}
+        onMouseLeave={() => setIsHoveringCanvas(false)}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -718,14 +721,21 @@ export const PDFViewer = ({
             </div>
           </div>
         ) : (
-          <canvas
-            ref={canvasRef}
-            className="shadow-medium border"
-            style={{
-              maxWidth: "100%",
-              height: "auto",
-            }}
-          />
+          <>
+            <canvas
+              ref={canvasRef}
+              className="shadow-medium border"
+              style={{
+                maxWidth: "100%",
+                height: "auto",
+              }}
+            />
+            {isHoveringCanvas && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <Search className="w-16 h-16 text-primary/30" strokeWidth={1.5} />
+              </div>
+            )}
+          </>
         )}
       </div>
 
