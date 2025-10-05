@@ -17,7 +17,8 @@ interface KeywordMatch {
 }
 
 export const PDFSignature = () => {
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
   const [dateSearch, setDateSearch] = useState<string>("");
   const [searchMode, setSearchMode] = useState<"keyword" | "date">("keyword");
@@ -31,15 +32,31 @@ export const PDFSignature = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const currentPdf = pdfFiles[currentPdfIndex] || null;
+
   const handleFileSelect = useCallback((file: File) => {
     if (file.type !== "application/pdf") {
       toast("Please select a PDF file");
       return;
     }
-    setPdfFile(file);
+    setPdfFiles(prev => [...prev, file]);
     setMatchingPages(new Set());
     setKeywordMatches([]);
-    toast("PDF loaded successfully!");
+    setSelectedPagesForExtraction(new Set());
+    toast("PDF added successfully!");
+  }, []);
+
+  const handleMultipleFileSelect = useCallback((files: FileList) => {
+    const pdfFilesArray = Array.from(files).filter(file => file.type === "application/pdf");
+    if (pdfFilesArray.length === 0) {
+      toast("No valid PDF files selected");
+      return;
+    }
+    setPdfFiles(prev => [...prev, ...pdfFilesArray]);
+    setMatchingPages(new Set());
+    setKeywordMatches([]);
+    setSelectedPagesForExtraction(new Set());
+    toast(`${pdfFilesArray.length} PDF(s) added successfully!`);
   }, []);
 
   const handleKeywordMatchesDetected = useCallback((matches: KeywordMatch[]) => {
@@ -70,7 +87,7 @@ export const PDFSignature = () => {
   }, [keywords, dateSearch, searchMode]);
 
   const handleDownload = useCallback(async () => {
-    if (!pdfFile || selectedPagesForExtraction.size === 0) {
+    if (!currentPdf || selectedPagesForExtraction.size === 0) {
       toast("No pages selected for extraction");
       return;
     }
@@ -78,7 +95,7 @@ export const PDFSignature = () => {
     try {
       toast("Creating PDF with selected pages...");
       
-      const arrayBuffer = await pdfFile.arrayBuffer();
+      const arrayBuffer = await currentPdf.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const newPdfDoc = await PDFDocument.create();
       
@@ -103,17 +120,29 @@ export const PDFSignature = () => {
       console.error("Error creating PDF:", error);
       toast("Failed to create PDF");
     }
-  }, [pdfFile, selectedPagesForExtraction]);
+  }, [currentPdf, selectedPagesForExtraction]);
 
-  const handleRemovePdf = useCallback(() => {
-    setPdfFile(null);
+  const handleRemovePdf = useCallback((index: number) => {
+    setPdfFiles(prev => prev.filter((_, i) => i !== index));
+    if (currentPdfIndex >= index && currentPdfIndex > 0) {
+      setCurrentPdfIndex(prev => prev - 1);
+    }
+    setMatchingPages(new Set());
+    setSelectedPagesForExtraction(new Set());
+    setKeywordMatches([]);
+    toast("PDF removed");
+  }, [currentPdfIndex]);
+
+  const handleRemoveAllPdfs = useCallback(() => {
+    setPdfFiles([]);
+    setCurrentPdfIndex(0);
     setMatchingPages(new Set());
     setSelectedPagesForExtraction(new Set());
     setKeywordMatches([]);
     setKeywords("");
     setDateSearch("");
     setSuggestedKeywords("");
-    toast("PDF removed");
+    toast("All PDFs removed");
   }, []);
 
   const handleKeywordSuggest = useCallback((suggested: string) => {
@@ -171,19 +200,27 @@ export const PDFSignature = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              {!pdfFile ? (
+              {pdfFiles.length === 0 ? (
                 <Button onClick={triggerFileUpload} className="gap-2">
                   <Upload className="w-4 h-4" />
-                  Upload PDF
+                  Upload PDF(s)
                 </Button>
               ) : (
                 <>
                   <Button 
                     variant="outline" 
-                    onClick={handleRemovePdf}
+                    onClick={triggerFileUpload}
                     className="gap-2"
                   >
-                    Remove PDF
+                    <Upload className="w-4 h-4" />
+                    Add More PDFs
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleRemoveAllPdfs}
+                    className="gap-2"
+                  >
+                    Remove All
                   </Button>
                   <Button 
                     onClick={handleDownload}
@@ -201,22 +238,60 @@ export const PDFSignature = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {!pdfFile ? (
+        {pdfFiles.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <FileUpload onFileSelect={handleFileSelect} />
             <input
               ref={fileInputRef}
               type="file"
               accept=".pdf"
+              multiple
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileSelect(file);
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  handleMultipleFileSelect(files);
+                }
               }}
               className="hidden"
             />
           </div>
         ) : (
           <div className="space-y-6">
+            {/* PDF File Selector */}
+            {pdfFiles.length > 1 && (
+              <Card className="p-4 shadow-medium">
+                <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
+                <div className="flex flex-wrap gap-2">
+                  {pdfFiles.map((file, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Button
+                        variant={currentPdfIndex === index ? "default" : "outline"}
+                        onClick={() => {
+                          setCurrentPdfIndex(index);
+                          setMatchingPages(new Set());
+                          setKeywordMatches([]);
+                          setSelectedPagesForExtraction(new Set());
+                        }}
+                        className="gap-2"
+                        size="sm"
+                      >
+                        <FileText className="w-4 h-4" />
+                        {file.name}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemovePdf(index)}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             {/* AI Assistant at Top */}
             <div className="h-[400px]">
               <AISearchAssistant 
@@ -391,7 +466,7 @@ export const PDFSignature = () => {
             {/* PDF Viewer */}
             <Card className="shadow-medium overflow-hidden">
               <PDFViewer
-                file={pdfFile}
+                file={currentPdf}
                 keywords={searchMode === "keyword" ? keywords : ""}
                 dateSearch={searchMode === "date" ? dateSearch : ""}
                 matchingPages={matchingPages}

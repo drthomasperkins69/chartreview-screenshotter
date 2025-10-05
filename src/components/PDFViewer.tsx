@@ -17,7 +17,7 @@ interface KeywordMatch {
 }
 
 interface PDFViewerProps {
-  file: File;
+  file: File | null;
   keywords: string;
   dateSearch: string;
   matchingPages: Set<number>;
@@ -55,6 +55,8 @@ export const PDFViewer = ({
 
   useEffect(() => {
     const loadPdf = async () => {
+      if (!file) return;
+      
       try {
         console.log("Starting PDF load...");
         setLoading(true);
@@ -72,9 +74,7 @@ export const PDFViewer = ({
       }
     };
 
-    if (file) {
-      loadPdf();
-    }
+    loadPdf();
   }, [file]);
 
   useEffect(() => {
