@@ -16,7 +16,7 @@ import { DiagnosticAssessment } from "./DiagnosticAssessment";
 import { DiagnosticAssessmentResults } from "./DiagnosticAssessmentResults";
 import { DIASettings } from "./DIASettings";
 import { useDIA } from "@/contexts/DIAContext";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2 } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
@@ -363,6 +363,29 @@ export const PDFSignature = () => {
   const deselectAllPages = useCallback(() => {
     setSelectedPagesForExtraction(new Set());
   }, []);
+
+  const removeMatchFromList = useCallback((fileIndex: number, pageNum: number) => {
+    // Remove from keyword matches
+    setKeywordMatches(prev => prev.filter(m => !(m.fileIndex === fileIndex && m.page === pageNum)));
+    
+    // Remove from selected pages
+    setSelectedPagesForExtraction(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(`${fileIndex}-${pageNum}`);
+      return newSet;
+    });
+    
+    // Remove from matching pages if it's the current PDF
+    if (fileIndex === currentPdfIndex) {
+      setMatchingPages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pageNum);
+        return newSet;
+      });
+    }
+    
+    toast.success("Page removed from matches");
+  }, [currentPdfIndex]);
 
   const handleCategoryCheckbox = useCallback((categoryId: number, checked: boolean) => {
     setSearchCategories(prev => 
@@ -1000,7 +1023,7 @@ export const PDFSignature = () => {
                                       const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
                                       
                                       return (
-                                        <div 
+                                         <div 
                                           key={`${fileIndex}-${page}`}
                                           className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
                                             isCurrent ? 'ring-2 ring-primary' : ''
@@ -1010,7 +1033,7 @@ export const PDFSignature = () => {
                                             type="checkbox"
                                             checked={isSelected}
                                             onChange={() => togglePageSelection(page, fileIndex)}
-                                            className="mt-0.5 w-4 h-4 cursor-pointer"
+                                            className="mt-0.5 w-4 h-4 cursor-pointer flex-shrink-0"
                                             onClick={(e) => e.stopPropagation()}
                                           />
                                           <div 
@@ -1024,6 +1047,17 @@ export const PDFSignature = () => {
                                               </div>
                                             ))}
                                           </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 flex-shrink-0 hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              removeMatchFromList(fileIndex, page);
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
                                         </div>
                                       );
                                     })}
