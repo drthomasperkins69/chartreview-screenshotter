@@ -418,6 +418,7 @@ export const PDFViewer = ({
   const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
   const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
+  const [isAutoScanning, setIsAutoScanning] = useState(false);
 
   // Update local input when page changes
   useEffect(() => {
@@ -472,6 +473,84 @@ export const PDFViewer = ({
       toast.error("Failed to suggest diagnosis");
     } finally {
       setIsAISuggesting(false);
+    }
+  };
+
+  const handleAutoScanAll = async () => {
+    if (!pdf || !currentFile || !onDiagnosisChange) {
+      toast.error("Unable to scan pages");
+      return;
+    }
+
+    setIsAutoScanning(true);
+    const totalPages = numPages;
+    let successCount = 0;
+    
+    try {
+      toast(`Starting AI scan of ${totalPages} pages...`);
+
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        try {
+          // Render the page to canvas to get image
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 1.2 });
+          
+          // Create temporary canvas for this page
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = viewport.width;
+          tempCanvas.height = viewport.height;
+          const context = tempCanvas.getContext('2d');
+          
+          if (!context) continue;
+
+          await page.render({
+            canvasContext: context,
+            viewport: viewport,
+            canvas: tempCanvas,
+          }).promise;
+
+          const pageImage = tempCanvas.toDataURL('image/jpeg', 0.85);
+          
+          // Get extracted text for this page if available
+          const fileContent = pdfContent.find(p => p.fileIndex === currentFileIndex);
+          const pageText = fileContent?.pages.find(p => p.pageNum === pageNum)?.text || "";
+
+          // Call edge function
+          const { data, error } = await supabase.functions.invoke('suggest-diagnosis', {
+            body: {
+              pageImage,
+              pageText,
+              fileName: currentFile.name,
+              pageNum: pageNum
+            }
+          });
+
+          if (error) {
+            console.error(`AI suggestion error for page ${pageNum}:`, error);
+            continue;
+          }
+
+          if (data?.diagnosis) {
+            // Auto-save the diagnosis
+            onDiagnosisChange(currentFileIndex, pageNum, data.diagnosis);
+            successCount++;
+            toast.success(`Page ${pageNum}/${totalPages}: ${data.diagnosis}`);
+          }
+
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+        } catch (pageError) {
+          console.error(`Error processing page ${pageNum}:`, pageError);
+        }
+      }
+
+      toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed.`);
+    } catch (error) {
+      console.error("Error in auto-scan:", error);
+      toast.error("Auto-scan failed");
+    } finally {
+      setIsAutoScanning(false);
     }
   };
 
@@ -555,7 +634,7 @@ export const PDFViewer = ({
           <label htmlFor="diagnosis-input" className="block text-sm font-medium mb-2">
             Diagnosis for Page {currentPage}:
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 mb-2">
             <textarea
               id="diagnosis-input"
               value={diagnosisInput}
@@ -571,7 +650,7 @@ export const PDFViewer = ({
             />
             <Button
               onClick={handleAISuggest}
-              disabled={isAISuggesting}
+              disabled={isAISuggesting || isAutoScanning}
               size="default"
               variant="secondary"
               className="gap-2"
@@ -590,12 +669,33 @@ export const PDFViewer = ({
             </Button>
             <Button
               onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
-              disabled={diagnosisInput === currentDiagnosis}
+              disabled={diagnosisInput === currentDiagnosis || isAutoScanning}
               size="default"
               className="gap-2"
             >
               <Save className="w-4 h-4" />
               Save
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleAutoScanAll}
+              disabled={isAutoScanning || isAISuggesting}
+              size="sm"
+              variant="outline"
+              className="gap-2 w-full"
+            >
+              {isAutoScanning ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Auto-scanning {numPages} pages...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  AI Auto-Scan All Pages ({numPages} pages)
+                </>
+              )}
             </Button>
           </div>
         </div>
