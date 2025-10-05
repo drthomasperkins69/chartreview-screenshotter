@@ -126,6 +126,9 @@ IMPORTANT: ${selectedContent.length} page image(s) are attached below. These con
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Claude API error:", response.status, errorText);
+        console.error("Request details - Images:", selectedContent.filter((p: any) => p.image).length);
+        console.error("Request details - Content parts:", claudeContent.length);
+        
         if (response.status === 429) {
           return new Response(
             JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
@@ -138,7 +141,13 @@ IMPORTANT: ${selectedContent.length} page image(s) are attached below. These con
             { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        throw new Error(`Claude API error: ${response.status}`);
+        if (response.status === 401) {
+          return new Response(
+            JSON.stringify({ error: "Invalid API key. Please check your ANTHROPIC_API_KEY in settings." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw new Error(`Claude API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
