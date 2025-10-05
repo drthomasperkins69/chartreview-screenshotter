@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,12 @@ export const PDFSignature = () => {
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
-  const [searchCategories, setSearchCategories] = useState([
-    { id: 1, label: "Lumbar", terms: "", checked: false }
-  ]);
+  const [searchCategories, setSearchCategories] = useState(() => {
+    const saved = localStorage.getItem('pdfSearchCategories');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, label: "Lumbar", terms: "", checked: false }
+    ];
+  });
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
   const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set()); // Format: "fileIndex-pageNumber"
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
@@ -260,12 +263,19 @@ export const PDFSignature = () => {
   }, [searchCategories]);
 
   const updateCategoryTerms = useCallback((categoryId: number, terms: string) => {
-    setSearchCategories(prev => 
-      prev.map(cat => 
+    setSearchCategories(prev => {
+      const updated = prev.map(cat => 
         cat.id === categoryId ? { ...cat, terms } : cat
-      )
-    );
+      );
+      localStorage.setItem('pdfSearchCategories', JSON.stringify(updated));
+      return updated;
+    });
   }, []);
+
+  // Persist search categories to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('pdfSearchCategories', JSON.stringify(searchCategories));
+  }, [searchCategories]);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
