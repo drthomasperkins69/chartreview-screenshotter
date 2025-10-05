@@ -10,6 +10,30 @@ import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 
+// Default global categories (used when backend is unavailable)
+const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
+  { id: 1, label: 'Lumbar' },
+  { id: 2, label: 'Thoracic' },
+  { id: 3, label: 'Right Hip' },
+  { id: 4, label: 'Left Hip' },
+  { id: 5, label: 'Right Knee' },
+  { id: 6, label: 'Left Knee' },
+  { id: 7, label: 'Shins' },
+  { id: 8, label: 'Right Ankle' },
+  { id: 9, label: 'Left Ankle' },
+  { id: 10, label: 'Right Foot' },
+  { id: 11, label: 'Left Foot' },
+  { id: 12, label: 'Cervical' },
+  { id: 13, label: 'Right Shoulder' },
+  { id: 14, label: 'Left Shoulder' },
+  { id: 15, label: 'Right Elbow' },
+  { id: 16, label: 'Left Elbow' },
+  { id: 17, label: 'Right Wrist' },
+  { id: 18, label: 'Left Wrist' },
+  { id: 19, label: 'Right Hand' },
+  { id: 20, label: 'Left Hand' },
+];
+
 interface KeywordMatch {
   page: number;
   keyword: string;
@@ -28,7 +52,9 @@ export const PDFSignature = () => {
     label: string;
     terms: string;
     checked: boolean;
-  }>>([]);
+  }>>(
+    DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
+  );
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
   const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set()); // Format: "fileIndex-pageNumber"
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
@@ -47,7 +73,9 @@ export const PDFSignature = () => {
 
       if (!url || !key) {
         console.warn('Backend env missing; using default categories');
-        setSearchCategories([{ id: 1, label: 'Lumbar', terms: '', checked: false }]);
+        setSearchCategories(
+          DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
+        );
         return;
       }
 
@@ -61,14 +89,18 @@ export const PDFSignature = () => {
         if (error) {
           console.error('Error fetching search categories:', error);
           toast.error('Failed to load search categories');
-          setSearchCategories([{ id: 1, label: 'Lumbar', terms: '', checked: false }]);
+          setSearchCategories(
+            DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
+          );
           return;
         }
         
         setSearchCategories((data ?? []).map(cat => ({ ...cat, checked: false })));
       } catch (e) {
         console.error('Failed to initialize backend client', e);
-        setSearchCategories([{ id: 1, label: 'Lumbar', terms: '', checked: false }]);
+        setSearchCategories(
+          DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
+        );
       }
     };
     
