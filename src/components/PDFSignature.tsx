@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -788,9 +788,7 @@ export const PDFSignature = () => {
   };
 
   const handleDownloadAllAsZip = async () => {
-    const diagnosisGroups = getDiagnosisGroups();
-    
-    if (diagnosisGroups.length === 0) {
+    if (getDiagnosisGroups.length === 0) {
       toast.error("No diagnoses to download");
       return;
     }
@@ -799,7 +797,7 @@ export const PDFSignature = () => {
       toast("Creating ZIP file with all diagnoses...");
       const zip = new JSZip();
 
-      for (const group of diagnosisGroups) {
+      for (const group of getDiagnosisGroups) {
         const pagesForDiagnosis = Array.from(selectedPagesForExtraction).filter(
           key => pageDiagnoses[key]?.trim().toLowerCase() === group.diagnosis.toLowerCase()
         );
@@ -826,7 +824,7 @@ export const PDFSignature = () => {
     }
   };
 
-  const getDiagnosisGroups = () => {
+  const getDiagnosisGroups = useMemo(() => {
     const groups: Record<string, string[]> = {};
     
     Array.from(selectedPagesForExtraction).forEach(key => {
@@ -844,7 +842,7 @@ export const PDFSignature = () => {
       pageCount: pages.length,
       pages
     })).sort((a, b) => a.diagnosis.localeCompare(b.diagnosis));
-  };
+  }, [selectedPagesForExtraction, pageDiagnoses]);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -1326,7 +1324,7 @@ export const PDFSignature = () => {
         </ResizablePanelGroup>
 
         {/* Diagnosis Summary Section */}
-        {getDiagnosisGroups().length > 0 && (
+        {getDiagnosisGroups.length > 0 && (
           <Card className="mt-4 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold">Diagnoses Summary</h3>
@@ -1341,7 +1339,7 @@ export const PDFSignature = () => {
               </Button>
             </div>
             <div className="space-y-2">
-              {getDiagnosisGroups().map((group, index) => (
+              {getDiagnosisGroups.map((group, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between p-3 bg-accent/10 rounded-lg border"
