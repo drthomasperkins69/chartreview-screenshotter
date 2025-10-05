@@ -28,10 +28,10 @@ serve(async (req) => {
       );
     }
 
-    // Build context from PDF content - send more text per page
+    // Build context from PDF content - send ALL text per page
     const pdfContext = pdfContent.map((doc: any) => 
       `Document: ${doc.fileName}\n${doc.pages.map((p: any) => 
-        `Page ${p.pageNum}: ${p.text.substring(0, 2000)}${p.text.length > 2000 ? '...' : ''}`
+        `Page ${p.pageNum}: ${p.text}`
       ).join('\n\n')}`
     ).join('\n\n=== NEXT DOCUMENT ===\n\n');
 
