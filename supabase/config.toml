@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.suggest-diagnosis]
 verify_jwt = false
+
+[functions.generate-diagnosis-form]
+verify_jwt = false

@@ -13,7 +13,7 @@ import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
@@ -106,6 +106,7 @@ export const PDFSignature = () => {
   const [isAutoScanningAll, setIsAutoScanningAll] = useState(false);
   const [editingDiagnosis, setEditingDiagnosis] = useState<string | null>(null);
   const [editDiagnosisValue, setEditDiagnosisValue] = useState<string>("");
+  const [generatingForm, setGeneratingForm] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfFilesRef = useRef<File[]>(pdfFiles);
@@ -946,6 +947,93 @@ export const PDFSignature = () => {
 
     toast.success(`Deleted diagnosis "${diagnosisToDelete}"`);
   }, []);
+
+  const handleGenerateDiagnosisForm = useCallback(async (diagnosis: string) => {
+    setGeneratingForm(diagnosis);
+    toast.info('Generating diagnosis form with AI...');
+
+    try {
+      // Get all pages associated with this diagnosis
+      const associatedPages: Array<{ key: string; fileIndex: number; pageNum: number }> = [];
+      
+      Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
+        const diagnoses = diagnosisString.split(',').map(d => d.trim());
+        if (diagnoses.includes(diagnosis)) {
+          const [fileIndex, pageNum] = key.split('-').map(Number);
+          associatedPages.push({ key, fileIndex, pageNum });
+        }
+      });
+
+      // Collect PDF content for these pages
+      let combinedContent = '';
+      for (const page of associatedPages) {
+        const fileName = pdfFiles[page.fileIndex]?.name || `Document ${page.fileIndex + 1}`;
+        const pageContent = pdfContent.find(
+          pc => pc.fileIndex === page.fileIndex
+        )?.pages.find(p => p.pageNum === page.pageNum);
+        
+        if (pageContent) {
+          combinedContent += `\n\n=== ${fileName} - Page ${page.pageNum} ===\n${pageContent.text}`;
+        }
+      }
+
+      if (!combinedContent.trim()) {
+        toast.error('No content found for this diagnosis');
+        setGeneratingForm(null);
+        return;
+      }
+
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke('generate-diagnosis-form', {
+        body: { 
+          diagnosis,
+          pdfContent: combinedContent
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        toast.error(error.message || 'Failed to generate form');
+        setGeneratingForm(null);
+        return;
+      }
+
+      if (!data?.success) {
+        toast.error('Failed to generate diagnosis form');
+        setGeneratingForm(null);
+        return;
+      }
+
+      // Show the generated content in a dialog or download as a document
+      // For now, let's create a text file with the form content
+      const formContent = `DVA DIAGNOSIS FORM
+Generated: ${new Date().toLocaleDateString()}
+
+Diagnosis: ${diagnosis}
+
+${data.content}
+
+---
+Associated Pages: ${associatedPages.length}
+${associatedPages.map(p => `- ${pdfFiles[p.fileIndex]?.name || 'Document'} Page ${p.pageNum}`).join('\n')}
+`;
+
+      const blob = new Blob([formContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Diagnosis_Form_${diagnosis.replace(/[^a-z0-9]/gi, '_')}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      toast.success('Diagnosis form generated and downloaded!');
+    } catch (error) {
+      console.error('Error generating diagnosis form:', error);
+      toast.error('Failed to generate diagnosis form');
+    } finally {
+      setGeneratingForm(null);
+    }
+  }, [pageDiagnoses, pdfFiles, pdfContent]);
 
   const handleScanAllFiles = useCallback(async () => {
     if (pdfFiles.length === 0) {
@@ -2177,6 +2265,23 @@ export const PDFSignature = () => {
                               </span>
                             </div>
                             <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenerateDiagnosisForm(diagnosis);
+                                }}
+                                disabled={generatingForm === diagnosis}
+                                className="h-8 w-8 p-0 hover:text-primary"
+                                aria-label="Generate diagnosis form"
+                              >
+                                {generatingForm === diagnosis ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <FileEdit className="w-4 h-4" />
+                                )}
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
