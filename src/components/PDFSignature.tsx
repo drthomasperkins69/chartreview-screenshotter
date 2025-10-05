@@ -1237,8 +1237,13 @@ export const PDFSignature = () => {
             size="lg"
           >
             <Download className="w-4 h-4" />
-            Generate PDF with Screenshots ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
+            Download PDF with All Selected Pages & Diagnoses ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
           </Button>
+          {selectedPagesForExtraction.size > 0 && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              {Object.keys(pageDiagnoses).filter(key => selectedPagesForExtraction.has(key) && pageDiagnoses[key]?.trim()).length} page(s) with diagnosis notes
+            </p>
+          )}
         </div>
       </main>
       
