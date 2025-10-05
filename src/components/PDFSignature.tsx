@@ -13,10 +13,12 @@ import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { DiagnosticAssessment } from "./DiagnosticAssessment";
 import { DIASettings } from "./DIASettings";
+import { useDIA } from "@/contexts/DIAContext";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
+import { Textarea } from "./ui/textarea";
 
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
@@ -72,6 +74,7 @@ interface PDFContent {
 }
 
 export const PDFSignature = () => {
+  const { diaInstructions, setDiaInstructions } = useDIA();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
   const [keywords, setKeywords] = useState<string>("");
@@ -1028,6 +1031,28 @@ export const PDFSignature = () => {
                   </Card>
                 </ResizablePanel>
               </ResizablePanelGroup>
+
+              {/* DIA Instructions Row - Full Width at Bottom */}
+              <Card className="mt-4 p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="dia-instructions-bottom" className="text-sm font-medium">
+                      DIA Instructions
+                    </Label>
+                    <DIASettings />
+                  </div>
+                  <Textarea
+                    id="dia-instructions-bottom"
+                    placeholder="Paste your diagnostic assessment instructions here..."
+                    value={diaInstructions}
+                    onChange={(e) => setDiaInstructions(e.target.value)}
+                    className="min-h-[120px] font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    These instructions will be used when generating diagnostic assessments
+                  </p>
+                </div>
+              </Card>
             </>
           )}
         <input

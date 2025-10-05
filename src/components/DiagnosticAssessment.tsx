@@ -328,7 +328,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     <div className="h-full flex flex-col gap-4 p-4">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">DIA Instructions</Label>
+          <Label className="text-sm font-medium">Generate Assessment</Label>
           <DIASettings />
         </div>
 
@@ -357,19 +357,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="dia-instructions" className="text-sm font-medium mb-2 block">
-            DIA Instructions
-          </Label>
-          <Textarea
-            id="dia-instructions"
-            placeholder="Paste your diagnostic assessment instructions here..."
-            value={localInstructions}
-            onChange={(e) => setLocalInstructions(e.target.value)}
-            className="min-h-[150px] font-mono text-sm"
-          />
         </div>
 
         <div>
@@ -466,7 +453,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
           <div className="space-y-2">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Enter DIA instructions, upload SOP documents (optional), and click Generate to create your diagnostic assessment PDF
+              Enter DIA instructions below, upload SOP documents (optional), and click Generate to create your diagnostic assessment PDF
             </p>
           </div>
         </Card>
