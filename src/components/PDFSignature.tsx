@@ -336,17 +336,33 @@ export const PDFSignature = () => {
   }, [autoNavigate, currentPdfIndex, pdfFiles.length, keywordMatches]);
 
   const togglePageSelection = useCallback((pageNum: number, fileIndex: number) => {
+    const key = `${fileIndex}-${pageNum}`;
+    
     setSelectedPagesForExtraction(prev => {
       const newSet = new Set(prev);
-      const key = `${fileIndex}-${pageNum}`;
       if (newSet.has(key)) {
         newSet.delete(key);
+        // Remove from keyword matches too
+        setKeywordMatches(prevMatches => 
+          prevMatches.filter(m => !(m.fileIndex === fileIndex && m.page === pageNum))
+        );
       } else {
         newSet.add(key);
+        // Add to keyword matches
+        setKeywordMatches(prevMatches => [
+          ...prevMatches,
+          {
+            page: pageNum,
+            keyword: "Manually Added",
+            count: 1,
+            fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`,
+            fileIndex
+          }
+        ]);
       }
       return newSet;
     });
-  }, []);
+  }, [pdfFiles]);
 
   const selectAllPages = useCallback(() => {
     const allMatchingPages = new Set(keywordMatches.map(m => `${m.fileIndex}-${m.page}`));
