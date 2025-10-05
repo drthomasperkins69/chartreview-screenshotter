@@ -1907,8 +1907,9 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
     const context: Array<{
       diagnosis: string;
-      files: Array<{ fileName: string; pageNum: number; text?: string }>;
+      files: Array<{ fileName: string; pageNum: number; text?: string; fileId?: string }>;
     }> = [];
+    const fileIds = new Set<string>();
 
     selectedDiagnosesForChat.forEach(diagnosis => {
       // Find all pages with this diagnosis
@@ -1929,11 +1930,19 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         }
       });
 
-      const files = pagesWithDiagnosis.map(page => ({
-        fileName: page.fileName,
-        pageNum: page.pageNum,
-        text: pdfContent[page.fileIndex]?.[page.pageNum]
-      }));
+      const files = pagesWithDiagnosis.map(page => {
+        const fileName = page.fileName;
+        const metadata = fileMetadata.get(fileName);
+        if (metadata) {
+          fileIds.add(metadata.id);
+        }
+        return {
+          fileName: page.fileName,
+          pageNum: page.pageNum,
+          text: pdfContent[page.fileIndex]?.[page.pageNum],
+          fileId: metadata?.id
+        };
+      });
 
       context.push({ diagnosis, files });
     });
@@ -1941,13 +1950,15 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     // Add ADMIN.pdf if it exists in workspace
     const adminFile = workspaceFiles.find(f => f.file_name === 'ADMIN.pdf');
     if (adminFile && selectedWorkspace) {
+      fileIds.add(adminFile.id);
       // Find the file index for ADMIN.pdf
       const adminFileIndex = pdfFiles.findIndex(f => f.name === 'ADMIN.pdf');
       if (adminFileIndex >= 0 && pdfContent[adminFileIndex]) {
         const adminPages = Object.entries(pdfContent[adminFileIndex]).map(([pageNum, text]) => ({
           fileName: 'ADMIN.pdf',
           pageNum: parseInt(pageNum),
-          text
+          text,
+          fileId: adminFile.id
         }));
         
         context.push({
@@ -1957,8 +1968,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       }
     }
 
-    return context;
-  }, [selectedDiagnosesForChat, pageDiagnoses, pdfFiles, pdfContent, workspaceFiles, selectedWorkspace]);
+    return { context, fileIds: Array.from(fileIds) };
+  }, [selectedDiagnosesForChat, pageDiagnoses, pdfFiles, pdfContent, workspaceFiles, selectedWorkspace, fileMetadata]);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">

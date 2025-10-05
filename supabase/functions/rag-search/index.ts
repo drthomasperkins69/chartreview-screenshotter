@@ -55,26 +55,20 @@ serve(async (req) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform vector similarity search
-    let searchQuery = supabase.rpc('match_documents', {
+    // Perform vector similarity search with file ID filtering
+    const { data: matches, error: searchError } = await supabase.rpc('match_documents', {
       query_embedding: queryEmbedding,
       match_threshold: 0.5,
       match_count: limit,
+      file_ids: fileIds && fileIds.length > 0 ? fileIds : null,
     });
-
-    // Filter by file IDs if provided
-    if (fileIds && fileIds.length > 0) {
-      searchQuery = searchQuery.in('file_id', fileIds);
-    }
-
-    const { data: matches, error: searchError } = await searchQuery;
 
     if (searchError) {
       console.error('Search error:', searchError);
       throw searchError;
     }
 
-    console.log(`Found ${matches?.length || 0} relevant document chunks`);
+    console.log(`Found ${matches?.length || 0} relevant document chunks${fileIds && fileIds.length > 0 ? ` from ${fileIds.length} file(s)` : ''}`);
 
     return new Response(
       JSON.stringify({ matches: matches || [] }),

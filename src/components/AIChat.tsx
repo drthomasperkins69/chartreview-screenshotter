@@ -17,11 +17,11 @@ interface Message {
 
 interface DiagnosisContext {
   diagnosis: string;
-  files: Array<{ fileName: string; pageNum: number; text?: string }>;
+  files: Array<{ fileName: string; pageNum: number; text?: string; fileId?: string }>;
 }
 
 interface AIChatProps {
-  diagnosesContext?: DiagnosisContext[] | null;
+  diagnosesContext?: { context: DiagnosisContext[]; fileIds: string[] } | null;
 }
 
 const AI_PROVIDERS = [
@@ -102,19 +102,16 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
     try {
       // Perform RAG search if we have diagnosis context
       let ragContext = '';
-      if (diagnosesContext && diagnosesContext.length > 0) {
+      if (diagnosesContext && diagnosesContext.context.length > 0) {
         try {
-          // Get file IDs from diagnosis context
-          const fileIds = Array.from(new Set(
-            diagnosesContext.flatMap(ctx => 
-              ctx.files.map(f => f.fileName)
-            )
-          ));
+          // Use the file IDs from the context
+          const fileIds = diagnosesContext.fileIds;
 
           // Perform RAG search
           const { data: searchResults, error: searchError } = await supabase.functions.invoke('rag-search', {
             body: {
               query: input,
+              fileIds: fileIds,
               limit: 10,
             },
           });
@@ -133,9 +130,9 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
 
       // Build diagnosis context message if diagnoses are selected
       let diagnosisContext = '';
-      if (diagnosesContext && diagnosesContext.length > 0) {
+      if (diagnosesContext && diagnosesContext.context.length > 0) {
         diagnosisContext = '\n\n--- Selected Diagnoses (Direct Context) ---\n';
-        diagnosesContext.forEach(({ diagnosis, files }) => {
+        diagnosesContext.context.forEach(({ diagnosis, files }) => {
           diagnosisContext += `\nDiagnosis: ${diagnosis}\nFiles:\n`;
           files.forEach(({ fileName, pageNum, text }) => {
             diagnosisContext += `  - ${fileName}, Page ${pageNum}\n`;
@@ -222,14 +219,14 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
       </div>
 
       <ScrollArea className="flex-1 p-4">
-        {diagnosesContext && diagnosesContext.length > 0 && (
+        {diagnosesContext && diagnosesContext.context.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
             <p className="text-xs font-medium text-primary mb-1">
               🔍 RAG-Enhanced Context Active
             </p>
             <div className="text-xs text-muted-foreground space-y-1">
-              <p className="mb-2">Selected Diagnoses ({diagnosesContext.length}):</p>
-              {diagnosesContext.map((ctx, idx) => (
+              <p className="mb-2">Selected Diagnoses ({diagnosesContext.context.length}):</p>
+              {diagnosesContext.context.map((ctx, idx) => (
                 <div key={idx}>
                   • {ctx.diagnosis}: {ctx.files.length} file{ctx.files.length !== 1 ? 's' : ''}
                 </div>
@@ -246,7 +243,7 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
             <Sparkles className="w-12 h-12 mb-4 text-muted-foreground/50" />
             <p className="text-lg font-medium mb-2">Choose an AI provider and start chatting</p>
             <p className="text-sm max-w-md">
-              {diagnosesContext && diagnosesContext.length > 0 
+              {diagnosesContext && diagnosesContext.context.length > 0 
                 ? 'AI has access to selected diagnoses and their files'
                 : 'Switch between different AI models to compare responses and capabilities'}
             </p>
