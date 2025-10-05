@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
-import { FileText, Download, Upload, Search } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 
@@ -88,6 +88,7 @@ export const PDFSignature = () => {
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
+  const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -263,6 +264,17 @@ export const PDFSignature = () => {
     setMatchingPages(new Set());
     setSelectedPagesForExtraction(new Set());
     setKeywordMatches([]);
+    setOcrCompletedFiles(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(index);
+      // Re-index remaining files
+      const reindexed = new Set<number>();
+      Array.from(newSet).forEach(i => {
+        if (i > index) reindexed.add(i - 1);
+        else reindexed.add(i);
+      });
+      return reindexed;
+    });
     toast("PDF removed");
   }, [currentPdfIndex]);
 
@@ -275,6 +287,7 @@ export const PDFSignature = () => {
     setKeywords("");
     setSuggestedKeywords("");
     setSearchCategories(prev => prev.map(cat => ({ ...cat, checked: false })));
+    setOcrCompletedFiles(new Set());
     toast("All PDFs removed");
   }, []);
 
@@ -429,6 +442,9 @@ export const PDFSignature = () => {
       const existing = prev.filter(p => p.fileIndex !== fileIndex);
       return [...existing, { fileName, fileIndex, pages: pageTexts }];
     });
+    
+    // Mark this file as OCR complete
+    setOcrCompletedFiles(prev => new Set(prev).add(fileIndex));
   }, []);
 
   const handleOCRProgress = useCallback((current: number, total: number, message: string) => {
@@ -531,33 +547,41 @@ export const PDFSignature = () => {
                 <Card className="p-4 shadow-medium mb-4">
                   <Label className="text-sm font-medium mb-2 block">Select PDF to View</Label>
                   <div className="flex flex-wrap gap-2">
-                    {pdfFiles.map((file, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Button
-                          variant={currentPdfIndex === index ? "default" : "outline"}
-                          onClick={() => {
-                            setCurrentPdfIndex(index);
-                            setMatchingPages(new Set());
-                            setKeywordMatches([]);
-                            setSelectedPagesForExtraction(new Set());
-                            setSelectedPage(null);
-                          }}
-                          className="gap-2"
-                          size="sm"
-                        >
-                          <FileText className="w-4 h-4" />
-                          {file.name || `PDF ${index + 1}`}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemovePdf(index)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ))}
+                    {pdfFiles.map((file, index) => {
+                      const isComplete = ocrCompletedFiles.has(index);
+                      return (
+                        <div key={index} className="flex items-center gap-2">
+                          <Button
+                            variant={currentPdfIndex === index ? "default" : "outline"}
+                            onClick={() => {
+                              setCurrentPdfIndex(index);
+                              setMatchingPages(new Set());
+                              setKeywordMatches([]);
+                              setSelectedPagesForExtraction(new Set());
+                              setSelectedPage(null);
+                            }}
+                            className="gap-2 relative"
+                            size="sm"
+                          >
+                            <FileText className="w-4 h-4" />
+                            {file.name || `PDF ${index + 1}`}
+                            {isComplete ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-1" />
+                            ) : (
+                              <Clock className="w-3.5 h-3.5 text-yellow-500 ml-1 animate-pulse" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemovePdf(index)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </Card>
               )}
