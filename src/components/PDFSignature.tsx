@@ -1845,10 +1845,10 @@ export const PDFSignature = () => {
 
                 {/* Right Panel: Matches Found */}
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                  <Card className="h-full min-h-0 rounded-none border-0 p-0 flex flex-col">
+                  <Card className="h-full rounded-none border-0 overflow-hidden flex flex-col">
                     {keywordMatches.length > 0 ? (
                       <>
-                        <div className="space-y-2 mb-3">
+                        <div className="p-4 space-y-2">
                           <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold">
                               Matches Found ({selectedPagesForExtraction.size})
@@ -1883,7 +1883,7 @@ export const PDFSignature = () => {
                           </div>
                         </div>
                         <ScrollArea className="flex-1">
-                          <div className="space-y-3 pr-4">
+                          <div className="space-y-3 px-4 pb-4">
                             {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
                               .filter(idx => !isNaN(idx) && idx >= 0)
                               .sort((a, b) => a - b)
@@ -1949,22 +1949,25 @@ export const PDFSignature = () => {
                         </ScrollArea>
                       </>
                     ) : (
-                      <div className="flex-1 min-h-0 flex flex-col">
+                      <>
                         {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 ? (
-                          <div className="p-4 h-full flex flex-col min-h-0">
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
-                              <Button
-                                onClick={handleDownloadAllAsZip}
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                              >
-                                <FileArchive className="w-4 h-4" />
-                                Download All as ZIP
-                              </Button>
+                          <>
+                            <div className="p-4 pb-2">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
+                                <Button
+                                  onClick={handleDownloadAllAsZip}
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2"
+                                >
+                                  <FileArchive className="w-4 h-4" />
+                                  Download All as ZIP
+                                </Button>
+                              </div>
                             </div>
-                            <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
+                            <div className="flex-1 overflow-y-auto px-4 pb-4">
+                              <div className="space-y-2">
                               {(() => {
                                 // Split comma-separated diagnoses and group pages by individual diagnosis
                                 const diagnosisGroups: Record<string, Array<{ key: string; fileIndex: number; pageNum: number; fileName: string }>> = {};
@@ -2061,12 +2064,13 @@ export const PDFSignature = () => {
                               })()}
                             </div>
                           </div>
+                          </>
                         ) : (
-                          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                          <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground p-4">
                             No diagnoses yet. Use AI auto-scan to generate diagnoses.
                           </div>
                         )}
-                      </div>
+                      </>
                     )}
                   </Card>
                 </ResizablePanel>
