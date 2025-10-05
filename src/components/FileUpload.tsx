@@ -11,19 +11,9 @@ export const FileUpload = ({ onFileSelect }: FileUploadProps) => {
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       const files = Array.from(e.dataTransfer.files);
-      const supportedFile = files.find(file => 
-        file.type === "application/pdf" ||
-        file.type === "text/html" ||
-        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        file.type === "application/msword" ||
-        file.name.toLowerCase().endsWith('.pdf') ||
-        file.name.toLowerCase().endsWith('.html') ||
-        file.name.toLowerCase().endsWith('.htm') ||
-        file.name.toLowerCase().endsWith('.docx') ||
-        file.name.toLowerCase().endsWith('.doc')
-      );
-      if (supportedFile) {
-        onFileSelect(supportedFile);
+      const pdfFile = files.find(file => file.type === "application/pdf");
+      if (pdfFile) {
+        onFileSelect(pdfFile);
       }
     },
     [onFileSelect]
@@ -56,22 +46,22 @@ export const FileUpload = ({ onFileSelect }: FileUploadProps) => {
         </div>
         
         <h3 className="text-xl font-semibold text-foreground mb-2">
-          Upload your document
+          Upload your PDF document
         </h3>
         
         <p className="text-muted-foreground mb-6 max-w-md">
-          Drag and drop your PDF, HTML, or Word file here, or click to browse and select a file from your computer.
+          Drag and drop your PDF file here, or click to browse and select a file from your computer.
         </p>
         
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
           <FileText className="w-4 h-4" />
-          Supports PDF, HTML, and Word (.doc, .docx) files
+          Supports PDF files of any size
         </div>
         
         <input
           id="file-input"
           type="file"
-          accept=".pdf,.html,.htm,.doc,.docx"
+          accept=".pdf"
           onChange={handleFileInputChange}
           className="hidden"
         />

@@ -21,7 +21,6 @@ import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 import dvaLogo from "@/assets/dva-logo.png";
 import { Textarea } from "./ui/textarea";
-import { convertToPdf } from "@/lib/fileConverter";
 
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
@@ -145,25 +144,16 @@ export const PDFSignature = () => {
     fetchCategories();
   }, []);
 
-  const handleFileSelect = useCallback(async (file: File) => {
-    try {
-      // Show loading toast
-      const loadingToast = toast.loading("Processing file...");
-      
-      // Convert to PDF if needed
-      const pdfFile = await convertToPdf(file);
-      
-      setPdfFiles(prev => [...prev, pdfFile]);
-      setMatchingPages(new Set());
-      setKeywordMatches([]);
-      setSelectedPagesForExtraction(new Set());
-      
-      toast.dismiss(loadingToast);
-      toast.success(`${file.name} ${file.type === 'application/pdf' ? 'added' : 'converted and added'} successfully!`);
-    } catch (error) {
-      console.error('Error processing file:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process file');
+  const handleFileSelect = useCallback((file: File) => {
+    if (file.type !== "application/pdf") {
+      toast.error("Please select a PDF file");
+      return;
     }
+    setPdfFiles(prev => [...prev, file]);
+    setMatchingPages(new Set());
+    setKeywordMatches([]);
+    setSelectedPagesForExtraction(new Set());
+    toast.success("PDF added successfully!");
   }, []);
 
   const handleMultipleFileSelect = useCallback((files: FileList) => {
