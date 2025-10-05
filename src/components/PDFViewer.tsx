@@ -76,7 +76,8 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isHoveringCanvas, setIsHoveringCanvas] = useState(false);
+  const [magnifierPos, setMagnifierPos] = useState<{ x: number; y: number } | null>(null);
+  const magnifierCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const currentFile = files[currentFileIndex] || null;
 
@@ -371,6 +372,62 @@ export const PDFViewer = ({
       console.error("Error rendering page:", error);
     }
   }, [pdf, currentPage, scale, rotation, matchingPages]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || !magnifierCanvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setMagnifierPos({ x: e.clientX, y: e.clientY });
+    
+    // Draw magnified area
+    const magnifierCanvas = magnifierCanvasRef.current;
+    const magnifierCtx = magnifierCanvas.getContext("2d");
+    if (!magnifierCtx) return;
+    
+    const magnification = 2;
+    const radius = 75;
+    magnifierCanvas.width = radius * 2;
+    magnifierCanvas.height = radius * 2;
+    
+    // Clear magnifier
+    magnifierCtx.clearRect(0, 0, magnifierCanvas.width, magnifierCanvas.height);
+    
+    // Draw circular clip
+    magnifierCtx.save();
+    magnifierCtx.beginPath();
+    magnifierCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+    magnifierCtx.closePath();
+    magnifierCtx.clip();
+    
+    // Draw magnified content
+    const sourceX = x - radius / magnification;
+    const sourceY = y - radius / magnification;
+    const sourceWidth = (radius * 2) / magnification;
+    const sourceHeight = (radius * 2) / magnification;
+    
+    magnifierCtx.drawImage(
+      canvas,
+      sourceX, sourceY, sourceWidth, sourceHeight,
+      0, 0, radius * 2, radius * 2
+    );
+    
+    magnifierCtx.restore();
+    
+    // Draw border
+    magnifierCtx.strokeStyle = "#000";
+    magnifierCtx.lineWidth = 3;
+    magnifierCtx.beginPath();
+    magnifierCtx.arc(radius, radius, radius - 1.5, 0, Math.PI * 2);
+    magnifierCtx.stroke();
+  };
+
+  const handleMouseLeave = () => {
+    setMagnifierPos(null);
+  };
 
   useEffect(() => {
     renderPage();
@@ -710,8 +767,6 @@ export const PDFViewer = ({
       <div
         ref={containerRef}
         className="flex-1 flex justify-center p-6 overflow-auto relative"
-        onMouseEnter={() => setIsHoveringCanvas(true)}
-        onMouseLeave={() => setIsHoveringCanvas(false)}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -729,11 +784,18 @@ export const PDFViewer = ({
                 maxWidth: "100%",
                 height: "auto",
               }}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
             />
-            {isHoveringCanvas && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                <Search className="w-16 h-16 text-primary/30" strokeWidth={1.5} />
-              </div>
+            {magnifierPos && (
+              <canvas
+                ref={magnifierCanvasRef}
+                className="pointer-events-none absolute rounded-full shadow-lg"
+                style={{
+                  left: magnifierPos.x - 75,
+                  top: magnifierPos.y - 75,
+                }}
+              />
             )}
           </>
         )}
