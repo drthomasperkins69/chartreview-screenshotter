@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileText, Sparkles, Upload, Download, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, FileText, Sparkles, Upload, Download, X, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useDIA } from "@/contexts/DIAContext";
 import { DIASettings } from "./DIASettings";
@@ -33,6 +34,8 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
   const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
   const [isGenerating, setIsGenerating] = useState(false);
   const [assessment, setAssessment] = useState<string>("");
+  const [editableAssessment, setEditableAssessment] = useState<string>("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sopFiles, setSopFiles] = useState<File[]>([]);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string>("");
 
@@ -43,9 +46,10 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
 
   // Listen for generate event from parent
   useEffect(() => {
-    const handleGenerate = () => {
+    const handleGenerate = (event: any) => {
+      const sopFilesFromEvent = event.detail?.sopFiles || [];
       if (selectedPages.size > 0 && localInstructions.trim()) {
-        handleGenerateAssessment();
+        handleGenerateAssessment(sopFilesFromEvent);
       }
     };
 
@@ -76,7 +80,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     toast.success("SOP file removed");
   };
 
-  const handleGenerateAssessment = async () => {
+  const handleGenerateAssessment = async (sopFilesFromEvent: File[] = []) => {
     if (!localInstructions.trim()) {
       toast.error("Please enter DIA instructions");
       return;
@@ -89,14 +93,18 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
 
     setIsGenerating(true);
     setAssessment("");
+    setEditableAssessment("");
+
+    // Use SOP files from event if provided, otherwise use local state
+    const filesToUse = sopFilesFromEvent.length > 0 ? sopFilesFromEvent : sopFiles;
 
     try {
       // Parse SOP files if any
       let sopContent = "";
-      if (sopFiles.length > 0) {
+      if (filesToUse.length > 0) {
         toast("Extracting SOP content...");
         
-        for (const file of sopFiles) {
+        for (const file of filesToUse) {
           const arrayBuffer = await file.arrayBuffer();
           const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
           let fileText = `\n\n--- SOP Document: ${file.name} ---\n\n`;
@@ -186,11 +194,14 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
       const data = await resp.json();
       const assessmentText = data.assessment;
       setAssessment(assessmentText);
+      setEditableAssessment(assessmentText);
 
       // Now create the combined PDF with assessment + page screenshots
       toast("Creating PDF document...");
       await createCombinedPDF(assessmentText, selectedContent);
       
+      // Open the dialog to show the results
+      setIsDialogOpen(true);
       toast.success("Diagnostic assessment generated successfully!");
     } catch (error) {
       console.error("Error generating assessment:", error);
@@ -312,28 +323,92 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(assessment);
+    navigator.clipboard.writeText(editableAssessment);
     toast.success("Assessment copied to clipboard!");
   };
 
-  const handleDownload = () => {
-    if (generatedPdfUrl) {
-      const link = document.createElement('a');
-      link.href = generatedPdfUrl;
-      link.download = `diagnostic-assessment-${Date.now()}.pdf`;
-      link.click();
-      toast.success("PDF downloaded!");
-    } else {
-      // Fallback to text download
-      const blob = new Blob([assessment], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `diagnostic-assessment-${Date.now()}.txt`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success("Assessment downloaded!");
+  const handleDownload = async () => {
+    // Regenerate PDF with edited content
+    toast("Creating PDF with edited content...");
+    
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    const fontSize = 11;
+    const lineHeight = 14;
+    const margin = 50;
+    const maxWidth = 500;
+    
+    let page = pdfDoc.addPage([595, 842]);
+    let yPosition = 792;
+    
+    // Title
+    page.drawText("Diagnostic Assessment Report", {
+      x: margin,
+      y: yPosition,
+      size: 16,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 30;
+    
+    // Add edited assessment text
+    const lines = editableAssessment.split('\n');
+    for (const line of lines) {
+      if (yPosition < margin + 20) {
+        page = pdfDoc.addPage([595, 842]);
+        yPosition = 792;
+      }
+      
+      const words = line.split(' ');
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const width = font.widthOfTextAtSize(testLine, fontSize);
+        
+        if (width > maxWidth && currentLine) {
+          page.drawText(currentLine, {
+            x: margin,
+            y: yPosition,
+            size: fontSize,
+            font: font,
+            color: rgb(0, 0, 0),
+          });
+          yPosition -= lineHeight;
+          currentLine = word;
+          
+          if (yPosition < margin + 20) {
+            page = pdfDoc.addPage([595, 842]);
+            yPosition = 792;
+          }
+        } else {
+          currentLine = testLine;
+        }
+      }
+      
+      if (currentLine) {
+        page.drawText(currentLine, {
+          x: margin,
+          y: yPosition,
+          size: fontSize,
+          font: font,
+          color: rgb(0, 0, 0),
+        });
+        yPosition -= lineHeight;
+      }
     }
+    
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `diagnostic-assessment-${Date.now()}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("PDF downloaded!");
   };
 
   return (
@@ -425,29 +500,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
         </Card>
       )}
 
-      {assessment && !isGenerating && (
-        <Card className="flex-1 flex flex-col overflow-hidden">
-          <div className="border-b p-3 flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Assessment Results</h3>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleCopy}>
-                Copy
-              </Button>
-              <Button size="sm" variant="default" onClick={handleDownload} className="gap-2">
-                <Download className="w-4 h-4" />
-                Download PDF
-              </Button>
-            </div>
-          </div>
-          <ScrollArea className="flex-1 p-4">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <pre className="whitespace-pre-wrap text-sm">{assessment}</pre>
-            </div>
-          </ScrollArea>
-        </Card>
-      )}
-
-      {!assessment && !isGenerating && (
+      {!isGenerating && (
         <Card className="flex-1 flex items-center justify-center text-center p-6 border-dashed">
           <div className="space-y-2">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground/50" />
@@ -457,6 +510,38 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
           </div>
         </Card>
       )}
+
+      {/* Assessment Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Diagnostic Assessment Results</DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-hidden">
+            <Label className="text-sm font-medium mb-2 block">
+              Edit Assessment (changes will be reflected in the downloaded PDF)
+            </Label>
+            <Textarea
+              value={editableAssessment}
+              onChange={(e) => setEditableAssessment(e.target.value)}
+              className="w-full h-[60vh] resize-none font-mono text-sm"
+              placeholder="Assessment will appear here..."
+            />
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleCopy} className="gap-2">
+              <Copy className="w-4 h-4" />
+              Copy
+            </Button>
+            <Button onClick={handleDownload} className="gap-2">
+              <Download className="w-4 h-4" />
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
