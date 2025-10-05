@@ -9,6 +9,7 @@ import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
+import { createClient } from "@supabase/supabase-js";
 
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
@@ -80,8 +81,12 @@ export const PDFSignature = () => {
       }
 
       try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error } = await supabase
+        const client = createClient(url, key, {
+          auth: {
+            persistSession: false,
+          }
+        });
+        const { data, error } = await client
           .from('search_categories')
           .select('id, label, terms')
           .order('id');
@@ -97,7 +102,7 @@ export const PDFSignature = () => {
         
         setSearchCategories((data ?? []).map(cat => ({ ...cat, checked: false })));
       } catch (e) {
-        console.error('Failed to initialize backend client', e);
+        console.error('Failed to fetch categories', e);
         setSearchCategories(
           DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
         );
@@ -343,8 +348,16 @@ export const PDFSignature = () => {
     if (!category) return;
 
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { error } = await supabase
+      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+
+      if (!url || !key) {
+        toast.error('Backend not configured');
+        return;
+      }
+
+      const client = createClient(url, key, { auth: { persistSession: false } });
+      const { error } = await client
         .from('search_categories')
         .update({ terms: category.terms })
         .eq('id', categoryId);
@@ -357,7 +370,7 @@ export const PDFSignature = () => {
       }
     } catch (e) {
       console.error('Failed to update category', e);
-      toast.error('Backend not available - changes saved locally only');
+      toast.error('Failed to save keywords');
     }
   }, [searchCategories]);
 
