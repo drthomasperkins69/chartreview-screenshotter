@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import * as pdfjsLib from "pdfjs-dist";
+// Use Vite worker for pdf.js to ensure fast, reliable rendering
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - Vite ?worker returns a Worker constructor
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - assign worker instance to workerPort
+pdfjsLib.GlobalWorkerOptions.workerPort = new pdfjsWorker();
 import { Loader2 } from "lucide-react";
 
 interface PDFPageDialogProps {
