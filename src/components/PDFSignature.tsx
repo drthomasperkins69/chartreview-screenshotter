@@ -904,6 +904,7 @@ export const PDFSignature = () => {
     setIsAutoScanningAll(true);
     let totalScanned = 0;
     let totalPages = 0;
+    const batchedDiagnoses: Record<string, string> = {};
 
     try {
       toast(`Starting AI auto-scan of all ${pdfFiles.length} PDF(s)...`);
@@ -926,6 +927,8 @@ export const PDFSignature = () => {
 
         // Scan each page in this PDF
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          let tempCanvas: HTMLCanvasElement | null = null;
+          
           try {
             totalScanned++;
             toast.info(`Scanning page ${totalScanned}/${totalPages}...`, { duration: 1000 });
@@ -934,12 +937,15 @@ export const PDFSignature = () => {
             const page = await pdfDoc.getPage(pageNum);
             const viewport = page.getViewport({ scale: 1.2 });
             
-            const tempCanvas = document.createElement('canvas');
+            tempCanvas = document.createElement('canvas');
             tempCanvas.width = viewport.width;
             tempCanvas.height = viewport.height;
             const context = tempCanvas.getContext('2d');
             
-            if (!context) continue;
+            if (!context) {
+              tempCanvas = null;
+              continue;
+            }
 
             await page.render({
               canvasContext: context,
@@ -948,6 +954,11 @@ export const PDFSignature = () => {
             }).promise;
 
             const pageImage = tempCanvas.toDataURL('image/jpeg', 0.85);
+            
+            // Clean up canvas immediately after getting image
+            tempCanvas.width = 0;
+            tempCanvas.height = 0;
+            tempCanvas = null;
             
             // Get extracted text for this page if available
             const fileContent = pdfContent.find(p => p.fileIndex === fileIndex);
@@ -966,21 +977,40 @@ export const PDFSignature = () => {
 
             if (error) {
               console.error(`AI suggestion error for ${file.name} page ${pageNum}:`, error);
+              // Longer delay on error to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 2000));
               continue;
             }
 
             if (data?.diagnosis) {
-              // Wait for the diagnosis to be saved to PDF before continuing
-              await handleDiagnosisChange(fileIndex, pageNum, data.diagnosis);
+              // Batch diagnoses instead of immediate state updates
+              batchedDiagnoses[`${fileIndex}-${pageNum}`] = data.diagnosis;
+              
+              // Update state every 5 pages to reduce overhead
+              if (totalScanned % 5 === 0) {
+                setPageDiagnoses(prev => ({ ...prev, ...batchedDiagnoses }));
+              }
             }
 
-            // Small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Longer delay to avoid rate limiting and reduce system load
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
           } catch (pageError) {
             console.error(`Error processing ${file.name} page ${pageNum}:`, pageError);
+            // Clean up canvas on error
+            if (tempCanvas) {
+              tempCanvas.width = 0;
+              tempCanvas.height = 0;
+            }
+            // Longer delay on error
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
+      }
+
+      // Apply any remaining batched diagnoses
+      if (Object.keys(batchedDiagnoses).length > 0) {
+        setPageDiagnoses(prev => ({ ...prev, ...batchedDiagnoses }));
       }
 
       toast.success(`Auto-scan complete! Scanned ${totalScanned} pages across ${pdfFiles.length} PDF(s).`);
@@ -990,7 +1020,7 @@ export const PDFSignature = () => {
     } finally {
       setIsAutoScanningAll(false);
     }
-  }, [pdfFiles, pdfContent, handleDiagnosisChange]);
+  }, [pdfFiles, pdfContent]);
 
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
