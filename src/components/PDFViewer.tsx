@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist";
+import { createWorker } from "tesseract.js";
 // Use Vite worker for pdf.js to avoid CORS/version issues
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - Vite ?worker returns a Worker constructor
@@ -51,6 +53,7 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [ocrProgress, setOcrProgress] = useState<string>("");
 
   const currentFile = files[currentFileIndex] || null;
 
@@ -92,33 +95,68 @@ export const PDFViewer = ({
     loadPdf();
   }, [currentFile, selectedPage]);
 
-  // Extract text from all pages for AI analysis
+  // Extract text from all pages for AI analysis with OCR
   useEffect(() => {
-    const extractText = async () => {
+    const extractTextWithOCR = async () => {
       if (!currentFile || !onTextExtracted) return;
 
       try {
+        setOcrProgress("Initializing OCR...");
+        const worker = await createWorker('eng');
+        
         const arrayBuffer = await currentFile.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
         const pageTexts: Array<{ pageNum: number; text: string }> = [];
 
         for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          setOcrProgress(`Processing page ${pageNum} of ${pdfDoc.numPages}...`);
+          
           const page = await pdfDoc.getPage(pageNum);
+          
+          // Extract existing text layer
           const textContent = await page.getTextContent();
-          const pageText = textContent.items
+          const extractedText = textContent.items
             .map((item: any) => item.str)
             .join(' ');
           
-          pageTexts.push({ pageNum, text: pageText });
+          // Render page to canvas for OCR
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          
+          if (context) {
+            await page.render({
+              canvasContext: context,
+              viewport: viewport,
+              canvas: canvas,
+            }).promise;
+            
+            // Perform OCR on the rendered page
+            const { data: { text: ocrText } } = await worker.recognize(canvas);
+            
+            // Combine extracted text and OCR text
+            const combinedText = `${extractedText} ${ocrText}`.trim();
+            pageTexts.push({ pageNum, text: combinedText });
+          } else {
+            // Fallback to just extracted text if canvas fails
+            pageTexts.push({ pageNum, text: extractedText });
+          }
         }
 
+        await worker.terminate();
+        setOcrProgress("");
         onTextExtracted(currentFileIndex, currentFile.name, pageTexts);
+        toast.success(`OCR completed for ${currentFile.name}`);
       } catch (error) {
-        console.error("Error extracting text from PDF:", error);
+        console.error("Error extracting text with OCR:", error);
+        setOcrProgress("");
+        toast.error("OCR processing failed");
       }
     };
 
-    extractText();
+    extractTextWithOCR();
   }, [currentFile, currentFileIndex, onTextExtracted]);
 
   useEffect(() => {
@@ -386,14 +424,30 @@ export const PDFViewer = ({
         ref={containerRef}
         className="flex justify-center p-6 min-h-[600px] overflow-auto"
       >
-        <canvas
-          ref={canvasRef}
-          className="shadow-medium border"
-          style={{
-            maxWidth: "100%",
-            height: "auto",
-          }}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">Loading PDF...</p>
+            </div>
+          </div>
+        ) : ocrProgress ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">{ocrProgress}</p>
+            </div>
+          </div>
+        ) : (
+          <canvas
+            ref={canvasRef}
+            className="shadow-medium border"
+            style={{
+              maxWidth: "100%",
+              height: "auto",
+            }}
+          />
+        )}
       </div>
 
       {matchingPages.size > 0 && (
