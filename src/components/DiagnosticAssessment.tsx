@@ -117,8 +117,8 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles, sele
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
               if (context) {
-                // Use 2.5x scale for very high quality screenshots
-                const viewport = pdfPage.getViewport({ scale: 2.5 });
+                // Use 1.5x scale to balance quality and file size (keep under 5MB)
+                const viewport = pdfPage.getViewport({ scale: 1.5 });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 
@@ -128,8 +128,8 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles, sele
                   canvas: canvas,
                 }).promise;
                 
-                // Convert canvas to base64 PNG for lossless quality
-                image = canvas.toDataURL('image/png');
+                // Convert to JPEG with 85% quality to keep file size manageable
+                image = canvas.toDataURL('image/jpeg', 0.85);
               }
             }
           } catch (error) {
