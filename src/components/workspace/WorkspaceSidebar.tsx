@@ -34,6 +34,9 @@ import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, Chevron
 import dvaLogo from "@/assets/dva-logo.png";
 import { uploadPdfToStorage } from "@/utils/supabaseStorage";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import mammoth from "mammoth";
 
 interface WorkspaceSidebarProps {
   onFileSelect?: (fileId: string, filePath: string, fileName: string) => void;
@@ -90,29 +93,110 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
     setExpandedWorkspaces(new Set([workspaceId]));
   };
 
+  const convertHtmlToPdf = async (file: File): Promise<File> => {
+    const html = await file.text();
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.width = '800px';
+    document.body.appendChild(container);
+    
+    try {
+      const canvas = await html2canvas(container, { scale: 2, useCORS: true, logging: false });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      const pdfBlob = pdf.output('blob');
+      return new File([pdfBlob], file.name.replace(/\.(html?|htm)$/i, '.pdf'), { type: 'application/pdf' });
+    } finally {
+      document.body.removeChild(container);
+    }
+  };
+
+  const convertDocxToPdf = async (file: File): Promise<File> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.convertToHtml({ arrayBuffer });
+    const html = result.value;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.width = '800px';
+    container.style.padding = '40px';
+    container.style.fontFamily = 'Arial, sans-serif';
+    container.style.fontSize = '14px';
+    container.style.lineHeight = '1.6';
+    document.body.appendChild(container);
+    
+    try {
+      const canvas = await html2canvas(container, { scale: 2, useCORS: true, logging: false });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'a4' });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgWidth = pdf.internal.pageSize.getWidth();
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      const pdfBlob = pdf.output('blob');
+      return new File([pdfBlob], file.name.replace(/\.docx?$/i, '.pdf'), { type: 'application/pdf' });
+    } finally {
+      document.body.removeChild(container);
+    }
+  };
+
   const handleFileUpload = async (workspaceId: string, files: FileList | null) => {
     if (!files || files.length === 0 || !user) return;
 
     setUploadingForWorkspace(workspaceId);
+    const filesArray = Array.from(files);
+    
     try {
-      const file = files[0];
-      
-      // Validate file type
-      if (file.type !== 'application/pdf') {
-        toast.error('Only PDF files are supported');
+      toast.info(`Processing ${filesArray.length} file(s)...`);
+      const processedFiles: File[] = [];
+
+      for (const file of filesArray) {
+        try {
+          let processedFile = file;
+          
+          // Convert HTML to PDF
+          if (file.type === 'text/html' || file.name.match(/\.(html?|htm)$/i)) {
+            toast.info(`Converting ${file.name} to PDF...`);
+            processedFile = await convertHtmlToPdf(file);
+          }
+          // Convert Word to PDF
+          else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.match(/\.docx?$/i)) {
+            toast.info(`Converting ${file.name} to PDF...`);
+            processedFile = await convertDocxToPdf(file);
+          }
+          // Validate PDF
+          else if (file.type !== 'application/pdf') {
+            toast.error(`Unsupported file type: ${file.name}`);
+            continue;
+          }
+          
+          processedFiles.push(processedFile);
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error);
+          toast.error(`Failed to process ${file.name}`);
+        }
+      }
+
+      if (processedFiles.length === 0) {
+        toast.error('No valid files to upload');
         return;
       }
 
-      // Upload to storage
-      const filePath = await uploadPdfToStorage(file, file.name, workspaceId, user.id);
-      
-      if (filePath) {
-        toast.success('File uploaded successfully');
-        await refreshFiles();
+      // Upload all processed files
+      toast.info('Uploading to workspace...');
+      for (const file of processedFiles) {
+        await uploadPdfToStorage(file, file.name, workspaceId, user.id);
       }
+      
+      toast.success(`${processedFiles.length} file(s) uploaded successfully`);
+      await refreshFiles();
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload file');
+      toast.error('Failed to upload files');
     } finally {
       setUploadingForWorkspace(null);
     }
@@ -237,7 +321,8 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                             <input
                               ref={(el) => (fileInputRefs.current[workspace.id] = el)}
                               type="file"
-                              accept=".pdf"
+                              accept=".pdf,.html,.htm,.docx,.doc"
+                              multiple
                               onChange={(e) => handleFileUpload(workspace.id, e.target.files)}
                               className="hidden"
                             />
@@ -254,7 +339,7 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                               disabled={uploadingForWorkspace === workspace.id}
                             >
                               <Upload className="h-3 w-3 mr-2" />
-                              {uploadingForWorkspace === workspace.id ? 'Uploading...' : 'Upload PDF'}
+                              {uploadingForWorkspace === workspace.id ? 'Uploading...' : 'Upload Files'}
                             </Button>
 
                             {filesForWorkspace.length === 0 ? (
