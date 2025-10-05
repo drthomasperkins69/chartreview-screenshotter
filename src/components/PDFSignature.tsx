@@ -1809,7 +1809,7 @@ export const PDFSignature = () => {
                           )}
                         </Button>
                         <Button
-                          onClick={() => handleAutoScanAllPDFs("gemini")}
+                          onClick={() => handleAutoScanAllPDFs("claude")}
                           disabled={isAutoScanningAll}
                           variant="default"
                           size="sm"
@@ -1823,7 +1823,7 @@ export const PDFSignature = () => {
                           ) : (
                             <>
                               <Sparkles className="w-4 h-4" />
-                              AI Auto-scan All
+                              AI Auto-scan All (Claude)
                             </>
                           )}
                         </Button>

@@ -49,7 +49,7 @@ export const AISearchAssistant = ({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("gemini");
+  const [selectedModel, setSelectedModel] = useState<"gemini" | "claude">("claude");
 
   // Extract explicit dates from user input (e.g., "20 March 1989", "05/04/1989")
   const extractRequestedDates = (text: string): string[] => {

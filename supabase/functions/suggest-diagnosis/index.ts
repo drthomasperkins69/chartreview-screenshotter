@@ -20,94 +20,155 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     console.log(`Analyzing page ${pageNum} from ${fileName}`);
 
-    // Determine which model to use based on input (default to Gemini)
-    const aiModel = model === "claude" 
-      ? "anthropic/claude-3.5-sonnet" 
-      : "google/gemini-2.5-flash";
+    let diagnosis: string;
 
-    // Build the message content
-    const messages: any[] = [
-      {
-        role: "system",
-        content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses in PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names instead. Keep it concise - maximum 3-5 diagnoses. Do not include explanations, just the diagnosis names in plain words."
+    if (model === "claude") {
+      // Use Claude API directly
+      const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!ANTHROPIC_API_KEY) {
+        throw new Error("ANTHROPIC_API_KEY is not configured");
       }
-    ];
 
-    // Build user message with text and/or image
-    const userContent: any[] = [];
-    
-    if (pageText && pageText.trim()) {
-      userContent.push({
-        type: "text",
-        text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}`
+      // Build user message content
+      const userContent: any[] = [];
+      
+      if (pageText && pageText.trim()) {
+        userContent.push({
+          type: "text",
+          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses in PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names. Keep it concise - maximum 3-5 diagnoses. No explanations, just diagnosis names.`
+        });
+      } else {
+        userContent.push({
+          type: "text",
+          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses in PLAIN LANGUAGE - do NOT use codes. Maximum 3-5 diagnoses.`
+        });
+      }
+
+      if (pageImage) {
+        const base64Data = pageImage.split(',')[1] || pageImage;
+        const mediaType = pageImage.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+        
+        userContent.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: base64Data
+          }
+        });
+      }
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 500,
+          messages: [
+            {
+              role: "user",
+              content: userContent
+            }
+          ]
+        }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Claude API error:", response.status, errorText);
+        throw new Error(`Claude API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      diagnosis = data.content[0].text.trim();
     } else {
-      userContent.push({
-        type: "text",
-        text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses:`
-      });
-    }
+      // Use Lovable AI Gateway for Gemini
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        throw new Error("LOVABLE_API_KEY is not configured");
+      }
 
-    if (pageImage) {
-      // Extract base64 data
-      const base64Data = pageImage.split(',')[1] || pageImage;
-      const mediaType = pageImage.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-      
-      userContent.push({
-        type: "image_url",
-        image_url: {
-          url: `data:${mediaType};base64,${base64Data}`
+      const messages: any[] = [
+        {
+          role: "system",
+          content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses in PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names instead. Keep it concise - maximum 3-5 diagnoses. Do not include explanations, just the diagnosis names in plain words."
         }
-      });
-    }
+      ];
 
-    messages.push({
-      role: "user",
-      content: userContent
-    });
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: aiModel,
-        messages,
-        max_tokens: 500,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
+      const userContent: any[] = [];
       
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (pageText && pageText.trim()) {
+        userContent.push({
+          type: "text",
+          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}`
+        });
+      } else {
+        userContent.push({
+          type: "text",
+          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses:`
+        });
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Payment required, please add funds to your Lovable AI workspace." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+
+      if (pageImage) {
+        const base64Data = pageImage.split(',')[1] || pageImage;
+        const mediaType = pageImage.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+        
+        userContent.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${mediaType};base64,${base64Data}`
+          }
+        });
       }
-      throw new Error(`AI Gateway error: ${response.status}`);
+
+      messages.push({
+        role: "user",
+        content: userContent
+      });
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages,
+          max_tokens: 500,
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("AI Gateway error:", response.status, errorText);
+        
+        if (response.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "Rate limits exceeded, please try again later." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (response.status === 402) {
+          return new Response(
+            JSON.stringify({ error: "Payment required, please add funds to your Lovable AI workspace." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw new Error(`AI Gateway error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      diagnosis = data.choices[0].message.content.trim();
     }
 
-    const data = await response.json();
-    const diagnosis = data.choices[0].message.content.trim();
 
     console.log("AI suggested diagnosis:", diagnosis);
 
