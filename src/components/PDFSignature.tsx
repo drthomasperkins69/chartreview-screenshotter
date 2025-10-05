@@ -36,11 +36,19 @@ const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
   { id: 21, label: 'Strain and Sprain' },
   { id: 22, label: 'Osteoarthritis' },
   { id: 23, label: 'Labral Tear' },
+  { id: 24, label: 'Fracture' },
+  { id: 25, label: 'Tendinopathy' },
+  { id: 26, label: 'Iliotibial Band Syndrome' },
+  { id: 27, label: 'Trochanteric Bursitis' },
+  { id: 28, label: 'Chondromalacia Patella' },
+  { id: 29, label: 'Gluteal Tendinopathy' },
+  { id: 30, label: 'Epicondylitis' },
+  { id: 31, label: 'Ganglion' },
 ];
 
-// IDs 1-20 are body parts, 21-23 are conditions
+// IDs 1-20 are body parts, 21-31 are conditions
 const BODY_PART_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-const CONDITION_IDS = [21, 22, 23];
+const CONDITION_IDS = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
 
 interface KeywordMatch {
   page: number;
