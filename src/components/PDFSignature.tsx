@@ -1544,27 +1544,50 @@ export const PDFSignature = () => {
         {/* PDF File Selector */}
         {pdfFiles.length > 0 && (
                 <Card className="p-4 shadow-medium mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-medium">Select PDF to View</Label>
-                    <Button
-                      onClick={handleScanAllFiles}
-                      disabled={isAutoScanningAll}
-                      variant="secondary"
-                      size="sm"
-                      className="gap-2"
-                    >
-                      {isAutoScanningAll ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Scanning...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-4 h-4" />
-                          Scan All Files
-                        </>
-                      )}
-                    </Button>
+                  <div className="space-y-2 mb-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Select PDF to View</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleScanAllFiles}
+                          disabled={isAutoScanningAll}
+                          variant="secondary"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          {isAutoScanningAll ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Scanning...
+                            </>
+                          ) : (
+                            <>
+                              <Search className="w-4 h-4" />
+                              OCR Scan All
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={() => handleAutoScanAllPDFs("gemini")}
+                          disabled={isAutoScanningAll}
+                          variant="default"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          {isAutoScanningAll ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              AI Scanning...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              AI Auto-scan All
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {pdfFiles.map((file, index) => {
