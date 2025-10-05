@@ -994,7 +994,10 @@ export const PDFSignature = () => {
   };
 
   const handleDownloadAllAsZip = async () => {
-    if (getDiagnosisGroups.length === 0) {
+    // Get all unique diagnoses from pageDiagnoses
+    const allDiagnoses = Array.from(new Set(Object.values(pageDiagnoses).filter(d => d?.trim())));
+    
+    if (allDiagnoses.length === 0) {
       toast.error("No diagnoses to download");
       return;
     }
@@ -1003,16 +1006,16 @@ export const PDFSignature = () => {
       toast("Creating ZIP file with all diagnoses...");
       const zip = new JSZip();
 
-      for (const group of getDiagnosisGroups) {
-        // Get all pages with this diagnosis (not just selected ones)
+      for (const diagnosis of allDiagnoses) {
+        // Get all pages with this diagnosis
         const pagesForDiagnosis = Object.entries(pageDiagnoses)
-          .filter(([_, d]) => d?.trim().toLowerCase() === group.diagnosis.toLowerCase())
+          .filter(([_, d]) => d?.trim() === diagnosis)
           .map(([key]) => key);
 
         const selectedContent = await captureSelectedPages(pagesForDiagnosis);
-        const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses, group.diagnosis);
+        const pdfBytes = await createPDFWithPages(selectedContent, pageDiagnoses, diagnosis);
         
-        const safeFilename = group.diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+        const safeFilename = diagnosis.replace(/[^a-z0-9]/gi, '-').toLowerCase();
         zip.file(`${safeFilename}.pdf`, pdfBytes);
       }
 
