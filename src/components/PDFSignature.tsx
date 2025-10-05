@@ -13,6 +13,7 @@ import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { PDFPageDialog } from "./PDFPageDialog";
+import { AIChat } from "./AIChat";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit, ZoomIn } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
@@ -2315,21 +2316,23 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                  </ResizablePanel>
         </ResizablePanelGroup>
 
-        {/* Diagnosis Tracker Section */}
+        {/* Diagnosis Tracker and AI Chat Section */}
         {Object.keys(pageDiagnoses).filter(key => pageDiagnoses[key]?.trim()).length > 0 && (
-          <Card className="mt-4 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
-              <Button
-                onClick={handleDownloadAllAsZip}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <FileArchive className="w-4 h-4" />
-                Download All as ZIP
-              </Button>
-            </div>
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left Column: Diagnosis Tracker */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
+                <Button
+                  onClick={handleDownloadAllAsZip}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <FileArchive className="w-4 h-4" />
+                  Download All as ZIP
+                </Button>
+              </div>
             <div className="space-y-2">
               {(() => {
                 // Split comma-separated diagnoses and group pages by individual diagnosis
@@ -2533,6 +2536,12 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
               })()}
             </div>
           </Card>
+          
+          {/* Right Column: AI Chat */}
+          <div className="flex flex-col">
+            <AIChat />
+          </div>
+        </div>
         )}
 
         {/* Diagnosis Summary Section */}
