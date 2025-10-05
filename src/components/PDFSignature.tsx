@@ -1009,7 +1009,6 @@ export const PDFSignature = () => {
     setIsAutoScanningAll(true);
     let totalScanned = 0;
     let totalPages = 0;
-    const batchedDiagnoses: Record<string, string> = {};
 
     try {
       toast(`Starting AI auto-scan of all ${pdfFiles.length} PDF(s)...`);
@@ -1029,6 +1028,7 @@ export const PDFSignature = () => {
         const arrayBuffer = await file.arrayBuffer();
         const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
         const numPages = pdfDoc.numPages;
+        const fileDiagnoses: { pageNum: number; diagnosis: string }[] = [];
 
         // Scan each page in this PDF
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
@@ -1088,13 +1088,14 @@ export const PDFSignature = () => {
             }
 
             if (data?.diagnosis) {
-              // Batch diagnoses instead of immediate state updates
-              batchedDiagnoses[`${fileIndex}-${pageNum}`] = data.diagnosis;
+              // Store diagnosis for this page
+              fileDiagnoses.push({ pageNum, diagnosis: data.diagnosis });
               
-              // Update state every 5 pages to reduce overhead
-              if (totalScanned % 5 === 0) {
-                setPageDiagnoses(prev => ({ ...prev, ...batchedDiagnoses }));
-              }
+              // Update state immediately for UI
+              setPageDiagnoses(prev => ({
+                ...prev,
+                [`${fileIndex}-${pageNum}`]: data.diagnosis
+              }));
             }
 
             // Longer delay to avoid rate limiting and reduce system load
@@ -1111,11 +1112,18 @@ export const PDFSignature = () => {
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
-      }
 
-      // Apply any remaining batched diagnoses
-      if (Object.keys(batchedDiagnoses).length > 0) {
-        setPageDiagnoses(prev => ({ ...prev, ...batchedDiagnoses }));
+        // Save all diagnoses to PDF for this file
+        if (fileDiagnoses.length > 0) {
+          toast.info(`Saving diagnoses to ${file.name}...`);
+          for (const { pageNum, diagnosis } of fileDiagnoses) {
+            try {
+              await handleDiagnosisChange(fileIndex, pageNum, diagnosis);
+            } catch (error) {
+              console.error(`Error saving diagnosis for ${file.name} page ${pageNum}:`, error);
+            }
+          }
+        }
       }
 
       toast.success(`Auto-scan complete! Scanned ${totalScanned} pages across ${pdfFiles.length} PDF(s).`);
@@ -1125,7 +1133,7 @@ export const PDFSignature = () => {
     } finally {
       setIsAutoScanningAll(false);
     }
-  }, [pdfFiles, pdfContent]);
+  }, [pdfFiles, pdfContent, handleDiagnosisChange]);
 
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
