@@ -889,7 +889,7 @@ export const PDFSignature = () => {
                 {/* Middle Panel: PDF Viewer + Diagnostic Assessment */}
                 <ResizablePanel defaultSize={50} minSize={30}>
                   <ResizablePanelGroup direction="vertical">
-                    <ResizablePanel defaultSize={60} minSize={30}>
+                    <ResizablePanel defaultSize={40} minSize={20}>
                       <Card className="h-full rounded-none border-0 overflow-hidden">
                         <PDFViewer
                           files={pdfFiles}
@@ -910,7 +910,7 @@ export const PDFSignature = () => {
                     
                     <ResizableHandle withHandle />
                     
-                    <ResizablePanel defaultSize={40} minSize={20}>
+                    <ResizablePanel defaultSize={60} minSize={30}>
                       <Card className="h-full rounded-none border-0 overflow-hidden">
                         <div className="h-full">
                           <DiagnosticAssessment 
