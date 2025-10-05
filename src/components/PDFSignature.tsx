@@ -1113,15 +1113,94 @@ export const PDFSignature = () => {
           }
         }
 
-        // Save all diagnoses to PDF for this file
+        // Save all diagnoses to PDF for this file in one batch
         if (fileDiagnoses.length > 0) {
-          toast.info(`Saving diagnoses to ${file.name}...`);
-          for (const { pageNum, diagnosis } of fileDiagnoses) {
-            try {
-              await handleDiagnosisChange(fileIndex, pageNum, diagnosis);
-            } catch (error) {
-              console.error(`Error saving diagnosis for ${file.name} page ${pageNum}:`, error);
+          toast.info(`Saving ${fileDiagnoses.length} diagnoses to ${file.name}...`);
+          
+          try {
+            // Load the PDF once
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await PDFDocument.load(arrayBuffer);
+            const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+            
+            // Add all diagnoses to the PDF
+            for (const { pageNum, diagnosis } of fileDiagnoses) {
+              try {
+                const page = pdfDoc.getPage(pageNum - 1); // Convert to 0-indexed
+                const { width, height } = page.getSize();
+                
+                const fontSize = 12;
+                const maxWidth = width - 100; // Leave margins
+                
+                // Wrap text if too long
+                const words = diagnosis.split(' ');
+                let lines: string[] = [];
+                let currentLine = '';
+                
+                words.forEach(word => {
+                  const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                  const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+                  
+                  if (testWidth > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                  } else {
+                    currentLine = testLine;
+                  }
+                });
+                if (currentLine) lines.push(currentLine);
+                
+                // Draw text on page (top section with background)
+                const padding = 10;
+                const lineHeight = 16;
+                const boxHeight = (lines.length * lineHeight) + (padding * 2);
+                
+                // Draw background rectangle
+                page.drawRectangle({
+                  x: 20,
+                  y: height - 30 - boxHeight,
+                  width: width - 40,
+                  height: boxHeight,
+                  color: rgb(1, 1, 0.9),
+                  borderColor: rgb(0.8, 0.8, 0.8),
+                  borderWidth: 1,
+                });
+                
+                // Draw text lines
+                lines.forEach((line, index) => {
+                  page.drawText(line, {
+                    x: 30,
+                    y: height - 40 - (index * lineHeight),
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                  });
+                });
+              } catch (pageError) {
+                console.error(`Error adding diagnosis to ${file.name} page ${pageNum}:`, pageError);
+              }
             }
+            
+            // Save the modified PDF once with all diagnoses
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const newFile = new File([blob], file.name, { type: 'application/pdf' });
+            
+            // Update the files array
+            await new Promise<void>((resolve) => {
+              setPdfFiles(prev => {
+                const newFiles = [...prev];
+                newFiles[fileIndex] = newFile;
+                pdfFilesRef.current = newFiles;
+                return newFiles;
+              });
+              setTimeout(resolve, 10);
+            });
+            
+            toast.success(`${fileDiagnoses.length} diagnoses saved to ${file.name}`);
+          } catch (error) {
+            console.error(`Error saving diagnoses to ${file.name}:`, error);
+            toast.error(`Failed to save diagnoses to ${file.name}`);
           }
         }
       }
