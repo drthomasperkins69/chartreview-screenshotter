@@ -365,17 +365,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles, sele
           </div>
         </Card>
       )}
-
-      {!assessment && !isGenerating && (
-        <Card className="flex-1 flex items-center justify-center text-center p-6 border-dashed">
-          <div className="space-y-2">
-            <FileText className="w-12 h-12 mx-auto text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">
-              Configure settings above and click Generate button below to create your diagnostic assessment
-            </p>
-          </div>
-        </Card>
-      )}
     </div>
   );
 };
