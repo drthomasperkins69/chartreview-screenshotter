@@ -159,6 +159,7 @@ export const AISearchAssistant = ({
     }
     if (isDateQuery && pdfContent.length === 0) {
       toast("To extract pages by date, upload and scan your PDFs first.");
+      return; // prevent fallback to keyword chatbot
     }
 
     const userMessage: Message = { role: "user", content: input };
