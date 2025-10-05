@@ -297,6 +297,39 @@ export const PDFSignature = () => {
     }
   }, [searchCategories]);
 
+  const updateCategoryTerms = useCallback(async (categoryId: number, terms: string) => {
+    // Update local state immediately
+    setSearchCategories(prev => 
+      prev.map(cat => 
+        cat.id === categoryId ? { ...cat, terms } : cat
+      )
+    );
+
+    // Update database
+    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+
+    if (!url || !key) {
+      console.warn('Backend not available, changes not persisted');
+      return;
+    }
+
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase
+        .from('search_categories')
+        .update({ terms })
+        .eq('id', categoryId);
+
+      if (error) {
+        console.error('Error updating search category:', error);
+        toast.error('Failed to save keywords');
+      }
+    } catch (e) {
+      console.error('Failed to update category', e);
+    }
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -438,9 +471,12 @@ export const PDFSignature = () => {
                       >
                         {category.label}
                       </Label>
-                      <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                        {category.terms || 'No keywords set'}
-                      </div>
+                      <Input
+                        placeholder="Enter keywords (comma separated)"
+                        value={category.terms}
+                        onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                        className="text-sm"
+                      />
                     </div>
                   </div>
                 ))}
