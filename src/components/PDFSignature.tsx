@@ -84,16 +84,8 @@ export const PDFSignature = () => {
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-
-      if (!url || !key) {
-        console.warn('Backend env missing; using default categories');
-        setSearchCategories(
-          DEFAULT_CATEGORIES.map((c) => ({ ...c, terms: '', checked: false }))
-        );
-        return;
-      }
+      const url = (import.meta.env.VITE_SUPABASE_URL as string) || "https://hpclzzykgxolszduecqa.supabase.co";
+      const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwY2x6enlrZ3hvbHN6ZHVlY3FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MTI4NzgsImV4cCI6MjA3NTA4ODg3OH0.FjuWjLB2XDzSytypFd8tLTrE8F2fhrdTXUlDmphKbnI";
 
       try {
         const client = createClient(url, key, {
@@ -363,13 +355,8 @@ export const PDFSignature = () => {
     if (!category) return;
 
     try {
-      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-
-      if (!url || !key) {
-        toast.error('Backend not configured');
-        return;
-      }
+      const url = (import.meta.env.VITE_SUPABASE_URL as string) || "https://hpclzzykgxolszduecqa.supabase.co";
+      const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwY2x6enlrZ3hvbHN6ZHVlY3FhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MTI4NzgsImV4cCI6MjA3NTA4ODg3OH0.FjuWjLB2XDzSytypFd8tLTrE8F2fhrdTXUlDmphKbnI";
 
       const client = createClient(url, key, { auth: { persistSession: false } });
       const { error } = await client
