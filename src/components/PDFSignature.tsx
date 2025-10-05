@@ -436,6 +436,15 @@ export const PDFSignature = () => {
               <div>
                 <h1 className="text-xl font-semibold text-foreground">PDF Keyword Extractor</h1>
                 <p className="text-sm text-muted-foreground">Extract pages by keywords</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">
+                  v1.0.0 • Updated {new Date().toLocaleString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
               </div>
             </div>
             
