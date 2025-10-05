@@ -733,16 +733,15 @@ export const PDFSignature = () => {
                 </Card>
               )}
 
-              {/* 3-Panel Layout: Search Controls | PDF Viewer | Matches */}
+              {/* 3-Panel Layout: Search Controls | PDF Viewer + Assessment | Matches */}
               <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-300px)] rounded-lg border">
                 {/* Left Panel: AI Assistant & Search Categories in Tabs */}
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
                   <Card className="h-full rounded-none border-0">
                     <Tabs defaultValue="ai" className="h-full flex flex-col">
-                      <TabsList className="w-full rounded-none border-b grid grid-cols-3">
+                      <TabsList className="w-full rounded-none border-b grid grid-cols-2">
                         <TabsTrigger value="ai">AI Assistant</TabsTrigger>
                         <TabsTrigger value="categories">Search Categories</TabsTrigger>
-                        <TabsTrigger value="assessment">Diagnostic Assessment</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="ai" className="flex-1 mt-0 p-4 overflow-auto">
@@ -751,14 +750,6 @@ export const PDFSignature = () => {
                           onPagesSelected={handleAIPageSelection}
                           currentKeywords={keywords}
                           pdfContent={pdfContent}
-                        />
-                      </TabsContent>
-                      
-                      <TabsContent value="assessment" className="flex-1 mt-0 overflow-auto">
-                        <DiagnosticAssessment 
-                          pdfContent={pdfContent}
-                          selectedPages={selectedPagesForExtraction}
-                          pdfFiles={pdfFiles}
                         />
                       </TabsContent>
                       
@@ -895,24 +886,42 @@ export const PDFSignature = () => {
 
                 <ResizableHandle withHandle />
 
-                {/* Middle Panel: PDF Viewer */}
+                {/* Middle Panel: PDF Viewer + Diagnostic Assessment */}
                 <ResizablePanel defaultSize={50} minSize={30}>
-                  <Card className="h-full rounded-none border-0 overflow-hidden">
-                    <PDFViewer
-                      files={pdfFiles}
-                      currentFileIndex={currentPdfIndex}
-                      keywords={keywords}
-                      dateSearch=""
-                      matchingPages={matchingPages}
-                      isSearching={isSearching}
-                      onKeywordMatchesDetected={handleKeywordMatchesDetected}
-                      onTextExtracted={handlePDFTextExtracted}
-                      onOCRProgress={handleOCRProgress}
-                      selectedPage={selectedPage}
-                      onPageChange={setSelectedPage}
-                      triggerScan={handleScanFile}
-                    />
-                  </Card>
+                  <ResizablePanelGroup direction="vertical">
+                    <ResizablePanel defaultSize={60} minSize={30}>
+                      <Card className="h-full rounded-none border-0 overflow-hidden">
+                        <PDFViewer
+                          files={pdfFiles}
+                          currentFileIndex={currentPdfIndex}
+                          keywords={keywords}
+                          dateSearch=""
+                          matchingPages={matchingPages}
+                          isSearching={isSearching}
+                          onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                          onTextExtracted={handlePDFTextExtracted}
+                          onOCRProgress={handleOCRProgress}
+                          selectedPage={selectedPage}
+                          onPageChange={setSelectedPage}
+                          triggerScan={handleScanFile}
+                        />
+                      </Card>
+                    </ResizablePanel>
+                    
+                    <ResizableHandle withHandle />
+                    
+                    <ResizablePanel defaultSize={40} minSize={20}>
+                      <Card className="h-full rounded-none border-0 overflow-hidden">
+                        <div className="h-full">
+                          <DiagnosticAssessment 
+                            pdfContent={pdfContent}
+                            selectedPages={selectedPagesForExtraction}
+                            pdfFiles={pdfFiles}
+                          />
+                        </div>
+                      </Card>
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
                 </ResizablePanel>
 
                 <ResizableHandle withHandle />
