@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -267,14 +267,15 @@ export const AISearchAssistant = ({
         </div>
       </ScrollArea>
 
-      <div className="flex gap-2">
-        <Input
+      <div className="flex gap-2 items-end">
+        <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyPress}
-          placeholder={pdfContent.length > 0 ? "Ask AI to analyze PDFs..." : "Ask AI for keyword suggestions..."}
+          placeholder={pdfContent.length > 0 ? "Ask AI to analyze PDFs... (Shift+Enter for new line)" : "Ask AI for keyword suggestions... (Shift+Enter for new line)"}
           disabled={isLoading || isAnalyzing}
-          className="flex-1"
+          className="flex-1 resize-none"
+          rows={3}
         />
         {pdfContent.length > 0 ? (
           <Button
