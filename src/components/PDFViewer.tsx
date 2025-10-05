@@ -23,6 +23,8 @@ interface PDFViewerProps {
   matchingPages: Set<number>;
   isSearching: boolean;
   onKeywordMatchesDetected: (matches: KeywordMatch[]) => void;
+  selectedPage: number | null;
+  onPageChange: (page: number) => void;
 }
 
 export const PDFViewer = ({
@@ -32,6 +34,8 @@ export const PDFViewer = ({
   matchingPages,
   isSearching,
   onKeywordMatchesDetected,
+  selectedPage,
+  onPageChange,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +45,13 @@ export const PDFViewer = ({
   const [scale, setScale] = useState(1.2);
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Navigate to selected page when it changes
+  useEffect(() => {
+    if (selectedPage !== null && selectedPage !== currentPage) {
+      setCurrentPage(selectedPage);
+    }
+  }, [selectedPage]);
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -231,11 +242,15 @@ export const PDFViewer = ({
   }, [renderPage]);
 
   const nextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, numPages));
+    const newPage = Math.min(currentPage + 1, numPages);
+    setCurrentPage(newPage);
+    onPageChange(newPage);
   };
 
   const prevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
+    const newPage = Math.max(currentPage - 1, 1);
+    setCurrentPage(newPage);
+    onPageChange(newPage);
   };
 
   const zoomIn = () => {

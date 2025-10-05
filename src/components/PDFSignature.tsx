@@ -25,6 +25,8 @@ export const PDFSignature = () => {
   const [matchingPages, setMatchingPages] = useState<Set<number>>(new Set());
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedPage, setSelectedPage] = useState<number | null>(null);
+  const [autoNavigate, setAutoNavigate] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,6 +125,12 @@ export const PDFSignature = () => {
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
   };
+
+  const handlePageClick = useCallback((pageNum: number) => {
+    if (autoNavigate) {
+      setSelectedPage(pageNum);
+    }
+  }, [autoNavigate]);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -287,14 +295,33 @@ export const PDFSignature = () => {
 
                 {keywordMatches.length > 0 && (
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">Matches Found</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">Matches Found</h3>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={autoNavigate}
+                            onChange={(e) => setAutoNavigate(e.target.checked)}
+                            className="w-3 h-3"
+                          />
+                          Auto-navigate
+                        </label>
+                      </div>
+                    </div>
                     <div className="space-y-1 max-h-60 overflow-y-auto">
                       {Array.from(new Set(keywordMatches.map(m => m.page)))
                         .sort((a, b) => a - b)
                         .map((page) => {
                           const pageMatches = keywordMatches.filter(m => m.page === page);
                           return (
-                            <div key={page} className="text-xs p-2 bg-muted rounded">
+                            <div 
+                              key={page} 
+                              className={`text-xs p-2 bg-muted rounded cursor-pointer hover:bg-muted/80 transition-colors ${
+                                selectedPage === page ? 'ring-2 ring-primary' : ''
+                              }`}
+                              onClick={() => handlePageClick(page)}
+                            >
                               <div className="font-medium">Page {page}</div>
                               {pageMatches.map((match, idx) => (
                                 <div key={idx} className="text-muted-foreground">
@@ -319,6 +346,8 @@ export const PDFSignature = () => {
                 matchingPages={matchingPages}
                 isSearching={isSearching}
                 onKeywordMatchesDetected={handleKeywordMatchesDetected}
+                selectedPage={selectedPage}
+                onPageChange={setSelectedPage}
               />
             </Card>
           </div>
