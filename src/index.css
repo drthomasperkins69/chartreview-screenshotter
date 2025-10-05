@@ -2,45 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Professional PDF Signature App Design System */
+/* DVA Screenshotter Design System - Charcoal & Dark Red Theme */
 
 @layer base {
   :root {
-    /* Background & Surface Colors */
-    --background: 240 10% 99%;
-    --foreground: 220 13% 18%;
-    --surface: 240 10% 98%;
-    --surface-elevated: 240 10% 97%;
+    /* Background & Surface Colors - Charcoal */
+    --background: 0 0% 22%;
+    --foreground: 0 0% 95%;
+    --surface: 0 0% 26%;
+    --surface-elevated: 0 0% 30%;
 
     /* Card Colors */
-    --card: 240 10% 98%;
-    --card-foreground: 220 13% 18%;
+    --card: 0 0% 26%;
+    --card-foreground: 0 0% 95%;
 
     /* Popover Colors */
-    --popover: 240 10% 98%;
-    --popover-foreground: 220 13% 18%;
+    --popover: 0 0% 26%;
+    --popover-foreground: 0 0% 95%;
 
-    /* Primary Brand - Professional Blue */
-    --primary: 210 100% 45%;
+    /* Primary Brand - Dark Red (DVA Logo) */
+    --primary: 350 55% 40%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 210 100% 42%;
-    --primary-subtle: 210 100% 96%;
+    --primary-hover: 350 55% 35%;
+    --primary-subtle: 350 55% 15%;
 
     /* Secondary Colors */
-    --secondary: 210 15% 94%;
-    --secondary-foreground: 220 13% 18%;
-    --secondary-hover: 210 15% 90%;
+    --secondary: 0 0% 32%;
+    --secondary-foreground: 0 0% 95%;
+    --secondary-hover: 0 0% 36%;
 
     /* Muted Colors */
-    --muted: 210 15% 94%;
-    --muted-foreground: 220 8% 55%;
+    --muted: 0 0% 32%;
+    --muted-foreground: 0 0% 65%;
 
     /* Accent Colors */
-    --accent: 210 100% 96%;
-    --accent-foreground: 210 100% 45%;
+    --accent: 350 55% 15%;
+    --accent-foreground: 350 55% 75%;
 
     /* Status Colors */
-    --success: 142 76% 36%;
+    --success: 142 76% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
@@ -48,67 +48,68 @@
     --destructive-foreground: 0 0% 100%;
 
     /* Border & Input */
-    --border: 210 15% 88%;
-    --input: 210 15% 88%;
-    --ring: 210 100% 45%;
+    --border: 0 0% 35%;
+    --input: 0 0% 35%;
+    --ring: 350 55% 40%;
 
     /* Design System Extensions */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(210 100% 52%));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--surface)), hsl(var(--background)));
-    --shadow-soft: 0 2px 8px -2px hsl(210 10% 40% / 0.1);
-    --shadow-medium: 0 4px 16px -4px hsl(210 10% 40% / 0.15);
-    --shadow-large: 0 8px 32px -8px hsl(210 10% 40% / 0.2);
+    --gradient-primary: linear-gradient(135deg, hsl(350 55% 40%), hsl(350 55% 50%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 26%), hsl(0 0% 22%));
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
+    --shadow-large: 0 8px 32px -8px hsl(0 0% 0% / 0.5);
     --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
     --radius: 0.5rem;
     --radius-large: 0.75rem;
 
     /* PDF Signature Specific */
-    --signature-canvas: 0 0% 100%;
-    --signature-stroke: 220 13% 18%;
-    --pdf-background: 0 0% 96%;
-    --toolbar-background: 240 10% 98%;
+    --signature-canvas: 0 0% 26%;
+    --signature-stroke: 0 0% 95%;
+    --pdf-background: 0 0% 18%;
+    --toolbar-background: 0 0% 26%;
   }
 
   .dark {
-    --background: 220 13% 9%;
-    --foreground: 210 40% 98%;
-    --surface: 220 13% 11%;
-    --surface-elevated: 220 13% 13%;
+    /* Dark theme uses same charcoal theme */
+    --background: 0 0% 22%;
+    --foreground: 0 0% 95%;
+    --surface: 0 0% 26%;
+    --surface-elevated: 0 0% 30%;
 
-    --card: 220 13% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 26%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 220 13% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 26%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 210 100% 55%;
+    --primary: 350 55% 40%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 210 100% 52%;
-    --primary-subtle: 210 100% 15%;
+    --primary-hover: 350 55% 35%;
+    --primary-subtle: 350 55% 15%;
 
-    --secondary: 220 13% 16%;
-    --secondary-foreground: 210 40% 98%;
-    --secondary-hover: 220 13% 18%;
+    --secondary: 0 0% 32%;
+    --secondary-foreground: 0 0% 95%;
+    --secondary-hover: 0 0% 36%;
 
-    --muted: 220 13% 16%;
-    --muted-foreground: 210 15% 65%;
+    --muted: 0 0% 32%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 210 100% 15%;
-    --accent-foreground: 210 100% 55%;
+    --accent: 350 55% 15%;
+    --accent-foreground: 350 55% 75%;
 
-    --success: 142 76% 45%;
-    --warning: 38 92% 55%;
-    --destructive: 0 84% 65%;
+    --success: 142 76% 40%;
+    --warning: 38 92% 50%;
+    --destructive: 0 84% 60%;
 
-    --border: 220 13% 20%;
-    --input: 220 13% 20%;
-    --ring: 210 100% 55%;
+    --border: 0 0% 35%;
+    --input: 0 0% 35%;
+    --ring: 350 55% 40%;
 
-    --signature-canvas: 220 13% 11%;
-    --signature-stroke: 210 40% 98%;
-    --pdf-background: 220 13% 7%;
-    --toolbar-background: 220 13% 11%;
+    --signature-canvas: 0 0% 26%;
+    --signature-stroke: 0 0% 95%;
+    --pdf-background: 0 0% 18%;
+    --toolbar-background: 0 0% 26%;
   }
 }
 

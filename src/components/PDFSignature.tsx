@@ -14,6 +14,7 @@ import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
+import dvaLogo from "@/assets/dva-logo.png";
 
 // Default global categories (used when backend is unavailable)
 const DEFAULT_CATEGORIES: Array<{ id: number; label: string }> = [
@@ -554,9 +555,11 @@ export const PDFSignature = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-primary">
-                <FileText className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <img 
+                src={dvaLogo} 
+                alt="DVA Logo" 
+                className="w-12 h-12 object-contain"
+              />
               <div>
                 <h1 className="text-xl font-semibold text-foreground">DVA Screenshotter</h1>
                 <p className="text-sm text-muted-foreground">Extract pages by keywords with AI</p>
