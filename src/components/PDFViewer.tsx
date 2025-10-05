@@ -457,8 +457,7 @@ export const PDFViewer = ({
                   variant="destructive"
                   size="sm"
                   onClick={handleDeleteCurrentPage}
-                  disabled={!isCurrentPageSelected}
-                  title={!isCurrentPageSelected ? "Add page first to delete" : "Delete this page"}
+                  title="Remove this page from matches and selections"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
