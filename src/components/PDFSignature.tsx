@@ -1032,27 +1032,22 @@ export const PDFSignature = () => {
                 </ResizablePanel>
               </ResizablePanelGroup>
 
-              {/* DIA Instructions Row - Full Width at Bottom */}
-              <Card className="mt-4 p-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="dia-instructions-bottom" className="text-sm font-medium">
-                      DIA Instructions
-                    </Label>
-                    <DIASettings />
-                  </div>
-                  <Textarea
-                    id="dia-instructions-bottom"
-                    placeholder="Paste your diagnostic assessment instructions here..."
-                    value={diaInstructions}
-                    onChange={(e) => setDiaInstructions(e.target.value)}
-                    className="min-h-[120px] font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    These instructions will be used when generating diagnostic assessments
-                  </p>
-                </div>
-              </Card>
+              {/* Generate Button - Full Width at Bottom */}
+              <div className="mt-4">
+                <Button 
+                  onClick={() => {
+                    // Trigger generation in DiagnosticAssessment component
+                    const event = new CustomEvent('generate-assessment');
+                    window.dispatchEvent(event);
+                  }}
+                  disabled={selectedPagesForExtraction.size === 0}
+                  className="w-full gap-2"
+                  size="lg"
+                >
+                  <FileText className="w-4 h-4" />
+                  Generate Diagnostic Assessment ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
+                </Button>
+              </div>
             </>
           )}
         <input

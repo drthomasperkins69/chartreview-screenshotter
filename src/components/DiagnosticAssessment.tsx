@@ -41,6 +41,18 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     setLocalInstructions(diaInstructions);
   }, [diaInstructions]);
 
+  // Listen for generate event from parent
+  useEffect(() => {
+    const handleGenerate = () => {
+      if (selectedPages.size > 0 && localInstructions.trim()) {
+        handleGenerateAssessment();
+      }
+    };
+
+    window.addEventListener('generate-assessment', handleGenerate);
+    return () => window.removeEventListener('generate-assessment', handleGenerate);
+  }, [selectedPages, localInstructions]);
+
   const handleSopUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -64,7 +76,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     toast.success("SOP file removed");
   };
 
-  const handleGenerate = async () => {
+  const handleGenerateAssessment = async () => {
     if (!localInstructions.trim()) {
       toast.error("Please enter DIA instructions");
       return;
@@ -328,7 +340,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
     <div className="h-full flex flex-col gap-4 p-4">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Generate Assessment</Label>
+          <Label className="text-sm font-medium">Generate Settings</Label>
           <DIASettings />
         </div>
 
@@ -402,31 +414,18 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
             )}
           </div>
         </div>
-
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{selectedPages.size} page{selectedPages.size !== 1 ? 's' : ''} selected</span>
-        </div>
-
-        <Button 
-          onClick={handleGenerate} 
-          disabled={isGenerating || !localInstructions.trim() || selectedPages.size === 0}
-          className="w-full gap-2"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Generating Assessment & PDF...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              Generate Diagnostic Assessment
-            </>
-          )}
-        </Button>
       </div>
 
-      {assessment && (
+      {isGenerating && (
+        <Card className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-2">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <p className="text-sm text-muted-foreground">Generating assessment...</p>
+          </div>
+        </Card>
+      )}
+
+      {assessment && !isGenerating && (
         <Card className="flex-1 flex flex-col overflow-hidden">
           <div className="border-b p-3 flex items-center justify-between">
             <h3 className="font-semibold text-sm">Assessment Results</h3>
@@ -453,7 +452,7 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
           <div className="space-y-2">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Enter DIA instructions below, upload SOP documents (optional), and click Generate to create your diagnostic assessment PDF
+              Configure settings above and click Generate button below to create your diagnostic assessment PDF
             </p>
           </div>
         </Card>
