@@ -100,6 +100,10 @@ export const PDFSignature = () => {
   const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfFilesRef = useRef<File[]>(pdfFiles);
+  useEffect(() => {
+    pdfFilesRef.current = pdfFiles;
+  }, [pdfFiles]);
 
   const currentPdf = pdfFiles[currentPdfIndex] || null;
 
@@ -721,7 +725,7 @@ export const PDFSignature = () => {
     }
 
     try {
-      const file = pdfFiles[fileIndex];
+      const file = pdfFilesRef.current[fileIndex];
       if (!file) return;
 
       // Load the PDF
@@ -790,15 +794,16 @@ export const PDFSignature = () => {
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const newFile = new File([blob], file.name, { type: 'application/pdf' });
       
-      // Update the files array and wait for state to update
-      await new Promise<void>(resolve => {
+      // Update the files array and keep ref in sync
+      await new Promise<void>((resolve) => {
         setPdfFiles(prev => {
           const newFiles = [...prev];
           newFiles[fileIndex] = newFile;
+          pdfFilesRef.current = newFiles;
           return newFiles;
         });
-        // Small delay to ensure state update completes
-        setTimeout(resolve, 50);
+        // Let React commit the state update before resolving
+        setTimeout(resolve, 10);
       });
       
       toast.success("Diagnosis saved to PDF");
