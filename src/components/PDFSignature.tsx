@@ -9,7 +9,6 @@ import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { FileText, Download, Upload, Search } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
-import { supabase } from "@/integrations/supabase/client";
 
 interface KeywordMatch {
   page: number;
@@ -41,22 +40,35 @@ export const PDFSignature = () => {
 
   const currentPdf = pdfFiles[currentPdfIndex] || null;
 
-  // Fetch search categories from Supabase on mount
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data, error } = await supabase
-        .from('search_categories')
-        .select('id, label, terms')
-        .order('id');
-      
-      if (error) {
-        console.error('Error fetching search categories:', error);
-        toast.error('Failed to load search categories');
+      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+
+      if (!url || !key) {
+        console.warn('Backend env missing; using default categories');
+        setSearchCategories([{ id: 1, label: 'Lumbar', terms: '', checked: false }]);
         return;
       }
-      
-      if (data) {
-        setSearchCategories(data.map(cat => ({ ...cat, checked: false })));
+
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data, error } = await supabase
+          .from('search_categories')
+          .select('id, label, terms')
+          .order('id');
+        
+        if (error) {
+          console.error('Error fetching search categories:', error);
+          toast.error('Failed to load search categories');
+          setSearchCategories([{ id: 1, label: 'Lumbar', terms: '', checked: false }]);
+          return;
+        }
+        
+        setSearchCategories((data ?? []).map(cat => ({ ...cat, checked: false })));
+      } catch (e) {
+        console.error('Failed to initialize backend client', e);
+        setSearchCategories([{ id: 1, label: 'Lumbar', terms: '', checked: false }]);
       }
     };
     
