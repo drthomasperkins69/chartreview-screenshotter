@@ -89,6 +89,7 @@ export const PDFSignature = () => {
   const [autoNavigate, setAutoNavigate] = useState(true);
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
+  const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -456,6 +457,88 @@ export const PDFSignature = () => {
     }
   }, []);
 
+  const handleScanFile = useCallback(async (fileIndex: number) => {
+    if (fileIndex < 0 || fileIndex >= pdfFiles.length) return;
+    if (ocrCompletedFiles.has(fileIndex)) {
+      toast("This file has already been scanned");
+      return;
+    }
+
+    const file = pdfFiles[fileIndex];
+    setScanningFiles(prev => new Set(prev).add(fileIndex));
+    
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const pdfjsLib = await import("pdfjs-dist");
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+      const totalPages = pdfDoc.numPages;
+      
+      setOcrProgress({ current: 0, total: totalPages, message: `Scanning ${file.name}...` });
+      
+      const worker = await createWorker('eng');
+      const pageTexts: Array<{ pageNum: number; text: string }> = [];
+
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        setOcrProgress({
+          current: pageNum,
+          total: totalPages,
+          message: `Scanning ${file.name} - page ${pageNum}/${totalPages}...`
+        });
+        
+        const page = await pdfDoc.getPage(pageNum);
+        
+        // Extract existing text layer
+        const textContent = await page.getTextContent();
+        const extractedText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        
+        // Render page to canvas for OCR
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        if (context) {
+          await page.render({
+            canvasContext: context,
+            viewport: viewport,
+            canvas: canvas,
+          }).promise;
+          
+          // Perform OCR on the rendered page
+          const { data: { text: ocrText } } = await worker.recognize(canvas);
+          
+          // Combine extracted text and OCR text
+          const combinedText = `${extractedText} ${ocrText}`.trim();
+          pageTexts.push({ pageNum, text: combinedText });
+        } else {
+          // Fallback to just extracted text if canvas fails
+          pageTexts.push({ pageNum, text: extractedText });
+        }
+      }
+
+      await worker.terminate();
+      handlePDFTextExtracted(fileIndex, file.name, pageTexts);
+      
+      setOcrProgress(null);
+      toast.success(`Scan complete for ${file.name}`);
+    } catch (error) {
+      console.error("Error scanning PDF:", error);
+      toast.error("Scan failed");
+      setOcrProgress(null);
+    } finally {
+      setScanningFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fileIndex);
+        return newSet;
+      });
+    }
+  }, [pdfFiles, ocrCompletedFiles, handlePDFTextExtracted]);
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="border-b bg-card shadow-soft">
@@ -549,36 +632,55 @@ export const PDFSignature = () => {
                   <div className="flex flex-wrap gap-2">
                     {pdfFiles.map((file, index) => {
                       const isComplete = ocrCompletedFiles.has(index);
+                      const isScanning = scanningFiles.has(index);
                       return (
-                        <div key={index} className="flex items-center gap-2">
-                          <Button
-                            variant={currentPdfIndex === index ? "default" : "outline"}
-                            onClick={() => {
-                              setCurrentPdfIndex(index);
-                              setMatchingPages(new Set());
-                              setKeywordMatches([]);
-                              setSelectedPagesForExtraction(new Set());
-                              setSelectedPage(null);
-                            }}
-                            className="gap-2 relative"
-                            size="sm"
-                          >
-                            <FileText className="w-4 h-4" />
-                            {file.name || `PDF ${index + 1}`}
-                            {isComplete ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-1" />
-                            ) : (
-                              <Clock className="w-3.5 h-3.5 text-yellow-500 ml-1 animate-pulse" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemovePdf(index)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            ×
-                          </Button>
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant={currentPdfIndex === index ? "default" : "outline"}
+                              onClick={() => {
+                                setCurrentPdfIndex(index);
+                                setMatchingPages(new Set());
+                                setKeywordMatches([]);
+                                setSelectedPagesForExtraction(new Set());
+                                setSelectedPage(null);
+                              }}
+                              className="gap-2 relative flex-1"
+                              size="sm"
+                            >
+                              <FileText className="w-4 h-4" />
+                              <span className="truncate">{file.name || `PDF ${index + 1}`}</span>
+                              {isComplete && (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-1" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemovePdf(index)}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                          {!isComplete && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleScanFile(index)}
+                              disabled={isScanning}
+                              className="w-full text-xs"
+                            >
+                              {isScanning ? (
+                                <>
+                                  <Clock className="w-3 h-3 mr-1 animate-spin" />
+                                  Scanning...
+                                </>
+                              ) : (
+                                <>Scan & OCR</>
+                              )}
+                            </Button>
+                          )}
                         </div>
                       );
                     })}
@@ -754,6 +856,7 @@ export const PDFSignature = () => {
                       onOCRProgress={handleOCRProgress}
                       selectedPage={selectedPage}
                       onPageChange={setSelectedPage}
+                      triggerScan={handleScanFile}
                     />
                   </Card>
                 </ResizablePanel>

@@ -32,6 +32,7 @@ interface PDFViewerProps {
   onOCRProgress?: (current: number, total: number, message: string) => void;
   selectedPage: number | null;
   onPageChange: (page: number) => void;
+  triggerScan?: (fileIndex: number) => void;
 }
 
 export const PDFViewer = ({
@@ -46,6 +47,7 @@ export const PDFViewer = ({
   onOCRProgress,
   selectedPage,
   onPageChange,
+  triggerScan,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -96,92 +98,13 @@ export const PDFViewer = ({
     loadPdf();
   }, [currentFile, selectedPage]);
 
-  // Extract text from all files for AI analysis with OCR
+  // Manual OCR scan function exposed to parent
   useEffect(() => {
-    const extractAllFilesText = async () => {
-      if (files.length === 0 || !onTextExtracted) return;
-
-      try {
-        // Calculate total pages across all files
-        let totalPages = 0;
-        const filePagesMap = new Map<number, number>();
-        
-        for (let i = 0; i < files.length; i++) {
-          const arrayBuffer = await files[i].arrayBuffer();
-          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-          filePagesMap.set(i, pdfDoc.numPages);
-          totalPages += pdfDoc.numPages;
-        }
-
-        let processedPages = 0;
-        onOCRProgress?.(0, totalPages, "Initializing OCR for all files...");
-        
-        const worker = await createWorker('eng');
-
-        for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
-          const file = files[fileIndex];
-          onOCRProgress?.(processedPages, totalPages, `Processing ${file.name}...`);
-          
-          const arrayBuffer = await file.arrayBuffer();
-          const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-          const pageTexts: Array<{ pageNum: number; text: string }> = [];
-
-          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-            onOCRProgress?.(
-              processedPages + pageNum, 
-              totalPages, 
-              `Processing ${file.name} - page ${pageNum}/${pdfDoc.numPages}...`
-            );
-            
-            const page = await pdfDoc.getPage(pageNum);
-            
-            // Extract existing text layer
-            const textContent = await page.getTextContent();
-            const extractedText = textContent.items
-              .map((item: any) => item.str)
-              .join(' ');
-            
-            // Render page to canvas for OCR
-            const viewport = page.getViewport({ scale: 2.0 });
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            
-            if (context) {
-              await page.render({
-                canvasContext: context,
-                viewport: viewport,
-                canvas: canvas,
-              }).promise;
-              
-              // Perform OCR on the rendered page
-              const { data: { text: ocrText } } = await worker.recognize(canvas);
-              
-              // Combine extracted text and OCR text
-              const combinedText = `${extractedText} ${ocrText}`.trim();
-              pageTexts.push({ pageNum, text: combinedText });
-            } else {
-              // Fallback to just extracted text if canvas fails
-              pageTexts.push({ pageNum, text: extractedText });
-            }
-          }
-
-          processedPages += pdfDoc.numPages;
-          onTextExtracted(fileIndex, file.name, pageTexts);
-        }
-
-        await worker.terminate();
-        onOCRProgress?.(totalPages, totalPages, "OCR complete!");
-        toast.success(`OCR completed for ${files.length} file(s)`);
-      } catch (error) {
-        console.error("Error extracting text with OCR:", error);
-        toast.error("OCR processing failed");
-      }
-    };
-
-    extractAllFilesText();
-  }, [files, onTextExtracted, onOCRProgress]);
+    if (!triggerScan) return;
+    
+    // This effect doesn't do anything automatically anymore
+    // Scanning is now triggered manually via the triggerScan callback
+  }, [triggerScan]);
 
   useEffect(() => {
     const searchKeywords = async () => {
