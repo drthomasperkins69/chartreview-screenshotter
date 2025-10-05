@@ -187,11 +187,9 @@ export const PDFSignature = () => {
               />
             </div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Search Controls */}
-              <div className="lg:col-span-1">
-              <Card className="p-4 shadow-medium space-y-4">
+            {/* Search Controls */}
+            <Card className="p-4 shadow-medium">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
                     Search Keywords
@@ -205,25 +203,27 @@ export const PDFSignature = () => {
                     className="mb-2"
                   />
                   
-                  {suggestedKeywords && (
+                  <div className="flex gap-2">
+                    {suggestedKeywords && (
+                      <Button 
+                        onClick={useSuggestedKeywords}
+                        variant="outline"
+                        className="gap-2"
+                        size="sm"
+                      >
+                        Use Keywords
+                      </Button>
+                    )}
+                    
                     <Button 
-                      onClick={useSuggestedKeywords}
-                      variant="outline"
-                      className="w-full gap-2 mb-2"
-                      size="sm"
+                      onClick={handleSearch} 
+                      className="gap-2"
+                      disabled={isSearching || !keywords.trim()}
                     >
-                      Use Keywords
+                      <Search className="w-4 h-4" />
+                      {isSearching ? "Searching..." : "Search PDF"}
                     </Button>
-                  )}
-                  
-                  <Button 
-                    onClick={handleSearch} 
-                    className="w-full gap-2"
-                    disabled={isSearching || !keywords.trim()}
-                  >
-                    <Search className="w-4 h-4" />
-                    {isSearching ? "Searching..." : "Search PDF"}
-                  </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     Separate multiple keywords with commas
                   </p>
@@ -232,7 +232,7 @@ export const PDFSignature = () => {
                 {keywordMatches.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold">Matches Found</h3>
-                    <div className="space-y-1 max-h-96 overflow-y-auto">
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
                       {Array.from(new Set(keywordMatches.map(m => m.page)))
                         .sort((a, b) => a - b)
                         .map((page) => {
@@ -251,22 +251,19 @@ export const PDFSignature = () => {
                     </div>
                   </div>
                 )}
-              </Card>
-            </div>
-
-              {/* PDF Viewer */}
-              <div className="lg:col-span-3">
-              <Card className="shadow-medium overflow-hidden">
-                <PDFViewer
-                  file={pdfFile}
-                  keywords={keywords}
-                  matchingPages={matchingPages}
-                  isSearching={isSearching}
-                  onKeywordMatchesDetected={handleKeywordMatchesDetected}
-                />
-              </Card>
               </div>
-            </div>
+            </Card>
+
+            {/* PDF Viewer */}
+            <Card className="shadow-medium overflow-hidden">
+              <PDFViewer
+                file={pdfFile}
+                keywords={keywords}
+                matchingPages={matchingPages}
+                isSearching={isSearching}
+                onKeywordMatchesDetected={handleKeywordMatchesDetected}
+              />
+            </Card>
           </div>
         )}
       </main>
