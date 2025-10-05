@@ -30,7 +30,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload, Sparkles } from "lucide-react";
+import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload, Sparkles, CheckCircle2 } from "lucide-react";
 import dvaLogo from "@/assets/dva-logo.png";
 import { uploadPdfToStorage } from "@/utils/supabaseStorage";
 import { toast } from "sonner";
@@ -354,7 +354,7 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                                 </div>
                               ) : (
                                 <div className="space-y-1">
-                                  {filesForWorkspace.map((file) => (
+                                   {filesForWorkspace.map((file) => (
                                     <Button
                                       key={file.id}
                                       variant="ghost"
@@ -363,7 +363,10 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                                       onClick={() => onFileSelect?.(file.id, file.file_path, file.file_name)}
                                     >
                                       <FileText className="h-3 w-3 mr-2" />
-                                      <span className="truncate">{file.file_name}</span>
+                                      <span className="truncate flex-1 text-left">{file.file_name}</span>
+                                      {file.ocr_completed && (
+                                        <CheckCircle2 className="h-3 w-3 ml-1 text-green-500 flex-shrink-0" />
+                                      )}
                                     </Button>
                                   ))}
                                 </div>

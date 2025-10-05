@@ -19,6 +19,7 @@ interface WorkspaceFile {
   file_size: number | null;
   page_count: number | null;
   created_at: string;
+  ocr_completed?: boolean;
 }
 
 interface WorkspaceDiagnosis {
@@ -103,13 +104,30 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         const filesMap: Record<string, WorkspaceFile[]> = {};
         const diagnosesMap: Record<string, WorkspaceDiagnosis[]> = {};
         
-        data.forEach((workspace, index) => {
-          filesMap[workspace.id] = filesResults[index].data || [];
+        // Fetch OCR status for all files
+        for (let index = 0; index < data.length; index++) {
+          const workspace = data[index];
+          const files = filesResults[index].data || [];
+          
+          const filesWithOcrStatus = await Promise.all(
+            files.map(async (file) => {
+              const { data: pages, error: pagesError } = await supabase
+                .from("file_pages")
+                .select("ocr_completed")
+                .eq("file_id", file.id)
+                .limit(1);
+              
+              const ocr_completed = !pagesError && pages && pages.length > 0 && pages[0].ocr_completed;
+              return { ...file, ocr_completed };
+            })
+          );
+          
+          filesMap[workspace.id] = filesWithOcrStatus;
           diagnosesMap[workspace.id] = (diagnosesResults[index].data || []).map(d => ({
             ...d,
             pages: d.pages as any as Array<{ fileId: string; fileName: string; pageNum: number; key: string }>
           }));
-        });
+        }
         
         setAllWorkspaceFiles(filesMap);
         setAllWorkspaceDiagnoses(diagnosesMap);
@@ -131,11 +149,25 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error fetching files:", error);
       toast.error("Failed to load files");
     } else {
-      setWorkspaceFiles(data || []);
+      // Check OCR status for each file
+      const filesWithOcrStatus = await Promise.all(
+        (data || []).map(async (file) => {
+          const { data: pages, error: pagesError } = await supabase
+            .from("file_pages")
+            .select("ocr_completed")
+            .eq("file_id", file.id)
+            .limit(1);
+          
+          const ocr_completed = !pagesError && pages && pages.length > 0 && pages[0].ocr_completed;
+          return { ...file, ocr_completed };
+        })
+      );
+      
+      setWorkspaceFiles(filesWithOcrStatus);
       // Also update the all files map
       setAllWorkspaceFiles(prev => ({
         ...prev,
-        [selectedWorkspace.id]: data || []
+        [selectedWorkspace.id]: filesWithOcrStatus
       }));
     }
   };

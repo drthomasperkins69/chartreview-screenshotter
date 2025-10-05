@@ -91,7 +91,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [fileMetadata, setFileMetadata] = useState<Map<string, { id: string; path: string }>>(new Map());
   
-  // Load all workspace files into PDF viewer
+  // Load all workspace files into PDF viewer and check OCR status
   useEffect(() => {
     const loadWorkspaceFiles = async () => {
       if (!selectedWorkspace || !workspaceFiles.length) return;
@@ -99,8 +99,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       try {
         const loadedFiles: File[] = [];
         const metadata = new Map<string, { id: string; path: string }>();
+        const completedFiles = new Set<number>();
         
-        for (const wFile of workspaceFiles) {
+        for (let i = 0; i < workspaceFiles.length; i++) {
+          const wFile = workspaceFiles[i];
           const { data, error } = await supabase.storage
             .from('pdf-files')
             .download(wFile.file_path);
@@ -110,10 +112,16 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           const file = new File([data], wFile.file_name, { type: 'application/pdf' });
           loadedFiles.push(file);
           metadata.set(wFile.file_name, { id: wFile.id, path: wFile.file_path });
+          
+          // Check if OCR is completed for this file
+          if (wFile.ocr_completed) {
+            completedFiles.add(i);
+          }
         }
         
         setPdfFiles(loadedFiles);
         setFileMetadata(metadata);
+        setOcrCompletedFiles(completedFiles);
       } catch (error) {
         console.error('Error loading workspace files:', error);
         toast.error('Failed to load some workspace files');
