@@ -35,8 +35,6 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
   const [isGenerating, setIsGenerating] = useState(false);
   const [assessment, setAssessment] = useState<string>("");
   const [editableAssessment, setEditableAssessment] = useState<string>("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string>("");
   const [capturedPages, setCapturedPages] = useState<any[]>([]);
 
   // Update local instructions when global instructions change
@@ -177,125 +175,18 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
       setEditableAssessment(assessmentText);
       setCapturedPages(selectedContent);
       
-      // Open the dialog to show the results
-      setIsDialogOpen(true);
+      // Dispatch event for DiagnosticAssessmentResults component
+      const event = new CustomEvent('assessment-generated', {
+        detail: { assessment: assessmentText, capturedPages: selectedContent }
+      });
+      window.dispatchEvent(event);
+      
       toast.success("Diagnostic assessment generated successfully!");
     } catch (error) {
       console.error("Error generating assessment:", error);
       toast.error(error instanceof Error ? error.message : "Failed to generate assessment");
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const createCombinedPDF = async (assessmentText: string, selectedContent: any[]) => {
-    try {
-      const pdfDoc = await PDFDocument.create();
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      
-      // Add assessment text pages
-      const fontSize = 11;
-      const lineHeight = 14;
-      const margin = 50;
-      const maxWidth = 500;
-      
-      let page = pdfDoc.addPage([595, 842]); // A4 size
-      let yPosition = 792;
-      
-      // Title
-      page.drawText("Diagnostic Assessment Report", {
-        x: margin,
-        y: yPosition,
-        size: 16,
-        font: boldFont,
-        color: rgb(0, 0, 0),
-      });
-      yPosition -= 30;
-      
-      // Add assessment text with word wrapping
-      const lines = assessmentText.split('\n');
-      for (const line of lines) {
-        if (yPosition < margin + 20) {
-          page = pdfDoc.addPage([595, 842]);
-          yPosition = 792;
-        }
-        
-        const words = line.split(' ');
-        let currentLine = '';
-        
-        for (const word of words) {
-          const testLine = currentLine + (currentLine ? ' ' : '') + word;
-          const width = font.widthOfTextAtSize(testLine, fontSize);
-          
-          if (width > maxWidth && currentLine) {
-            page.drawText(currentLine, {
-              x: margin,
-              y: yPosition,
-              size: fontSize,
-              font: font,
-              color: rgb(0, 0, 0),
-            });
-            yPosition -= lineHeight;
-            currentLine = word;
-            
-            if (yPosition < margin + 20) {
-              page = pdfDoc.addPage([595, 842]);
-              yPosition = 792;
-            }
-          } else {
-            currentLine = testLine;
-          }
-        }
-        
-        if (currentLine) {
-          page.drawText(currentLine, {
-            x: margin,
-            y: yPosition,
-            size: fontSize,
-            font: font,
-            color: rgb(0, 0, 0),
-          });
-          yPosition -= lineHeight;
-        }
-      }
-      
-      // Add source pages section
-      page = pdfDoc.addPage([595, 842]);
-      page.drawText("Source Document Pages", {
-        x: margin,
-        y: 792,
-        size: 14,
-        font: boldFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      let sourceY = 760;
-      for (const content of selectedContent) {
-        if (sourceY < margin + 40) {
-          page = pdfDoc.addPage([595, 842]);
-          sourceY = 792;
-        }
-        
-        page.drawText(`• ${content.fileName} - Page ${content.pageNum}`, {
-          x: margin,
-          y: sourceY,
-          size: 10,
-          font: font,
-          color: rgb(0.3, 0.3, 0.3),
-        });
-        sourceY -= 20;
-      }
-      
-      // Save and create download URL
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setGeneratedPdfUrl(url);
-      
-    } catch (error) {
-      console.error("Error creating PDF:", error);
-      toast.error("Failed to create PDF document");
     }
   };
 
@@ -509,48 +400,16 @@ export const DiagnosticAssessment = ({ pdfContent, selectedPages, pdfFiles }: Di
         </Card>
       )}
 
-      {!isGenerating && (
+      {!assessment && !isGenerating && (
         <Card className="flex-1 flex items-center justify-center text-center p-6 border-dashed">
           <div className="space-y-2">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Configure settings above and click Generate button below to create your diagnostic assessment PDF
+              Configure settings above and click Generate button below to create your diagnostic assessment
             </p>
           </div>
         </Card>
       )}
-
-      {/* Assessment Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Diagnostic Assessment Results</DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-hidden">
-            <Label className="text-sm font-medium mb-2 block">
-              Edit Assessment (changes will be reflected in the downloaded PDF)
-            </Label>
-            <Textarea
-              value={editableAssessment}
-              onChange={(e) => setEditableAssessment(e.target.value)}
-              className="w-full h-[60vh] resize-none font-mono text-sm"
-              placeholder="Assessment will appear here..."
-            />
-          </div>
-
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={handleCopy} className="gap-2">
-              <Copy className="w-4 h-4" />
-              Copy
-            </Button>
-            <Button onClick={handleDownload} className="gap-2">
-              <Download className="w-4 h-4" />
-              Download PDF
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

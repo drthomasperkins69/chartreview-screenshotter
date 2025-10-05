@@ -12,6 +12,7 @@ import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { DiagnosticAssessment } from "./DiagnosticAssessment";
+import { DiagnosticAssessmentResults } from "./DiagnosticAssessmentResults";
 import { DIASettings } from "./DIASettings";
 import { useDIA } from "@/contexts/DIAContext";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock } from "lucide-react";
@@ -1107,6 +1108,13 @@ export const PDFSignature = () => {
                   Generate Diagnostic Assessment ({selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''})
                 </Button>
               </div>
+
+              {/* Assessment Results Section */}
+              <DiagnosticAssessmentResults 
+                pdfContent={pdfContent}
+                selectedPages={selectedPagesForExtraction}
+                pdfFiles={pdfFiles}
+              />
             </>
           )}
         <input
