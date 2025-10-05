@@ -609,22 +609,22 @@ export const PDFSignature = () => {
 
       {/* Veterans Health Centre Banner */}
       <div className="bg-primary/10 border-b border-primary/20">
-        <div className="container mx-auto px-4 py-2">
-          <p className="text-center text-sm text-foreground">
-            Brought to you by <span className="font-semibold">Veterans Health Centre</span> 
-            {" • "}
-            <a href="https://vhc.org.au" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              vhc.org.au
-            </a>
-            {" • "}
-            <a href="tel:1300838372" className="text-primary hover:underline">
-              1300 VETERAN
-            </a>
-            {" • "}
-            <a href="mailto:reception@vhc.org.au" className="text-primary hover:underline">
-              reception@vhc.org.au
-            </a>
-          </p>
+        <div className="container mx-auto px-4 py-3">
+          <div className="text-center space-y-1">
+            <p className="text-sm text-muted-foreground">Brought to you by</p>
+            <p className="text-base font-semibold text-foreground">Veterans Health Centre</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+              <a href="https://vhc.org.au" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                vhc.org.au
+              </a>
+              <a href="tel:1300838372" className="text-primary hover:underline">
+                1300 VETERAN
+              </a>
+              <a href="mailto:reception@vhc.org.au" className="text-primary hover:underline">
+                reception@vhc.org.au
+              </a>
+            </div>
+          </div>
         </div>
       </div>
 
