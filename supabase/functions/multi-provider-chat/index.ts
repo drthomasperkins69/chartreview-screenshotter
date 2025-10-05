@@ -57,6 +57,16 @@ async function handleLovableAI(messages: any[], model: string) {
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
 
+  // Add system message about medical document access if not present
+  const hasSystemMessage = messages.length > 0 && messages[0].role === 'system';
+  const messagesWithSystem = hasSystemMessage ? messages : [
+    {
+      role: 'system',
+      content: 'You are a medical AI assistant with access to patient medical documents. When medical document context is provided (marked as "RAG Context" or "Direct Context"), use it to answer questions accurately. If no context is provided but the user asks about documents, let them know they need to select diagnoses from the tracker first.'
+    },
+    ...messages
+  ];
+
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -65,7 +75,7 @@ async function handleLovableAI(messages: any[], model: string) {
     },
     body: JSON.stringify({
       model: model || 'google/gemini-2.5-flash',
-      messages,
+      messages: messagesWithSystem,
     }),
   });
 

@@ -145,6 +145,17 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
       }
 
       const fullContext = ragContext + diagnosisContext;
+      
+      if (fullContext) {
+        console.log('Sending medical document context to AI:', {
+          ragContextLength: ragContext.length,
+          diagnosisContextLength: diagnosisContext.length,
+          fileIds: diagnosesContext?.fileIds,
+        });
+      } else {
+        console.log('No medical document context available - user needs to select diagnoses');
+      }
+      
       const messagesToSend = fullContext
         ? [
             ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -221,32 +232,55 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
       <ScrollArea className="flex-1 p-4">
         {diagnosesContext && diagnosesContext.context.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-            <p className="text-xs font-medium text-primary mb-1">
-              🔍 RAG-Enhanced Context Active
+            <p className="text-xs font-medium text-primary mb-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Medical Document Access Active
             </p>
             <div className="text-xs text-muted-foreground space-y-1">
-              <p className="mb-2">Selected Diagnoses ({diagnosesContext.context.length}):</p>
+              <p className="font-medium">Selected for AI Analysis:</p>
               {diagnosesContext.context.map((ctx, idx) => (
-                <div key={idx}>
-                  • {ctx.diagnosis}: {ctx.files.length} file{ctx.files.length !== 1 ? 's' : ''}
+                <div key={idx} className="ml-2">
+                  • {ctx.diagnosis}: {ctx.files.length} page{ctx.files.length !== 1 ? 's' : ''}
                 </div>
               ))}
               <p className="mt-2 text-xs italic">
-                AI has access to full document content via vector search
+                ✓ RAG vector search enabled
+              </p>
+              <p className="text-xs italic">
+                ✓ Full document content accessible
               </p>
             </div>
+          </div>
+        )}
+        
+        {!diagnosesContext || diagnosesContext.context.length === 0 && (
+          <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg">
+            <p className="text-xs font-medium mb-1">📋 No Documents Selected</p>
+            <p className="text-xs text-muted-foreground">
+              Check "Add to Chat" next to diagnoses in the tracker above to give AI access to medical documents
+            </p>
           </div>
         )}
         
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <Sparkles className="w-12 h-12 mb-4 text-muted-foreground/50" />
-            <p className="text-lg font-medium mb-2">Choose an AI provider and start chatting</p>
-            <p className="text-sm max-w-md">
+            <p className="text-lg font-medium mb-2">Medical AI Assistant</p>
+            <p className="text-sm max-w-md mb-4">
               {diagnosesContext && diagnosesContext.context.length > 0 
-                ? 'AI has access to selected diagnoses and their files'
-                : 'Switch between different AI models to compare responses and capabilities'}
+                ? 'AI can now see your selected medical documents and diagnoses'
+                : 'Select diagnoses in the tracker above (check "Add to Chat") to give AI access to your medical documents'}
             </p>
+            {diagnosesContext && diagnosesContext.context.length > 0 && (
+              <div className="text-xs text-muted-foreground/70 max-w-md">
+                <p className="mb-2">Try asking:</p>
+                <ul className="list-disc text-left pl-4 space-y-1">
+                  <li>"What diagnoses are documented in these files?"</li>
+                  <li>"Summarize the medical findings"</li>
+                  <li>"What treatments are mentioned?"</li>
+                </ul>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
