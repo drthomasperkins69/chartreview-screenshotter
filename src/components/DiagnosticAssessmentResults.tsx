@@ -3,9 +3,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Download, Copy, FileText } from "lucide-react";
+import { Download, Copy, FileText, Edit3, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface PDFContent {
   fileName: string;
@@ -24,6 +26,7 @@ export const DiagnosticAssessmentResults = ({ pdfContent, selectedPages, pdfFile
   const [editableAssessment, setEditableAssessment] = useState<string>("");
   const [capturedPages, setCapturedPages] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     const handleAssessmentGenerated = (event: any) => {
@@ -215,23 +218,51 @@ export const DiagnosticAssessmentResults = ({ pdfContent, selectedPages, pdfFile
             <FileText className="w-4 h-4" />
             Generated Assessment
           </Label>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            className="gap-2"
-          >
-            <Copy className="w-4 h-4" />
-            Copy
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="gap-2"
+            >
+              {isEditMode ? (
+                <>
+                  <Eye className="w-4 h-4" />
+                  View
+                </>
+              ) : (
+                <>
+                  <Edit3 className="w-4 h-4" />
+                  Edit
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              className="gap-2"
+            >
+              <Copy className="w-4 h-4" />
+              Copy
+            </Button>
+          </div>
         </div>
 
-        <Textarea
-          value={editableAssessment}
-          onChange={(e) => setEditableAssessment(e.target.value)}
-          className="w-full min-h-[400px] font-mono text-sm"
-          placeholder="Assessment will appear here..."
-        />
+        {isEditMode ? (
+          <Textarea
+            value={editableAssessment}
+            onChange={(e) => setEditableAssessment(e.target.value)}
+            className="w-full min-h-[400px] font-mono text-sm"
+            placeholder="Assessment will appear here..."
+          />
+        ) : (
+          <div className="w-full min-h-[400px] prose prose-sm max-w-none p-4 border rounded-md bg-background">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {editableAssessment}
+            </ReactMarkdown>
+          </div>
+        )}
 
         <Button
           onClick={handleDownloadCombinedPDF}
