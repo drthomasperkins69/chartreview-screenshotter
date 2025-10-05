@@ -16,9 +16,10 @@ interface Message {
 
 interface AISearchAssistantProps {
   onKeywordSuggest: (keywords: string) => void;
+  currentKeywords?: string;
 }
 
-export const AISearchAssistant = ({ onKeywordSuggest }: AISearchAssistantProps) => {
+export const AISearchAssistant = ({ onKeywordSuggest, currentKeywords }: AISearchAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -101,6 +102,13 @@ export const AISearchAssistant = ({ onKeywordSuggest }: AISearchAssistantProps) 
         <Bot className="w-5 h-5 text-primary" />
         <h3 className="font-semibold">AI Search Assistant</h3>
       </div>
+
+      {currentKeywords && (
+        <div className="mb-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-medium text-muted-foreground mb-1">Current Keywords:</p>
+          <p className="text-sm font-mono text-foreground">{currentKeywords}</p>
+        </div>
+      )}
 
       <ScrollArea className="flex-1 pr-4 mb-4">
         <div className="space-y-4">

@@ -181,7 +181,10 @@ export const PDFSignature = () => {
           <div className="space-y-6">
             {/* AI Assistant at Top */}
             <div className="h-[400px]">
-              <AISearchAssistant onKeywordSuggest={handleKeywordSuggest} />
+              <AISearchAssistant 
+                onKeywordSuggest={handleKeywordSuggest}
+                currentKeywords={keywords}
+              />
             </div>
 
             {/* Main Content Grid */}
