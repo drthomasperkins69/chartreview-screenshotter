@@ -121,9 +121,24 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           }
         }
         
-        setPdfFiles(loadedFiles);
-        setFileMetadata(metadata);
-        setOcrCompletedFiles(completedFiles);
+        setPdfFiles(prev => {
+          const existing = new Set(prev.map(f => f.name));
+          const merged = [...prev];
+          loadedFiles.forEach(f => {
+            if (!existing.has(f.name)) merged.push(f);
+          });
+          return merged;
+        });
+        setFileMetadata(prev => {
+          const next = new Map(prev);
+          metadata.forEach((v, k) => next.set(k, v));
+          return next;
+        });
+        setOcrCompletedFiles(prev => {
+          const next = new Set(prev);
+          completedFiles.forEach(i => next.add(i));
+          return next;
+        });
       } catch (error) {
         console.error('Error loading workspace files:', error);
         toast.error('Failed to load some workspace files');
