@@ -90,6 +90,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const { selectedWorkspace, refreshFiles, workspaceFiles, saveDiagnosis, workspaceDiagnoses } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [fileMetadata, setFileMetadata] = useState<Map<string, { id: string; path: string }>>(new Map());
+  const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
+  const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   
   // Load all workspace files into PDF viewer and check OCR status
   useEffect(() => {
@@ -153,9 +155,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         if (error) throw error;
         
         const file = new File([data], selectedFile.name, { type: 'application/pdf' });
+        const newIndex = pdfFiles.length;
         setPdfFiles(prev => [...prev, file]);
         setFileMetadata(prev => new Map(prev).set(selectedFile.name, { id: selectedFile.id, path: selectedFile.path }));
-        setCurrentPdfIndex(pdfFiles.length);
+        setCurrentPdfIndex(newIndex);
       } catch (error) {
         console.error('Error loading file:', error);
         toast.error('Failed to load file');
@@ -163,8 +166,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     };
     
     loadFileFromStorage();
-  }, [selectedFile]);
-  const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
+  }, [selectedFile, pdfFiles.length, fileMetadata]);
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
   const [pdfContent, setPdfContent] = useState<PDFContent[]>([]);
@@ -183,7 +185,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
-  const [ocrCompletedFiles, setOcrCompletedFiles] = useState<Set<number>>(new Set());
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
   const [selectedDiagnosesForChat, setSelectedDiagnosesForChat] = useState<Set<string>>(new Set());
