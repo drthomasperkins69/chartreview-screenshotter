@@ -212,6 +212,9 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
   // Load existing diagnoses from workspace when workspace changes
   useEffect(() => {
+    // Always clear diagnoses when workspace changes to ensure isolation
+    setPageDiagnoses({});
+    
     if (!selectedWorkspace || !workspaceDiagnoses.length) return;
 
     // Convert workspace diagnoses back to pageDiagnoses format
