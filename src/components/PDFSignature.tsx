@@ -87,7 +87,7 @@ interface PDFContent {
 
 export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; path: string; name: string } | null }) => {
   const { user } = useAuth();
-  const { selectedWorkspace, refreshFiles, workspaceFiles, saveDiagnosis } = useWorkspace();
+  const { selectedWorkspace, refreshFiles, workspaceFiles, saveDiagnosis, workspaceDiagnoses } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [fileMetadata, setFileMetadata] = useState<Map<string, { id: string; path: string }>>(new Map());
   
@@ -209,6 +209,31 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   useEffect(() => {
     pdfFilesRef.current = pdfFiles;
   }, [pdfFiles]);
+
+  // Load existing diagnoses from workspace when workspace changes
+  useEffect(() => {
+    if (!selectedWorkspace || !workspaceDiagnoses.length) return;
+
+    // Convert workspace diagnoses back to pageDiagnoses format
+    const loadedDiagnoses: Record<string, string> = {};
+    
+    workspaceDiagnoses.forEach(diagnosis => {
+      diagnosis.pages.forEach(page => {
+        const key = page.key; // This is already in "fileIndex-pageNum" format
+        if (!loadedDiagnoses[key]) {
+          loadedDiagnoses[key] = diagnosis.diagnosis_name;
+        } else {
+          // Append diagnosis if multiple diagnoses exist for the same page
+          const existing = loadedDiagnoses[key].split(',').map(d => d.trim());
+          if (!existing.includes(diagnosis.diagnosis_name)) {
+            loadedDiagnoses[key] = [...existing, diagnosis.diagnosis_name].join(', ');
+          }
+        }
+      });
+    });
+
+    setPageDiagnoses(loadedDiagnoses);
+  }, [selectedWorkspace, workspaceDiagnoses]);
 
   // Auto-save diagnoses to Supabase whenever they change
   useEffect(() => {
