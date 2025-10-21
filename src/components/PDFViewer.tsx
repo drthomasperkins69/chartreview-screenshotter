@@ -79,10 +79,6 @@ export const PDFViewer = ({
   const [loading, setLoading] = useState(true);
   // Click to enlarge page dialog state
   const [showEnlargedPage, setShowEnlargedPage] = useState(false);
-  const [diagnosisBoxPosition, setDiagnosisBoxPosition] = useState<Record<number, { x: number; y: number }>>({});
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const diagnosisBoxRef = useRef<HTMLDivElement>(null);
 
   const currentFile = files[currentFileIndex] || null;
 
@@ -379,47 +375,8 @@ export const PDFViewer = ({
   }, [pdf, currentPage, scale, rotation, matchingPages]);
 
   const handleCanvasClick = () => {
-    if (!isDragging) {
-      setShowEnlargedPage(true);
-    }
+    setShowEnlargedPage(true);
   };
-
-  const handleDiagnosisBoxMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging(true);
-    const currentPos = diagnosisBoxPosition[currentPage] || { x: 20, y: 20 };
-    setDragStart({
-      x: e.clientX - currentPos.x,
-      y: e.clientY - currentPos.y,
-    });
-  };
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging) return;
-    
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-    
-    setDiagnosisBoxPosition(prev => ({
-      ...prev,
-      [currentPage]: { x: newX, y: newY }
-    }));
-  }, [isDragging, dragStart, currentPage]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
     renderPage();
@@ -768,7 +725,7 @@ export const PDFViewer = ({
             </div>
           </div>
         ) : (
-          <div className="relative inline-block">
+          <>
             <canvas
               ref={canvasRef}
               className="shadow-medium border cursor-pointer hover:shadow-lg transition-shadow"
@@ -778,35 +735,7 @@ export const PDFViewer = ({
               }}
               onClick={handleCanvasClick}
             />
-            
-            {/* Draggable Diagnosis Box */}
-            {currentDiagnosis && (
-              <div
-                ref={diagnosisBoxRef}
-                onMouseDown={handleDiagnosisBoxMouseDown}
-                style={{
-                  position: 'absolute',
-                  left: diagnosisBoxPosition[currentPage]?.x || 20,
-                  top: diagnosisBoxPosition[currentPage]?.y || 20,
-                  cursor: isDragging ? 'grabbing' : 'grab',
-                  zIndex: 10,
-                }}
-                className="bg-yellow-100 border-2 border-yellow-500 rounded-lg p-3 shadow-lg max-w-xs animate-fade-in"
-              >
-                <div className="flex items-start gap-2">
-                  <div className="text-xs font-semibold text-yellow-800 mb-1">
-                    📋 Diagnosis:
-                  </div>
-                </div>
-                <div className="text-sm text-yellow-900 whitespace-pre-wrap">
-                  {currentDiagnosis}
-                </div>
-                <div className="text-xs text-yellow-700 mt-2 italic">
-                  Drag to move
-                </div>
-              </div>
-            )}
-          </div>
+          </>
         )}
       </div>
 
