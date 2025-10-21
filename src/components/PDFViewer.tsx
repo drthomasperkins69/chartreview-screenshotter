@@ -688,6 +688,16 @@ export const PDFViewer = ({
               Save
             </Button>
           </div>
+          <div className="mt-2">
+            <Button
+              onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
+              size="sm"
+              className="gap-2 w-full"
+            >
+              <Save className="w-4 h-4" />
+              Save to Database
+            </Button>
+          </div>
           <div className="flex gap-2">
             <Button
               onClick={handleAutoScanAll}
