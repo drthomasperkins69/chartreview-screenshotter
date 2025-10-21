@@ -439,6 +439,7 @@ export const PDFViewer = ({
   const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
+  const [shouldStopScan, setShouldStopScan] = useState(false);
 
   // Sync input when switching pages/files
   useEffect(() => {
@@ -515,6 +516,7 @@ export const PDFViewer = ({
     }
 
     setIsAutoScanning(true);
+    setShouldStopScan(false);
     const totalPages = numPages;
     let successCount = 0;
     
@@ -522,6 +524,12 @@ export const PDFViewer = ({
       toast(`Starting AI scan of ${totalPages} pages...`);
 
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        // Check if scan should stop
+        if (shouldStopScan) {
+          toast.info(`Scan stopped at page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+          break;
+        }
+
         try {
           // Show progress
           toast.info(`Scanning page ${pageNum}/${totalPages}...`, { duration: 1000 });
@@ -581,12 +589,15 @@ export const PDFViewer = ({
         }
       }
 
-      toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to PDF.`);
+      if (!shouldStopScan) {
+        toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to PDF.`);
+      }
     } catch (error) {
       console.error("Error in auto-scan:", error);
       toast.error("Auto-scan failed");
     } finally {
       setIsAutoScanning(false);
+      setShouldStopScan(false);
     }
   };
 
@@ -720,25 +731,27 @@ export const PDFViewer = ({
             </Button>
           </div>
           <div className="flex gap-2">
-            <Button
-              onClick={handleAutoScanAll}
-              disabled={isAutoScanning || isAISuggesting}
-              size="sm"
-              variant="outline"
-              className="gap-2 w-full"
-            >
-              {isAutoScanning ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Auto-scanning {numPages} pages...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  AI Auto-Scan All Pages ({numPages} pages)
-                </>
-              )}
-            </Button>
+            {!isAutoScanning ? (
+              <Button
+                onClick={handleAutoScanAll}
+                disabled={isAISuggesting}
+                size="sm"
+                variant="outline"
+                className="gap-2 w-full"
+              >
+                <Sparkles className="w-4 h-4" />
+                AI Auto-Scan All Pages ({numPages} pages)
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setShouldStopScan(true)}
+                size="sm"
+                variant="destructive"
+                className="gap-2 w-full"
+              >
+                Stop Scan
+              </Button>
+            )}
           </div>
           
           {/* File Status Info */}
