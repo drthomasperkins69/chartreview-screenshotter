@@ -179,6 +179,15 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     if (!selectedWorkspace || !user) return;
 
+    // Check if session is still valid
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      toast.error("Your session has expired. Please refresh the page and log in again.");
+      console.error("Session error:", sessionError);
+      return;
+    }
+
     // Check if diagnosis already exists for current user
     const { data: existing } = await supabase
       .from("workspace_diagnoses")
@@ -210,7 +219,11 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error updating diagnosis:", error);
-        toast.error("Failed to update diagnosis");
+        if (error.code === '42501') {
+          toast.error("Session expired - please refresh the page and log in again");
+        } else {
+          toast.error("Failed to update diagnosis");
+        }
         return;
       }
     } else {
@@ -227,7 +240,11 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error saving diagnosis:", error);
-        toast.error("Failed to save diagnosis");
+        if (error.code === '42501') {
+          toast.error("Session expired - please refresh the page and log in again");
+        } else {
+          toast.error("Failed to save diagnosis");
+        }
         return;
       }
     }
