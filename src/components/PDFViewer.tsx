@@ -454,15 +454,11 @@ export const PDFViewer = ({
     }
   }, [onDiagnosisChange]);
 
-  // Sync input when page/file changes, or when text area is empty and there's a saved diagnosis
+  // Sync textarea with saved diagnosis whenever it changes or when switching pages
   useEffect(() => {
-    // If text area is empty and we have a saved diagnosis, populate it
-    if (!diagnosisInput && currentDiagnosis) {
-      setDiagnosisInput(currentDiagnosis);
-    }
-    // When switching pages/files, always sync
+    console.log('Syncing diagnosis input:', { currentDiagnosis, currentPage, currentFileIndex });
     setDiagnosisInput(currentDiagnosis);
-  }, [currentPage, currentFileIndex, currentDiagnosis, diagnosisInput]);
+  }, [currentPage, currentFileIndex, currentDiagnosis]);
 
   const handleAISuggest = async () => {
     if (!canvasRef.current || !currentFile) {
