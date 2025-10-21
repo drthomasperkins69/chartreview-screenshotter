@@ -1188,7 +1188,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         }]);
       }
       
-      toast.success("Diagnosis saved to PDF");
+      toast.success(`Diagnosis "${diagnosis}" saved to ${file.name}, page ${pageNum}`);
     } catch (error) {
       console.error("Error adding diagnosis to PDF:", error);
       toast.error("Failed to save diagnosis to PDF");
