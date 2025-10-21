@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
 import { PDFPageDialog } from "./PDFPageDialog";
+import { formatDistanceToNow } from "date-fns";
 // Use Vite worker for pdf.js to avoid CORS/version issues
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - Vite ?worker returns a Worker constructor
@@ -79,8 +80,20 @@ export const PDFViewer = ({
   const [loading, setLoading] = useState(true);
   // Click to enlarge page dialog state
   const [showEnlargedPage, setShowEnlargedPage] = useState(false);
+  // Track last modified time for each file
+  const [fileLastModified, setFileLastModified] = useState<Record<number, Date>>({});
+  const [, setTick] = useState(0); // Force re-render for relative time updates
 
   const currentFile = files[currentFileIndex] || null;
+
+  // Update relative time display every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(prev => prev + 1);
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Navigate to selected page when it changes
   useEffect(() => {
@@ -427,6 +440,18 @@ export const PDFViewer = ({
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
 
+  // Wrap onDiagnosisChange to track file updates
+  const handleSaveToDatabase = useCallback(async (fileIndex: number, pageNum: number, diagnosis: string) => {
+    if (onDiagnosisChange) {
+      await onDiagnosisChange(fileIndex, pageNum, diagnosis);
+      // Update the last modified time for this file
+      setFileLastModified(prev => ({
+        ...prev,
+        [fileIndex]: new Date()
+      }));
+    }
+  }, [onDiagnosisChange]);
+
   // Update local input when page changes
   useEffect(() => {
     setDiagnosisInput(currentDiagnosis);
@@ -543,7 +568,7 @@ export const PDFViewer = ({
 
           if (data?.diagnosis) {
             // Wait for the diagnosis to be saved to PDF before continuing
-            await onDiagnosisChange(currentFileIndex, pageNum, data.diagnosis);
+            await handleSaveToDatabase(currentFileIndex, pageNum, data.diagnosis);
             successCount++;
           }
 
@@ -679,7 +704,7 @@ export const PDFViewer = ({
               )}
             </Button>
             <Button
-              onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
+              onClick={() => handleSaveToDatabase(currentFileIndex, currentPage, diagnosisInput)}
               disabled={diagnosisInput === currentDiagnosis}
               size="default"
               className="gap-2"
@@ -690,7 +715,7 @@ export const PDFViewer = ({
           </div>
           <div className="mt-2">
             <Button
-              onClick={() => onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput)}
+              onClick={() => handleSaveToDatabase(currentFileIndex, currentPage, diagnosisInput)}
               size="sm"
               className="gap-2 w-full"
             >
@@ -719,6 +744,25 @@ export const PDFViewer = ({
               )}
             </Button>
           </div>
+          
+          {/* File Status Info */}
+          {currentFile && (
+            <div className="mt-3 pt-3 border-t space-y-1">
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium">Current file:</span>{" "}
+                <span className="break-all">{currentFile.name}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium">Last modified:</span>{" "}
+                {new Date(currentFile.lastModified).toLocaleString()}
+              </div>
+              {fileLastModified[currentFileIndex] && (
+                <div className="text-xs text-green-600 font-medium">
+                  Last saved {formatDistanceToNow(fileLastModified[currentFileIndex], { addSuffix: true })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
