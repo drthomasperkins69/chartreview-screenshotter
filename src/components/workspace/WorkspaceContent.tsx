@@ -4,10 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PDFSignature } from "@/components/PDFSignature";
-import { Upload, FileText, Calendar, Download } from "lucide-react";
+import { Upload, FileText, Calendar, Download, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { deletePdfFromStorage } from "@/utils/supabaseStorage";
 
 export const WorkspaceContent = ({ selectedFileFromSidebar }: { selectedFileFromSidebar: { id: string; path: string; name: string } | null }) => {
   const { selectedWorkspace, workspaceFiles, refreshFiles } = useWorkspace();
@@ -48,6 +49,15 @@ export const WorkspaceContent = ({ selectedFileFromSidebar }: { selectedFileFrom
   const handleFileSelect = async (fileId: string, filePath: string, fileName: string) => {
     setSelectedFile({ id: fileId, path: filePath, name: fileName });
     setShowPdfTools(true);
+  };
+
+  const handleDeleteFile = async (fileId: string, filePath: string, fileName: string) => {
+    if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
+    
+    const success = await deletePdfFromStorage(filePath, fileId);
+    if (success) {
+      await refreshFiles();
+    }
   };
 
   useEffect(() => {
@@ -142,14 +152,24 @@ export const WorkspaceContent = ({ selectedFileFromSidebar }: { selectedFileFrom
                           </span>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadFile(file.file_path, file.file_name)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadFile(file.file_path, file.file_name)}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteFile(file.id, file.file_path, file.file_name)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 ))}
