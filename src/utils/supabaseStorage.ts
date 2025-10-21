@@ -76,6 +76,63 @@ export const downloadPdfFromStorage = async (filePath: string): Promise<Blob | n
   }
 };
 
+export const updatePdfInStorage = async (
+  file: Blob,
+  fileName: string,
+  oldFilePath: string,
+  workspaceId: string,
+  userId: string,
+  fileId: string
+): Promise<string | null> => {
+  try {
+    // Delete old file from storage
+    const { error: deleteError } = await supabase.storage
+      .from('pdf-files')
+      .remove([oldFilePath]);
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError);
+      // Continue anyway - old file might not exist
+    }
+
+    // Upload new file with timestamp to ensure uniqueness
+    const filePath = `${userId}/${workspaceId}/${Date.now()}-${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('pdf-files')
+      .upload(filePath, file, {
+        contentType: 'application/pdf',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      toast.error('Failed to upload modified PDF');
+      return null;
+    }
+
+    // Update database record with new path and size
+    const { error: updateError } = await supabase
+      .from('workspace_files')
+      .update({
+        file_path: filePath,
+        file_size: file.size
+      })
+      .eq('id', fileId);
+
+    if (updateError) {
+      console.error('Database update error:', updateError);
+      toast.error('Failed to update file metadata');
+      return null;
+    }
+
+    return filePath;
+  } catch (error) {
+    console.error('Error updating PDF:', error);
+    toast.error('Failed to update PDF');
+    return null;
+  }
+};
+
 export const deletePdfFromStorage = async (filePath: string, fileId: string): Promise<boolean> => {
   try {
     // Delete from storage

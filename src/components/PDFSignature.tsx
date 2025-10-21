@@ -547,7 +547,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       }
       
       const pdfBytes = await newPdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -697,7 +697,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       
       // Save the new PDF
       const pdfBytes = await newPdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const newFile = new File([blob], file.name, { type: 'application/pdf' });
       
       // Update the files array
@@ -1133,7 +1133,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       
       // Save the modified PDF
       const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const newFile = new File([blob], file.name, { type: 'application/pdf' });
       
       // Update the files array and keep ref in sync
@@ -1588,10 +1588,37 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             
             // Save the modified PDF once with all diagnoses
             const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
             const newFile = new File([blob], file.name, { type: 'application/pdf' });
             
-            // Update the files array
+            // Upload modified PDF to storage if this file is from workspace
+            if (selectedWorkspace && user) {
+              const metadata = fileMetadata.get(file.name);
+              if (metadata) {
+                toast.info(`Uploading modified ${file.name} to workspace...`);
+                const { updatePdfInStorage } = await import('@/utils/supabaseStorage');
+                const newPath = await updatePdfInStorage(
+                  blob,
+                  file.name,
+                  metadata.path,
+                  selectedWorkspace.id,
+                  user.id,
+                  metadata.id
+                );
+                
+                if (newPath) {
+                  // Update metadata with new path
+                  setFileMetadata(prev => {
+                    const next = new Map(prev);
+                    next.set(file.name, { id: metadata.id, path: newPath });
+                    return next;
+                  });
+                  toast.success(`${file.name} saved with ${fileDiagnoses.length} diagnoses`);
+                }
+              }
+            }
+            
+            // Update the files array in memory
             await new Promise<void>((resolve) => {
               setPdfFiles(prev => {
                 const newFiles = [...prev];
@@ -1601,8 +1628,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
               });
               setTimeout(resolve, 10);
             });
-            
-            toast.success(`${fileDiagnoses.length} diagnoses saved to ${file.name}`);
           } catch (error) {
             console.error(`Error saving diagnoses to ${file.name}:`, error);
             toast.error(`Failed to save diagnoses to ${file.name}`);
@@ -1818,7 +1843,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   };
 
   const downloadPDF = async (pdfBytes: Uint8Array, filename: string) => {
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
     
     // Save to Supabase if workspace is selected
     if (selectedWorkspace && user) {
