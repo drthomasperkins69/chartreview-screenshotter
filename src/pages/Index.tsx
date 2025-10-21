@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
 import { WorkspaceContent } from "@/components/workspace/WorkspaceContent";
+import { Header } from "@/components/Header";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -37,12 +38,15 @@ const Index = () => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <WorkspaceSidebar onFileSelect={handleFileSelect} />
-        <WorkspaceContent selectedFileFromSidebar={selectedFileData} />
-      </div>
-    </SidebarProvider>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <SidebarProvider>
+        <div className="flex-1 flex w-full">
+          <WorkspaceSidebar onFileSelect={handleFileSelect} />
+          <WorkspaceContent selectedFileFromSidebar={selectedFileData} />
+        </div>
+      </SidebarProvider>
+    </div>
   );
 };
 
