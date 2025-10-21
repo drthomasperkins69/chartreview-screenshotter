@@ -452,10 +452,10 @@ export const PDFViewer = ({
     }
   }, [onDiagnosisChange]);
 
-  // Update local input when page changes
+  // Update local input when page changes (but not when diagnosis changes to prevent clearing after save)
   useEffect(() => {
     setDiagnosisInput(currentDiagnosis);
-  }, [currentDiagnosis, currentPage, currentFileIndex]);
+  }, [currentPage, currentFileIndex]);
 
   const handleAISuggest = async () => {
     if (!canvasRef.current || !currentFile) {
