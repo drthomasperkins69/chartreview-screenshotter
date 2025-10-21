@@ -2638,246 +2638,245 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                  </ResizablePanel>
         </ResizablePanelGroup>
 
-        {/* Diagnosis Tracker and AI Chat Section - Always Visible */}
-        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left Column: Diagnosis Tracker */}
-          <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
-                <Button
-                  onClick={handleDownloadAllAsZip}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <FileArchive className="w-4 h-4" />
-                  Download All as ZIP
-                </Button>
-              </div>
-            <div className="space-y-2">
-              {(() => {
-                // Split comma-separated diagnoses and group pages by individual diagnosis
-                const diagnosisGroups: Record<string, Array<{ key: string; fileIndex: number; pageNum: number; fileName: string }>> = {};
+
+        {/* Diagnosis Tracker - Full Width */}
+        <Card className="mt-4 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
+              <Button
+                onClick={handleDownloadAllAsZip}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <FileArchive className="w-4 h-4" />
+                Download All as ZIP
+              </Button>
+            </div>
+          <div className="space-y-2">
+            {(() => {
+              // Split comma-separated diagnoses and group pages by individual diagnosis
+              const diagnosisGroups: Record<string, Array<{ key: string; fileIndex: number; pageNum: number; fileName: string }>> = {};
+              
+              Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
+                if (!diagnosisString?.trim()) return;
                 
-                Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
-                  if (!diagnosisString?.trim()) return;
+                // Split by comma and trim each diagnosis
+                const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
+                
+                individualDiagnoses.forEach(diagnosis => {
+                  if (!diagnosisGroups[diagnosis]) {
+                    diagnosisGroups[diagnosis] = [];
+                  }
                   
-                  // Split by comma and trim each diagnosis
-                  const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
-                  
-                  individualDiagnoses.forEach(diagnosis => {
-                    if (!diagnosisGroups[diagnosis]) {
-                      diagnosisGroups[diagnosis] = [];
-                    }
-                    
-                    const [fileIndex, pageNum] = key.split('-').map(Number);
-                    diagnosisGroups[diagnosis].push({
-                      key,
-                      fileIndex,
-                      pageNum,
-                      fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
-                    });
+                  const [fileIndex, pageNum] = key.split('-').map(Number);
+                  diagnosisGroups[diagnosis].push({
+                    key,
+                    fileIndex,
+                    pageNum,
+                    fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
                   });
                 });
-                
-                // Sort diagnoses alphabetically and then sort pages within each diagnosis
-                return Object.entries(diagnosisGroups)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([diagnosis, pages]) => {
-                    const sortedPages = pages.sort((a, b) => {
-                      if (a.fileIndex !== b.fileIndex) return a.fileIndex - b.fileIndex;
-                      return a.pageNum - b.pageNum;
-                    });
+              });
+              
+              // Sort diagnoses alphabetically and then sort pages within each diagnosis
+              return Object.entries(diagnosisGroups)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([diagnosis, pages]) => {
+                  const sortedPages = pages.sort((a, b) => {
+                    if (a.fileIndex !== b.fileIndex) return a.fileIndex - b.fileIndex;
+                    return a.pageNum - b.pageNum;
+                  });
 
-                    return (
-                      <Collapsible key={diagnosis} defaultOpen={true}>
-                        <div className="border rounded-lg">
-                          <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
-                            <div className="flex items-center gap-3 flex-1">
-                              <Checkbox
-                                id={`chat-${diagnosis}`}
-                                checked={selectedDiagnosesForChat.has(diagnosis)}
-                                onCheckedChange={(checked) => {
-                                  handleToggleDiagnosisForChat(diagnosis);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <label 
-                                htmlFor={`chat-${diagnosis}`}
-                                className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Add to Chat
-                              </label>
-                              <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
-                              {editingDiagnosis === diagnosis ? (
-                                <Input
-                                  value={editDiagnosisValue}
-                                  onChange={(e) => setEditDiagnosisValue(e.target.value)}
-                                  onBlur={() => handleRenameDiagnosis(diagnosis, editDiagnosisValue)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleRenameDiagnosis(diagnosis, editDiagnosisValue);
-                                    } else if (e.key === 'Escape') {
-                                      setEditingDiagnosis(null);
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  autoFocus
-                                  className="h-8 font-medium"
-                                />
-                              ) : (
-                                <span 
-                                  className="font-medium cursor-pointer hover:text-primary transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingDiagnosis(diagnosis);
-                                    setEditDiagnosisValue(diagnosis);
-                                  }}
-                                >
-                                  {diagnosis}
-                                </span>
-                              )}
-                              <span className="text-sm text-muted-foreground">
-                                ({sortedPages.length} page{sortedPages.length !== 1 ? 's' : ''})
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleGenerateDiagnosisForm(diagnosis);
-                                }}
-                                disabled={generatingForm === diagnosis}
-                                className="h-8 w-8 p-0 hover:text-primary"
-                                aria-label="Generate diagnosis form"
-                              >
-                                {generatingForm === diagnosis ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <FileEdit className="w-4 h-4" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Delete all instances of "${diagnosis}"?`)) {
-                                    handleDeleteDiagnosis(diagnosis);
+                  return (
+                    <Collapsible key={diagnosis} defaultOpen={true}>
+                      <div className="border rounded-lg">
+                        <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-accent/5">
+                          <div className="flex items-center gap-3 flex-1">
+                            <Checkbox
+                              id={`chat-${diagnosis}`}
+                              checked={selectedDiagnosesForChat.has(diagnosis)}
+                              onCheckedChange={(checked) => {
+                                handleToggleDiagnosisForChat(diagnosis);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <label 
+                              htmlFor={`chat-${diagnosis}`}
+                              className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Add to Chat
+                            </label>
+                            <ChevronRight className="w-4 h-4 transition-transform group-data-[state=open]:rotate-90" />
+                            {editingDiagnosis === diagnosis ? (
+                              <Input
+                                value={editDiagnosisValue}
+                                onChange={(e) => setEditDiagnosisValue(e.target.value)}
+                                onBlur={() => handleRenameDiagnosis(diagnosis, editDiagnosisValue)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleRenameDiagnosis(diagnosis, editDiagnosisValue);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingDiagnosis(null);
                                   }
                                 }}
-                                className="h-8 w-8 p-0 hover:text-destructive"
-                                aria-label="Delete diagnosis"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                                className="h-8 font-medium"
+                              />
+                            ) : (
+                              <span 
+                                className="font-medium cursor-pointer hover:text-primary transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDownloadByDiagnosis(diagnosis);
+                                  setEditingDiagnosis(diagnosis);
+                                  setEditDiagnosisValue(diagnosis);
                                 }}
-                                className="ml-1 h-8 w-8 p-0"
-                                aria-label="Download PDF"
                               >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            {diagnosisForms[diagnosis] && (
-                              <div className="px-3 py-3 bg-accent/5 border-b space-y-3">
-                                <div className="grid gap-3">
+                                {diagnosis}
+                              </span>
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              ({sortedPages.length} page{sortedPages.length !== 1 ? 's' : ''})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateDiagnosisForm(diagnosis);
+                              }}
+                              disabled={generatingForm === diagnosis}
+                              className="h-8 w-8 p-0 hover:text-primary"
+                              aria-label="Generate diagnosis form"
+                            >
+                              {generatingForm === diagnosis ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <FileEdit className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete all instances of "${diagnosis}"?`)) {
+                                  handleDeleteDiagnosis(diagnosis);
+                                }
+                              }}
+                              className="h-8 w-8 p-0 hover:text-destructive"
+                              aria-label="Delete diagnosis"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadByDiagnosis(diagnosis);
+                              }}
+                              className="ml-1 h-8 w-8 p-0"
+                              aria-label="Download PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          {diagnosisForms[diagnosis] && (
+                            <div className="px-3 py-3 bg-accent/5 border-b space-y-3">
+                              <div className="grid gap-3">
+                                <div>
+                                  <Label className="text-sm font-semibold">Medical Diagnosis</Label>
+                                  <p className="text-sm mt-1">{diagnosisForms[diagnosis].medicalDiagnosis}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-semibold">Basis for Diagnosis</Label>
+                                  <p className="text-sm mt-1 whitespace-pre-wrap">{diagnosisForms[diagnosis].basisForDiagnosis}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm font-semibold">Related Conditions</Label>
+                                  <p className="text-sm mt-1">{diagnosisForms[diagnosis].relatedConditions}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
                                   <div>
-                                    <Label className="text-sm font-semibold">Medical Diagnosis</Label>
-                                    <p className="text-sm mt-1">{diagnosisForms[diagnosis].medicalDiagnosis}</p>
+                                    <Label className="text-sm font-semibold">Date of Onset</Label>
+                                    <p className="text-sm mt-1">{diagnosisForms[diagnosis].dateOfOnset}</p>
                                   </div>
                                   <div>
-                                    <Label className="text-sm font-semibold">Basis for Diagnosis</Label>
-                                    <p className="text-sm mt-1 whitespace-pre-wrap">{diagnosisForms[diagnosis].basisForDiagnosis}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-sm font-semibold">Related Conditions</Label>
-                                    <p className="text-sm mt-1">{diagnosisForms[diagnosis].relatedConditions}</p>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <Label className="text-sm font-semibold">Date of Onset</Label>
-                                      <p className="text-sm mt-1">{diagnosisForms[diagnosis].dateOfOnset}</p>
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm font-semibold">First Consultation</Label>
-                                      <p className="text-sm mt-1">{diagnosisForms[diagnosis].firstConsultation}</p>
-                                    </div>
+                                    <Label className="text-sm font-semibold">First Consultation</Label>
+                                    <p className="text-sm mt-1">{diagnosisForms[diagnosis].firstConsultation}</p>
                                   </div>
                                 </div>
                               </div>
-                            )}
-                            <div className="px-3 pb-3 space-y-1">
-                              {sortedPages.map((page) => (
-                            <div
-                              key={page.key}
-                              className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/10 cursor-pointer"
+                            </div>
+                          )}
+                          <div className="px-3 pb-3 space-y-1">
+                            {sortedPages.map((page) => (
+                          <div
+                            key={page.key}
+                            className="flex items-center justify-between py-2 px-3 rounded hover:bg-accent/10 cursor-pointer"
+                          >
+                            <div 
+                              className="flex items-center gap-2 text-sm flex-1"
+                              onClick={() => {
+                                setCurrentPdfIndex(page.fileIndex);
+                                setSelectedPage(page.pageNum);
+                              }}
                             >
-                              <div 
-                                className="flex items-center gap-2 text-sm flex-1"
-                                onClick={() => {
-                                  setCurrentPdfIndex(page.fileIndex);
-                                  setSelectedPage(page.pageNum);
-                                }}
-                              >
-                                <FileText className="w-4 h-4 text-muted-foreground" />
-                                <span>{page.fileName}</span>
-                                <span className="text-muted-foreground">- Page {page.pageNum}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEnlargedPageDialog({
-                                      open: true,
-                                      fileIndex: page.fileIndex,
-                                      pageNum: page.pageNum,
-                                    });
-                                  }}
-                                  className="h-7 w-7 p-0 hover:text-primary"
-                                  title="View enlarged"
-                                >
-                                  <ZoomIn className="h-3 w-3" />
-                                </Button>
-                              </div>
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                              <span>{page.fileName}</span>
+                              <span className="text-muted-foreground">- Page {page.pageNum}</span>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  removeMatchFromList(page.fileIndex, page.pageNum);
+                                  setEnlargedPageDialog({
+                                    open: true,
+                                    fileIndex: page.fileIndex,
+                                    pageNum: page.pageNum,
+                                  });
                                 }}
-                                className="h-7 w-7 p-0 hover:text-destructive"
+                                className="h-7 w-7 p-0 hover:text-primary"
+                                title="View enlarged"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <ZoomIn className="h-3 w-3" />
                               </Button>
                             </div>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </div>
-                  </Collapsible>
-                );
-              });
-              })()}
-            </div>
-          </Card>
-          
-          {/* Right Column: AI Chat */}
-          <div className="flex flex-col">
-            <AIChat diagnosesContext={getSelectedDiagnosesContext} />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeMatchFromList(page.fileIndex, page.pageNum);
+                              }}
+                              className="h-7 w-7 p-0 hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            });
+            })()}
           </div>
+        </Card>
+
+        {/* AI Chat - Below Diagnosis Tracker */}
+        <div className="mt-4">
+          <AIChat diagnosesContext={getSelectedDiagnosesContext} />
         </div>
+
 
         {/* Diagnosis Summary Section */}
         {getDiagnosisGroups.length > 0 && (
