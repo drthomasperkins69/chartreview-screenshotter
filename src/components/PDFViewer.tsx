@@ -730,19 +730,27 @@ export const PDFViewer = ({
               Save to Database
             </Button>
           </div>
-          <div className="flex gap-2">
-            {!isAutoScanning ? (
-              <Button
-                onClick={handleAutoScanAll}
-                disabled={isAISuggesting}
-                size="sm"
-                variant="outline"
-                className="gap-2 w-full"
-              >
-                <Sparkles className="w-4 h-4" />
-                AI Auto-Scan All Pages ({numPages} pages)
-              </Button>
-            ) : (
+          <div className="space-y-2">
+            <Button
+              onClick={handleAutoScanAll}
+              disabled={isAutoScanning || isAISuggesting}
+              size="sm"
+              variant="outline"
+              className="gap-2 w-full"
+            >
+              {isAutoScanning ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Auto-scanning {numPages} pages...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  AI Auto-Scan All Pages ({numPages} pages)
+                </>
+              )}
+            </Button>
+            {isAutoScanning && (
               <Button
                 onClick={() => setShouldStopScan(true)}
                 size="sm"
