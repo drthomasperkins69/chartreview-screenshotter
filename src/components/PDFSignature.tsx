@@ -1172,7 +1172,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           }
         }
 
-        // Immediately persist this single-page diagnosis to the tracker
+        // Persist single-page diagnosis to tracker
         const pageKey = `${fileIndex}-${pageNum}`;
         await saveDiagnosis(diagnosis, [{
           fileId: pageKey,
