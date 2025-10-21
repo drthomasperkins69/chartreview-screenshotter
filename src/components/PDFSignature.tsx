@@ -1612,10 +1612,45 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
       toast.success(`Auto-scan complete! Scanned ${totalScanned} pages across ${pdfFiles.length} PDF(s).`);
       
-      // Auto-save diagnoses to database after scan completes
-      if (selectedWorkspace) {
-        toast.info("Saving diagnoses to database...");
-        // The diagnoses are already saved by the useEffect hook that watches pageDiagnoses
+      // Force save all diagnoses to database after scan completes
+      if (selectedWorkspace && Object.keys(pageDiagnoses).length > 0) {
+        toast.info("Saving all diagnoses to workspace...");
+        
+        // Group pages by diagnosis
+        const diagnosisGroups: Record<string, Array<{ fileId: string; fileName: string; pageNum: number; key: string }>> = {};
+        
+        Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
+          if (!diagnosisString?.trim()) return;
+          
+          const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
+          
+          individualDiagnoses.forEach(diagnosis => {
+            if (!diagnosisGroups[diagnosis]) {
+              diagnosisGroups[diagnosis] = [];
+            }
+            
+            const [fileIndex, pageNum] = key.split('-').map(Number);
+            const fileName = pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`;
+            
+            diagnosisGroups[diagnosis].push({
+              fileId: key,
+              fileName,
+              pageNum,
+              key
+            });
+          });
+        });
+
+        // Save each diagnosis group to Supabase
+        for (const [diagnosis, pages] of Object.entries(diagnosisGroups)) {
+          try {
+            await saveDiagnosis(diagnosis, pages);
+          } catch (error) {
+            console.error(`Error saving diagnosis "${diagnosis}":`, error);
+          }
+        }
+        
+        toast.success("All diagnoses saved successfully!");
       }
     } catch (error) {
       console.error("Error in auto-scan all:", error);
@@ -1623,7 +1658,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     } finally {
       setIsAutoScanningAll(false);
     }
-  }, [pdfFiles, pdfContent, handleDiagnosisChange, selectedWorkspace]);
+  }, [pdfFiles, pdfContent, handleDiagnosisChange, selectedWorkspace, pageDiagnoses, saveDiagnosis]);
 
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
