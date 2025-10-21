@@ -454,10 +454,10 @@ export const PDFViewer = ({
     }
   }, [onDiagnosisChange]);
 
-  // Always keep input synced with saved diagnosis
+  // Sync input only when page/file changes, not when diagnosis changes
   useEffect(() => {
     setDiagnosisInput(currentDiagnosis);
-  }, [currentDiagnosis, currentPage, currentFileIndex]);
+  }, [currentPage, currentFileIndex]);
 
   const handleAISuggest = async () => {
     if (!canvasRef.current || !currentFile) {
