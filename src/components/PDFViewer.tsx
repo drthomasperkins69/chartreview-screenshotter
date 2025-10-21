@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
 import { createWorker } from "tesseract.js";
 import { PDFPageDialog } from "./PDFPageDialog";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 // Use Vite worker for pdf.js to avoid CORS/version issues
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - Vite ?worker returns a Worker constructor
@@ -449,6 +449,8 @@ export const PDFViewer = ({
         ...prev,
         [fileIndex]: new Date()
       }));
+      // Keep the input in sync immediately
+      setDiagnosisInput(diagnosis);
     }
   }, [onDiagnosisChange]);
 
@@ -750,7 +752,17 @@ export const PDFViewer = ({
             <div className="mt-3 pt-3 border-t space-y-1">
               <div className="text-xs text-muted-foreground">
                 <span className="font-medium">Current file:</span>{" "}
-                <span className="break-all">{currentFile.name}</span>
+                <span className="break-all">
+                  {currentFile.name}
+                  {fileLastModified[currentFileIndex] && (
+                    <>
+                      {" "}
+                      <span className="text-muted-foreground/70">
+                        ({format(fileLastModified[currentFileIndex], 'yyyy-MM-dd HH:mm:ss')})
+                      </span>
+                    </>
+                  )}
+                </span>
               </div>
               <div className="text-xs text-muted-foreground">
                 <span className="font-medium">Last modified:</span>{" "}
@@ -758,7 +770,7 @@ export const PDFViewer = ({
               </div>
               {fileLastModified[currentFileIndex] && (
                 <div className="text-xs text-green-600 font-medium">
-                  Last saved {formatDistanceToNow(fileLastModified[currentFileIndex], { addSuffix: true })}
+                  Last updated {formatDistanceToNow(fileLastModified[currentFileIndex], { addSuffix: true })}
                 </div>
               )}
             </div>
