@@ -1148,13 +1148,38 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         setTimeout(resolve, 10);
       });
       
+      // Upload modified PDF to storage if this file is from workspace
+      if (selectedWorkspace && user) {
+        const metadata = fileMetadata.get(file.name);
+        if (metadata) {
+          const { updatePdfInStorage } = await import('@/utils/supabaseStorage');
+          const newPath = await updatePdfInStorage(
+            blob,
+            file.name,
+            metadata.path,
+            selectedWorkspace.id,
+            user.id,
+            metadata.id
+          );
+          
+          if (newPath) {
+            // Update metadata with new path
+            setFileMetadata(prev => {
+              const next = new Map(prev);
+              next.set(file.name, { id: metadata.id, path: newPath });
+              return next;
+            });
+          }
+        }
+      }
+      
       toast.success("Diagnosis saved to PDF");
     } catch (error) {
       console.error("Error adding diagnosis to PDF:", error);
       toast.error("Failed to save diagnosis to PDF");
       throw error; // Re-throw to handle in auto-scan
     }
-  }, [pdfFiles]);
+  }, [pdfFiles, selectedWorkspace, user, fileMetadata]);
 
   const handleRenameDiagnosis = useCallback((oldDiagnosis: string, newDiagnosis: string) => {
     if (!newDiagnosis.trim() || oldDiagnosis === newDiagnosis) {
