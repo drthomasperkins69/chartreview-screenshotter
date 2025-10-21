@@ -267,20 +267,20 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
       // Group pages by diagnosis
       const diagnosisGroups: Record<string, Array<{ fileId: string; fileName: string; pageNum: number; key: string }>> = {};
-      
+
       Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
         if (!diagnosisString?.trim()) return;
-        
+
         const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
-        
+
         individualDiagnoses.forEach(diagnosis => {
           if (!diagnosisGroups[diagnosis]) {
             diagnosisGroups[diagnosis] = [];
           }
-          
+
           const [fileIndex, pageNum] = key.split('-').map(Number);
           const fileName = pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`;
-          
+
           diagnosisGroups[diagnosis].push({
             fileId: key,
             fileName,
@@ -290,13 +290,22 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         });
       });
 
-      // Save each diagnosis group to Supabase
+      // Save each diagnosis group to Supabase (suppress individual toasts)
+      const results = [];
       for (const [diagnosis, pages] of Object.entries(diagnosisGroups)) {
         try {
-          await saveDiagnosis(diagnosis, pages);
+          const result = await saveDiagnosis(diagnosis, pages, { showToast: false });
+          results.push({ diagnosis, success: result?.success ?? false, error: result?.error });
         } catch (error) {
           console.error(`Error saving diagnosis "${diagnosis}":`, error);
+          results.push({ diagnosis, success: false, error: String(error) });
         }
+      }
+
+      // Show a single summary toast
+      const failedDiagnoses = results.filter(r => !r.success);
+      if (failedDiagnoses.length > 0) {
+        toast.error(`Failed to save ${failedDiagnoses.length} diagnosis(es)`);
       }
     };
 
@@ -1178,16 +1187,20 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           }
         }
 
-        // Persist single-page diagnosis to tracker
+        // Persist single-page diagnosis to tracker (suppress toast as auto-save effect will handle batch saves)
         const pageKey = `${fileIndex}-${pageNum}`;
-        await saveDiagnosis(diagnosis, [{
+        const result = await saveDiagnosis(diagnosis, [{
           fileId: pageKey,
           fileName: file.name,
           pageNum,
           key: pageKey,
-        }]);
+        }], { showToast: false });
+
+        if (!result?.success) {
+          console.error("Failed to save diagnosis to database:", result?.error);
+        }
       }
-      
+
       toast.success("Diagnosis saved to PDF");
     } catch (error) {
       console.error("Error adding diagnosis to PDF:", error);
@@ -1690,16 +1703,24 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       // Force save all diagnoses to database after scan completes
       if (selectedWorkspace) {
         toast.info("Saving all diagnoses to workspace...");
-        
+
+        const results = [];
         for (const [diagnosis, pages] of Object.entries(aggregated)) {
           try {
-            await saveDiagnosis(diagnosis, pages);
+            const result = await saveDiagnosis(diagnosis, pages, { showToast: false });
+            results.push({ diagnosis, success: result?.success ?? false });
           } catch (error) {
             console.error(`Error saving diagnosis "${diagnosis}":`, error);
+            results.push({ diagnosis, success: false });
           }
         }
-        
-        toast.success("All diagnoses saved successfully!");
+
+        const failedCount = results.filter(r => !r.success).length;
+        if (failedCount > 0) {
+          toast.error(`Failed to save ${failedCount} diagnosis(es)`);
+        } else {
+          toast.success("All diagnoses saved successfully!");
+        }
       }
     } catch (error) {
       console.error("Error in auto-scan all:", error);

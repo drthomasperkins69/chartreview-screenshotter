@@ -175,9 +175,10 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const saveDiagnosis = async (
     diagnosis: string,
-    pages: Array<{ fileId: string; fileName: string; pageNum: number; key: string }>
+    pages: Array<{ fileId: string; fileName: string; pageNum: number; key: string }>,
+    options: { showToast?: boolean } = { showToast: true }
   ) => {
-    if (!selectedWorkspace || !user) return;
+    if (!selectedWorkspace || !user) return { success: false, error: "No workspace or user" };
 
     // Check if diagnosis already exists for current user
     const { data: existing } = await supabase
@@ -210,8 +211,10 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error updating diagnosis:", error);
-        toast.error("Failed to update diagnosis");
-        return;
+        if (options.showToast) {
+          toast.error("Failed to update diagnosis");
+        }
+        return { success: false, error: error.message };
       }
     } else {
       // Create new diagnosis
@@ -227,12 +230,15 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error saving diagnosis:", error);
-        toast.error("Failed to save diagnosis");
-        return;
+        if (options.showToast) {
+          toast.error("Failed to save diagnosis");
+        }
+        return { success: false, error: error.message };
       }
     }
 
     await refreshDiagnoses();
+    return { success: true };
   };
 
   const deleteDiagnosis = async (diagnosisId: string) => {
