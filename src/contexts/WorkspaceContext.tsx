@@ -210,8 +210,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error updating diagnosis:", error);
-        toast.error("Failed to update diagnosis");
-        return;
+        throw error;
       }
     } else {
       // Create new diagnosis
@@ -227,8 +226,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error saving diagnosis:", error);
-        toast.error("Failed to save diagnosis");
-        return;
+        throw error;
       }
     }
 

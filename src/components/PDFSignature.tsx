@@ -291,12 +291,19 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       });
 
       // Save each diagnosis group to Supabase
+      const errors: string[] = [];
       for (const [diagnosis, pages] of Object.entries(diagnosisGroups)) {
         try {
           await saveDiagnosis(diagnosis, pages);
         } catch (error) {
           console.error(`Error saving diagnosis "${diagnosis}":`, error);
+          errors.push(diagnosis);
         }
+      }
+
+      // Show a single toast if there were errors
+      if (errors.length > 0) {
+        toast.error(`Failed to save ${errors.length} diagnosis${errors.length > 1 ? 'es' : ''}`);
       }
     };
 
@@ -1690,16 +1697,22 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       // Force save all diagnoses to database after scan completes
       if (selectedWorkspace) {
         toast.info("Saving all diagnoses to workspace...");
-        
+
+        const saveErrors: string[] = [];
         for (const [diagnosis, pages] of Object.entries(aggregated)) {
           try {
             await saveDiagnosis(diagnosis, pages);
           } catch (error) {
             console.error(`Error saving diagnosis "${diagnosis}":`, error);
+            saveErrors.push(diagnosis);
           }
         }
-        
-        toast.success("All diagnoses saved successfully!");
+
+        if (saveErrors.length === 0) {
+          toast.success("All diagnoses saved successfully!");
+        } else {
+          toast.error(`Failed to save ${saveErrors.length} diagnosis${saveErrors.length > 1 ? 'es' : ''}`);
+        }
       }
     } catch (error) {
       console.error("Error in auto-scan all:", error);
