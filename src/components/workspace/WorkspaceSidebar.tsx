@@ -43,7 +43,7 @@ interface WorkspaceSidebarProps {
 }
 
 export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
-  const { workspaces, selectedWorkspace, allWorkspaceFiles, allWorkspaceDiagnoses, selectWorkspace, createWorkspace, deleteWorkspace, refreshFiles } =
+  const { workspaces, selectedWorkspace, allWorkspaceFiles, selectWorkspace, createWorkspace, deleteWorkspace, refreshFiles } =
     useWorkspace();
   const { user, signOut } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -276,7 +276,6 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                   const isExpanded = expandedWorkspaces.has(workspace.id);
                   const isSelected = selectedWorkspace?.id === workspace.id;
                   const filesForWorkspace = allWorkspaceFiles[workspace.id] || [];
-                  const diagnosesForWorkspace = allWorkspaceDiagnoses[workspace.id] || [];
                   
                   return (
                     <Collapsible key={workspace.id} open={isExpanded} onOpenChange={() => toggleWorkspace(workspace.id)}>
@@ -367,39 +366,6 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                                       {file.ocr_completed && (
                                         <CheckCircle2 className="h-3 w-3 ml-1 text-green-500 flex-shrink-0" />
                                       )}
-                                    </Button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Diagnoses Section */}
-                            <div>
-                              <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
-                                Diagnoses
-                              </div>
-                              
-                              {diagnosesForWorkspace.length === 0 ? (
-                                <div className="text-xs text-muted-foreground py-2 px-2">
-                                  No diagnoses yet
-                                </div>
-                              ) : (
-                                <div className="space-y-1">
-                                  {diagnosesForWorkspace.map((diagnosis) => (
-                                    <Button
-                                      key={diagnosis.id}
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full justify-start text-xs h-8"
-                                      title={diagnosis.diagnosis_name}
-                                    >
-                                      <Sparkles className="h-3 w-3 mr-2 text-primary" />
-                                      <span className="truncate flex-1 text-left">
-                                        {diagnosis.diagnosis_name}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground ml-1">
-                                        ({diagnosis.page_count})
-                                      </span>
                                     </Button>
                                   ))}
                                 </div>
