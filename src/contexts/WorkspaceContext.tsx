@@ -188,12 +188,22 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       .single();
 
     if (existing) {
-      // Update existing diagnosis
+      // Merge existing pages with new pages (by unique key) to avoid overwriting
+      const existingPages = (existing.pages as any[] | null) ?? [];
+      const byKey = new Map<string, { fileId: string; fileName: string; pageNum: number; key: string }>();
+      for (const p of existingPages) {
+        if (p && typeof p.key === 'string') byKey.set(p.key, p);
+      }
+      for (const p of pages) {
+        if (p && typeof p.key === 'string') byKey.set(p.key, p);
+      }
+      const mergedPages = Array.from(byKey.values());
+
       const { error } = await supabase
         .from("workspace_diagnoses")
         .update({
-          pages: pages,
-          page_count: pages.length,
+          pages: mergedPages,
+          page_count: mergedPages.length,
         })
         .eq("id", existing.id);
 
