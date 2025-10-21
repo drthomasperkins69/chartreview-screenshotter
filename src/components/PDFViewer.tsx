@@ -436,7 +436,6 @@ export const PDFViewer = ({
 
   const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
   const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
-  const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
 
@@ -449,16 +448,8 @@ export const PDFViewer = ({
         ...prev,
         [fileIndex]: new Date()
       }));
-      // Keep the input in sync immediately
-      setDiagnosisInput(diagnosis);
     }
   }, [onDiagnosisChange]);
-
-  // Sync textarea with saved diagnosis whenever it changes or when switching pages
-  useEffect(() => {
-    console.log('Syncing diagnosis input:', { currentDiagnosis, currentPage, currentFileIndex });
-    setDiagnosisInput(currentDiagnosis);
-  }, [currentPage, currentFileIndex, currentDiagnosis]);
 
   const handleAISuggest = async () => {
     if (!canvasRef.current || !currentFile) {
@@ -498,8 +489,8 @@ export const PDFViewer = ({
       }
 
       if (data?.diagnosis) {
-        setDiagnosisInput(data.diagnosis);
-        toast.success("AI diagnosis suggested!");
+        await handleSaveToDatabase(currentFileIndex, currentPage, data.diagnosis);
+        toast.success("AI diagnosis suggested and saved!");
       } else {
         toast.error("No diagnosis suggestion received");
       }
@@ -676,13 +667,8 @@ export const PDFViewer = ({
           <div className="flex gap-2 mb-2">
             <textarea
               id="diagnosis-input"
-              value={diagnosisInput}
-              onChange={(e) => setDiagnosisInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.ctrlKey) {
-                  onDiagnosisChange(currentFileIndex, currentPage, diagnosisInput);
-                }
-              }}
+              value={currentDiagnosis}
+              onChange={(e) => handleSaveToDatabase(currentFileIndex, currentPage, e.target.value)}
               placeholder="Enter diagnosis..."
               rows={3}
               className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background resize-y"
@@ -707,23 +693,24 @@ export const PDFViewer = ({
               )}
             </Button>
             <Button
-              onClick={() => handleSaveToDatabase(currentFileIndex, currentPage, diagnosisInput)}
-              disabled={diagnosisInput === currentDiagnosis}
+              onClick={() => toast.success("Diagnosis auto-saves as you type!")}
               size="default"
+              variant="secondary"
               className="gap-2"
             >
               <Save className="w-4 h-4" />
-              Save
+              Auto-Save On
             </Button>
           </div>
           <div className="mt-2">
             <Button
-              onClick={() => handleSaveToDatabase(currentFileIndex, currentPage, diagnosisInput)}
+              onClick={() => toast.success("Diagnosis auto-saves as you type!")}
               size="sm"
+              variant="secondary"
               className="gap-2 w-full"
             >
               <Save className="w-4 h-4" />
-              Save to Database
+              Auto-Save Active
             </Button>
           </div>
           <div className="flex gap-2">
