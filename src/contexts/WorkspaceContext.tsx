@@ -179,13 +179,14 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     if (!selectedWorkspace || !user) return;
 
-    // Check if diagnosis already exists
+    // Check if diagnosis already exists for current user
     const { data: existing } = await supabase
       .from("workspace_diagnoses")
       .select("*")
       .eq("workspace_id", selectedWorkspace.id)
       .eq("diagnosis_name", diagnosis)
-      .single();
+      .eq("created_by", user.id)
+      .maybeSingle();
 
     if (existing) {
       // Merge existing pages with new pages (by unique key) to avoid overwriting

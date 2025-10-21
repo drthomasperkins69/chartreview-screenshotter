@@ -1171,6 +1171,15 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             });
           }
         }
+
+        // Immediately persist this single-page diagnosis to the tracker
+        const pageKey = `${fileIndex}-${pageNum}`;
+        await saveDiagnosis(diagnosis, [{
+          fileId: pageKey,
+          fileName: file.name,
+          pageNum,
+          key: pageKey,
+        }]);
       }
       
       toast.success("Diagnosis saved to PDF");
@@ -1439,6 +1448,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     setIsAutoScanningAll(true);
     let totalScanned = 0;
     let totalPages = 0;
+    // Aggregate diagnoses locally to avoid stale state issues
+    const aggregated: Record<string, Array<{ fileId: string; fileName: string; pageNum: number; key: string }>> = {};
 
     try {
       toast(`Starting AI auto-scan of all ${pdfFiles.length} PDF(s)...`);
@@ -1520,6 +1531,14 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             if (data?.diagnosis) {
               // Store diagnosis for this page
               fileDiagnoses.push({ pageNum, diagnosis: data.diagnosis });
+              
+              // Aggregate locally for reliable DB save later
+              const pageKey = `${fileIndex}-${pageNum}`;
+              const entry = { fileId: pageKey, fileName: file.name, pageNum, key: pageKey };
+              if (!aggregated[data.diagnosis]) aggregated[data.diagnosis] = [];
+              if (!aggregated[data.diagnosis].some(p => p.key === pageKey)) {
+                aggregated[data.diagnosis].push(entry);
+              }
               
               // Update state immediately for UI
               setPageDiagnoses(prev => ({
@@ -1663,36 +1682,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       toast.success(`Auto-scan complete! Scanned ${totalScanned} pages across ${pdfFiles.length} PDF(s).`);
       
       // Force save all diagnoses to database after scan completes
-      if (selectedWorkspace && Object.keys(pageDiagnoses).length > 0) {
+      if (selectedWorkspace) {
         toast.info("Saving all diagnoses to workspace...");
         
-        // Group pages by diagnosis
-        const diagnosisGroups: Record<string, Array<{ fileId: string; fileName: string; pageNum: number; key: string }>> = {};
-        
-        Object.entries(pageDiagnoses).forEach(([key, diagnosisString]) => {
-          if (!diagnosisString?.trim()) return;
-          
-          const individualDiagnoses = diagnosisString.split(',').map(d => d.trim()).filter(d => d);
-          
-          individualDiagnoses.forEach(diagnosis => {
-            if (!diagnosisGroups[diagnosis]) {
-              diagnosisGroups[diagnosis] = [];
-            }
-            
-            const [fileIndex, pageNum] = key.split('-').map(Number);
-            const fileName = pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`;
-            
-            diagnosisGroups[diagnosis].push({
-              fileId: key,
-              fileName,
-              pageNum,
-              key
-            });
-          });
-        });
-
-        // Save each diagnosis group to Supabase
-        for (const [diagnosis, pages] of Object.entries(diagnosisGroups)) {
+        for (const [diagnosis, pages] of Object.entries(aggregated)) {
           try {
             await saveDiagnosis(diagnosis, pages);
           } catch (error) {
@@ -1708,7 +1701,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     } finally {
       setIsAutoScanningAll(false);
     }
-  }, [pdfFiles, pdfContent, handleDiagnosisChange, selectedWorkspace, pageDiagnoses, saveDiagnosis]);
+  }, [pdfFiles, pdfContent, handleDiagnosisChange, selectedWorkspace, saveDiagnosis]);
 
   const handleGeneratePDF = async () => {
     if (selectedPagesForExtraction.size === 0) {
