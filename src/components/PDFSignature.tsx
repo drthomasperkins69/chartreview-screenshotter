@@ -141,7 +141,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         });
       } catch (error) {
         console.error('Error loading workspace files:', error);
-        toast.error('Failed to load some workspace files');
+        toast.error('Some workspace files could not be loaded. They may have been deleted from storage.');
       }
     };
     
@@ -176,7 +176,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         setCurrentPdfIndex(newIndex);
       } catch (error) {
         console.error('Error loading file:', error);
-        toast.error('Failed to load file');
+        toast.error('Failed to load file. It may have been deleted from storage.');
       }
     };
     
@@ -228,10 +228,16 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
   // Load existing diagnoses from workspace when workspace changes
   useEffect(() => {
-    // Always clear diagnoses when workspace changes to ensure isolation
-    setPageDiagnoses({});
+    if (!selectedWorkspace) {
+      // Only clear diagnoses when no workspace is selected
+      setPageDiagnoses({});
+      return;
+    }
     
-    if (!selectedWorkspace || !workspaceDiagnoses.length) return;
+    if (!workspaceDiagnoses.length) {
+      // No diagnoses to load, but don't clear existing ones
+      return;
+    }
 
     // Convert workspace diagnoses back to pageDiagnoses format
     const loadedDiagnoses: Record<string, string> = {};
