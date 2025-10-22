@@ -101,12 +101,12 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
     setLoading(true);
 
     try {
-      // Perform RAG search if we have diagnosis context
+      // Perform RAG search on all workspace files if available
       let ragContext = '';
-      if (diagnosesContext && diagnosesContext.context.length > 0) {
+      if (workspaceFiles && workspaceFiles.length > 0) {
         try {
-          // Use the file IDs from the context
-          const fileIds = diagnosesContext.fileIds;
+          // Use all workspace file IDs for RAG search
+          const fileIds = workspaceFiles.map(f => f.id);
 
           // Perform RAG search
           const { data: searchResults, error: searchError } = await supabase.functions.invoke('rag-search', {
@@ -118,9 +118,9 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
           });
 
           if (!searchError && searchResults?.matches && searchResults.matches.length > 0) {
-            ragContext = '\n\n--- Relevant Medical Document Context (via RAG) ---\n';
+            ragContext = '\n\n--- Relevant Document Context (via RAG Vector Search) ---\n';
             searchResults.matches.forEach((match: any, idx: number) => {
-              ragContext += `\n${idx + 1}. [Page ${match.page_number}, Chunk ${match.chunk_index}] (Relevance: ${(match.similarity * 100).toFixed(1)}%)\n${match.content}\n`;
+              ragContext += `\n${idx + 1}. [File: ${match.file_name}, Page ${match.page_number}, Chunk ${match.chunk_index}] (Relevance: ${(match.similarity * 100).toFixed(1)}%)\n${match.content}\n`;
             });
             ragContext += '--- End RAG Context ---\n\n';
           }
@@ -129,16 +129,17 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
         }
       }
 
-      // Build diagnosis context message if diagnoses are selected
+      // Build direct context for diagnoses marked as "Add to Chat"
       let diagnosisContext = '';
       if (diagnosesContext && diagnosesContext.context.length > 0) {
-        diagnosisContext = '\n\n--- Selected Diagnoses (Direct Context) ---\n';
+        diagnosisContext = '\n\n--- Selected Diagnoses (Full Document Context - "Add to Chat") ---\n';
+        diagnosisContext += 'These documents have been explicitly selected for detailed analysis:\n\n';
         diagnosesContext.context.forEach(({ diagnosis, files }) => {
-          diagnosisContext += `\nDiagnosis: ${diagnosis}\nFiles:\n`;
+          diagnosisContext += `\nDiagnosis: ${diagnosis}\nAssociated Pages:\n`;
           files.forEach(({ fileName, pageNum, text }) => {
             diagnosisContext += `  - ${fileName}, Page ${pageNum}\n`;
             if (text) {
-              diagnosisContext += `    Text: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}\n`;
+              diagnosisContext += `    Full Text: ${text}\n`;
             }
           });
         });
@@ -148,13 +149,12 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
       const fullContext = ragContext + diagnosisContext;
       
       if (fullContext) {
-        console.log('Sending medical document context to AI:', {
+        console.log('Sending document context to AI:', {
           ragContextLength: ragContext.length,
-          diagnosisContextLength: diagnosisContext.length,
-          fileIds: diagnosesContext?.fileIds,
+          diagnosisDirectContextLength: diagnosisContext.length,
+          workspaceFileCount: workspaceFiles?.length || 0,
+          selectedDiagnosesCount: diagnosesContext?.context.length || 0,
         });
-      } else {
-        console.log('No medical document context available - user needs to select diagnoses');
       }
       
       const messagesToSend = fullContext
@@ -255,33 +255,28 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
             <p className="text-xs font-medium text-primary mb-1 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              Medical Document Access Active
+              Direct Context Active - "Add to Chat" Selected
             </p>
             <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-medium">Selected for AI Analysis:</p>
+              <p className="font-medium">Full document content attached:</p>
               {diagnosesContext.context.map((ctx, idx) => (
                 <div key={idx} className="ml-2">
                   • {ctx.diagnosis}: {ctx.files.length} page{ctx.files.length !== 1 ? 's' : ''}
                 </div>
               ))}
               <p className="mt-2 text-xs italic">
-                ✓ RAG vector search enabled
-              </p>
-              <p className="text-xs italic">
-                ✓ Full document content accessible
+                ✓ Complete page content included in conversation
               </p>
             </div>
           </div>
         )}
         
-        {!diagnosesContext || diagnosesContext.context.length === 0 && (
+        {(!diagnosesContext || diagnosesContext.context.length === 0) && workspaceFiles && workspaceFiles.length > 0 && (
           <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg">
-            <p className="text-xs font-medium mb-1">📋 Workspace Mode Active</p>
+            <p className="text-xs font-medium mb-1">📋 RAG Search Active</p>
             <p className="text-xs text-muted-foreground">
-              {workspaceFiles && workspaceFiles.length > 0 
-                ? `AI has access to all ${workspaceFiles.length} files in this workspace. You can ask about any of them.`
-                : 'Check "Add to Chat" next to diagnoses in the tracker above to give AI additional context'
-              }
+              AI will search across all {workspaceFiles.length} workspace files to find relevant information. 
+              Use "Add to Chat" in diagnosis tracker to attach full document content.
             </p>
           </div>
         )}
