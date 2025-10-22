@@ -223,16 +223,25 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   
   const [chartReviewInput, setChartReviewInput] = useState<string>('');
   const [chartReviewLabel, setChartReviewLabel] = useState<string>('');
+  const [chartReviewResponse, setChartReviewResponse] = useState<{ label: string; content: string } | null>(null);
   
   const handleChartReviewInstruction = useCallback((instruction: string, label: string) => {
     setChartReviewInput(instruction);
     setChartReviewLabel(label);
-    toast.info(`Loading ${label} instruction`);
+    toast.info(`Processing ${label}...`);
   }, []);
   
   const handleChartReviewInputProcessed = useCallback(() => {
     setChartReviewInput('');
+  }, []);
+  
+  const handleChartReviewResponseGenerated = useCallback((label: string, content: string) => {
+    setChartReviewResponse({ label, content });
     setChartReviewLabel('');
+  }, []);
+  
+  const handleChartReviewResponseProcessed = useCallback(() => {
+    setChartReviewResponse(null);
   }, []);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3165,7 +3174,12 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
         {/* Chart Review - Above AI Chat */}
         <div className="mt-4">
-          <ChartReview onSendInstruction={handleChartReviewInstruction} />
+          <ChartReview 
+            onSendInstruction={handleChartReviewInstruction}
+            aiResponse={chartReviewResponse}
+            onResponseProcessed={handleChartReviewResponseProcessed}
+            isProcessing={!!chartReviewLabel}
+          />
         </div>
 
         {/* AI Chat - Below Chart Review */}
@@ -3174,7 +3188,9 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             diagnosesContext={getSelectedDiagnosesContext} 
             workspaceFiles={workspaceFiles}
             externalInput={chartReviewInput}
+            externalLabel={chartReviewLabel}
             onExternalInputProcessed={handleChartReviewInputProcessed}
+            onResponseGenerated={handleChartReviewResponseGenerated}
           />
         </div>
 

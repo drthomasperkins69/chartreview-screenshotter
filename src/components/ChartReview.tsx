@@ -1,19 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings, FileText } from "lucide-react";
+import { Settings, FileText, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from "docx";
+import { saveAs } from "file-saver";
 
 interface ChartReviewProps {
   onSendInstruction: (instruction: string, label: string) => void;
+  aiResponse?: { label: string; content: string } | null;
+  onResponseProcessed?: () => void;
+  isProcessing?: boolean;
 }
 
 interface ChartSection {
   id: string;
   label: string;
   instruction: string;
+  response?: string;
+  isGenerating?: boolean;
 }
 
 const DEFAULT_SECTIONS: ChartSection[] = [
@@ -26,10 +33,28 @@ const DEFAULT_SECTIONS: ChartSection[] = [
   { id: "timelines", label: "Timelines", instruction: "Create a chronological timeline of significant medical events." },
 ];
 
-export const ChartReview = ({ onSendInstruction }: ChartReviewProps) => {
+export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed, isProcessing }: ChartReviewProps) => {
   const [sections, setSections] = useState<ChartSection[]>(DEFAULT_SECTIONS);
   const [editingSection, setEditingSection] = useState<ChartSection | null>(null);
   const [tempInstruction, setTempInstruction] = useState("");
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  // Handle AI response when it comes back
+  useEffect(() => {
+    if (aiResponse && activeSection) {
+      const section = sections.find(s => s.id === activeSection);
+      if (section?.label === aiResponse.label) {
+        setSections(sections.map(s => 
+          s.id === activeSection 
+            ? { ...s, response: aiResponse.content, isGenerating: false }
+            : s
+        ));
+        setActiveSection(null);
+        onResponseProcessed?.();
+        toast.success(`${aiResponse.label} generated successfully`);
+      }
+    }
+  }, [aiResponse, activeSection]);
 
   const handleOpenEdit = (section: ChartSection) => {
     setEditingSection(section);
@@ -50,8 +75,68 @@ export const ChartReview = ({ onSendInstruction }: ChartReviewProps) => {
   };
 
   const handleExecuteInstruction = (section: ChartSection) => {
+    setSections(sections.map(s => 
+      s.id === section.id 
+        ? { ...s, isGenerating: true }
+        : s
+    ));
+    setActiveSection(section.id);
     onSendInstruction(section.instruction, section.label);
-    toast.info(`Executing ${section.label}`);
+    toast.info(`Generating ${section.label}...`);
+  };
+
+  const handleDownloadWord = async (section: ChartSection) => {
+    if (!section.response) {
+      toast.error("No content to download");
+      return;
+    }
+
+    try {
+      // Create a Word document
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              new Paragraph({
+                text: section.label,
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+                spacing: {
+                  after: 400,
+                },
+              }),
+              new Paragraph({
+                text: "",
+                spacing: { after: 200 },
+              }),
+              // Split content into paragraphs
+              ...section.response.split('\n\n').map(para => 
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: para,
+                      size: 24,
+                    }),
+                  ],
+                  spacing: {
+                    after: 200,
+                  },
+                })
+              ),
+            ],
+          },
+        ],
+      });
+
+      // Generate and download
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `${section.label.replace(/\s+/g, '_')}.docx`);
+      toast.success(`${section.label} downloaded`);
+    } catch (error) {
+      console.error("Error generating Word document:", error);
+      toast.error("Failed to generate document");
+    }
   };
 
   return (
@@ -68,9 +153,28 @@ export const ChartReview = ({ onSendInstruction }: ChartReviewProps) => {
               variant="outline"
               className="flex-1"
               onClick={() => handleExecuteInstruction(section)}
+              disabled={section.isGenerating || isProcessing}
             >
-              {section.label}
+              {section.isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {section.label}
+                </>
+              ) : (
+                section.label
+              )}
             </Button>
+            
+            {section.response && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDownloadWord(section)}
+                title="Download Word document"
+              >
+                <Download className="w-4 h-4 text-green-600" />
+              </Button>
+            )}
             
             <Dialog open={editingSection?.id === section.id} onOpenChange={(open) => !open && setEditingSection(null)}>
               <DialogTrigger asChild>

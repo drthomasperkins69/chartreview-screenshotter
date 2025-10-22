@@ -25,6 +25,8 @@ interface AIChatProps {
   workspaceFiles?: Array<{ id: string; file_name: string; page_count: number | null }>;
   externalInput?: string;
   onExternalInputProcessed?: () => void;
+  onResponseGenerated?: (label: string, content: string) => void;
+  externalLabel?: string;
 }
 
 const AI_PROVIDERS = [
@@ -84,7 +86,7 @@ const AI_PROVIDERS = [
   },
 ];
 
-export const AIChat = ({ diagnosesContext, workspaceFiles, externalInput, onExternalInputProcessed }: AIChatProps) => {
+export const AIChat = ({ diagnosesContext, workspaceFiles, externalInput, onExternalInputProcessed, onResponseGenerated, externalLabel }: AIChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -100,13 +102,13 @@ export const AIChat = ({ diagnosesContext, workspaceFiles, externalInput, onExte
       setInput(externalInput);
       // Trigger send after a short delay to allow state to update
       setTimeout(() => {
-        handleSend(externalInput);
+        handleSend(externalInput, externalLabel);
         onExternalInputProcessed?.();
       }, 100);
     }
   }, [externalInput]);
 
-  const handleSend = async (overrideInput?: string) => {
+  const handleSend = async (overrideInput?: string, label?: string) => {
     const messageContent = overrideInput || input;
     if (!messageContent.trim() || loading) return;
 
@@ -197,6 +199,11 @@ export const AIChat = ({ diagnosesContext, workspaceFiles, externalInput, onExte
         model: data.model,
       };
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // If this was triggered by Chart Review, notify with the response
+      if (label && onResponseGenerated) {
+        onResponseGenerated(label, data.content);
+      }
     } catch (error: any) {
       console.error('Chat error:', error);
       toast.error(error.message || 'Failed to get response');
