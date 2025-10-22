@@ -3150,7 +3150,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
         {/* AI Chat - Below Diagnosis Tracker */}
         <div className="mt-4">
-          <AIChat diagnosesContext={getSelectedDiagnosesContext} />
+          <AIChat 
+            diagnosesContext={getSelectedDiagnosesContext} 
+            workspaceFiles={workspaceFiles}
+          />
         </div>
 
 

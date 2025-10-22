@@ -22,6 +22,7 @@ interface DiagnosisContext {
 
 interface AIChatProps {
   diagnosesContext?: { context: DiagnosisContext[]; fileIds: string[] } | null;
+  workspaceFiles?: Array<{ id: string; file_name: string; page_count: number | null }>;
 }
 
 const AI_PROVIDERS = [
@@ -81,7 +82,7 @@ const AI_PROVIDERS = [
   },
 ];
 
-export const AIChat = ({ diagnosesContext }: AIChatProps) => {
+export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -168,6 +169,7 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
           provider,
           model: model || availableModels[0]?.value,
           messages: messagesToSend,
+          workspaceFiles: workspaceFiles || [],
         },
       });
 
@@ -230,6 +232,25 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
       </div>
 
       <ScrollArea className="flex-1 p-4">
+        {workspaceFiles && workspaceFiles.length > 0 && (
+          <div className="mb-4 p-3 bg-secondary/10 border border-secondary/20 rounded-lg">
+            <p className="text-xs font-medium text-secondary mb-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Workspace Files Available ({workspaceFiles.length})
+            </p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>AI has access to all files in this workspace:</p>
+              <div className="ml-2 max-h-20 overflow-y-auto">
+                {workspaceFiles.map((file, idx) => (
+                  <div key={idx}>
+                    • {file.file_name}{file.page_count ? ` (${file.page_count} pages)` : ''}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {diagnosesContext && diagnosesContext.context.length > 0 && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
             <p className="text-xs font-medium text-primary mb-1 flex items-center gap-1">
@@ -255,9 +276,12 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
         
         {!diagnosesContext || diagnosesContext.context.length === 0 && (
           <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg">
-            <p className="text-xs font-medium mb-1">📋 No Documents Selected</p>
+            <p className="text-xs font-medium mb-1">📋 Workspace Mode Active</p>
             <p className="text-xs text-muted-foreground">
-              Check "Add to Chat" next to diagnoses in the tracker above to give AI access to medical documents
+              {workspaceFiles && workspaceFiles.length > 0 
+                ? `AI has access to all ${workspaceFiles.length} files in this workspace. You can ask about any of them.`
+                : 'Check "Add to Chat" next to diagnoses in the tracker above to give AI additional context'
+              }
             </p>
           </div>
         )}
@@ -267,20 +291,23 @@ export const AIChat = ({ diagnosesContext }: AIChatProps) => {
             <Sparkles className="w-12 h-12 mb-4 text-muted-foreground/50" />
             <p className="text-lg font-medium mb-2">Medical AI Assistant</p>
             <p className="text-sm max-w-md mb-4">
-              {diagnosesContext && diagnosesContext.context.length > 0 
-                ? 'AI can now see your selected medical documents and diagnoses'
-                : 'Select diagnoses in the tracker above (check "Add to Chat") to give AI access to your medical documents'}
+              {workspaceFiles && workspaceFiles.length > 0
+                ? `AI has access to all ${workspaceFiles.length} files in this workspace`
+                : diagnosesContext && diagnosesContext.context.length > 0 
+                  ? 'AI can now see your selected medical documents and diagnoses'
+                  : 'Select diagnoses in the tracker above (check "Add to Chat") to give AI additional context'}
             </p>
-            {diagnosesContext && diagnosesContext.context.length > 0 && (
+            {(diagnosesContext && diagnosesContext.context.length > 0) || (workspaceFiles && workspaceFiles.length > 0) ? (
               <div className="text-xs text-muted-foreground/70 max-w-md">
                 <p className="mb-2">Try asking:</p>
                 <ul className="list-disc text-left pl-4 space-y-1">
+                  <li>"What files are in this workspace?"</li>
                   <li>"What diagnoses are documented in these files?"</li>
                   <li>"Summarize the medical findings"</li>
                   <li>"What treatments are mentioned?"</li>
                 </ul>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="space-y-4">
