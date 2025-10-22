@@ -37,12 +37,12 @@ serve(async (req) => {
       if (pageText && pageText.trim()) {
         userContent.push({
           type: "text",
-          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses using this EXACT format: "Side Joint - Condition" (e.g., "Right Ankle - Sprain", "Left Knee - Osteoarthritis"). NEVER use "Bilateral" - if both sides are affected, list each side separately (e.g., "Right Knee - Arthritis, Left Knee - Arthritis"). Use descriptive medical condition names, NO ICD codes. Maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.`
+          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses using this EXACT format: "Joint - Side - Diagnosis" (e.g., "Ankle - Right - Sprain", "Knee - Left - Osteoarthritis"). NEVER use "Bilateral" - if both sides are affected, list each side separately (e.g., "Knee - Right - Arthritis, Knee - Left - Arthritis"). Use descriptive medical condition names, NO ICD codes. Maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.`
         });
       } else {
         userContent.push({
           type: "text",
-          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list using format: "Side Joint - Condition" (e.g., "Right Shoulder - Tendinopathy"). NEVER use "Bilateral" - list each side separately. NO ICD codes. Maximum 3-5 diagnoses.`
+          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list using format: "Joint - Side - Diagnosis" (e.g., "Shoulder - Right - Tendinopathy"). NEVER use "Bilateral" - list each side separately. NO ICD codes. Maximum 3-5 diagnoses.`
         });
       }
 
@@ -97,7 +97,7 @@ serve(async (req) => {
       const messages: any[] = [
         {
           role: "system",
-          content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses in PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names instead. Keep it concise - maximum 3-5 diagnoses. Do not include explanations, just the diagnosis names in plain words."
+          content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses using this EXACT format: 'Joint - Side - Diagnosis' (e.g., 'Ankle - Right - Sprain', 'Knee - Left - Osteoarthritis'). NEVER use 'Bilateral' - if both sides are affected, list each side separately. Use PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names. Keep it concise - maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format."
         }
       ];
 
