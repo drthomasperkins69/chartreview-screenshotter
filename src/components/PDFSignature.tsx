@@ -14,6 +14,7 @@ import { PDFViewer } from "./PDFViewer";
 import { AISearchAssistant } from "./AISearchAssistant";
 import { PDFPageDialog } from "./PDFPageDialog";
 import { AIChat } from "./AIChat";
+import { ChartReview } from "./ChartReview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit, ZoomIn } from "lucide-react";
@@ -219,6 +220,20 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     fileIndex: number;
     pageNum: number;
   }>({ open: false, fileIndex: 0, pageNum: 1 });
+  
+  const [chartReviewInput, setChartReviewInput] = useState<string>('');
+  const [chartReviewLabel, setChartReviewLabel] = useState<string>('');
+  
+  const handleChartReviewInstruction = useCallback((instruction: string, label: string) => {
+    setChartReviewInput(instruction);
+    setChartReviewLabel(label);
+    toast.info(`Loading ${label} instruction`);
+  }, []);
+  
+  const handleChartReviewInputProcessed = useCallback(() => {
+    setChartReviewInput('');
+    setChartReviewLabel('');
+  }, []);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfFilesRef = useRef<File[]>(pdfFiles);
@@ -3148,11 +3163,18 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           </div>
         </Card>
 
-        {/* AI Chat - Below Diagnosis Tracker */}
+        {/* Chart Review - Above AI Chat */}
+        <div className="mt-4">
+          <ChartReview onSendInstruction={handleChartReviewInstruction} />
+        </div>
+
+        {/* AI Chat - Below Chart Review */}
         <div className="mt-4">
           <AIChat 
             diagnosesContext={getSelectedDiagnosesContext} 
             workspaceFiles={workspaceFiles}
+            externalInput={chartReviewInput}
+            onExternalInputProcessed={handleChartReviewInputProcessed}
           />
         </div>
 

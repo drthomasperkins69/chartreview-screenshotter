@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,8 @@ interface DiagnosisContext {
 interface AIChatProps {
   diagnosesContext?: { context: DiagnosisContext[]; fileIds: string[] } | null;
   workspaceFiles?: Array<{ id: string; file_name: string; page_count: number | null }>;
+  externalInput?: string;
+  onExternalInputProcessed?: () => void;
 }
 
 const AI_PROVIDERS = [
@@ -82,7 +84,7 @@ const AI_PROVIDERS = [
   },
 ];
 
-export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
+export const AIChat = ({ diagnosesContext, workspaceFiles, externalInput, onExternalInputProcessed }: AIChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -92,10 +94,23 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
   const currentProvider = AI_PROVIDERS.find(p => p.value === provider);
   const availableModels = currentProvider?.models || [];
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  // Handle external input (e.g., from Chart Review)
+  useEffect(() => {
+    if (externalInput && !loading) {
+      setInput(externalInput);
+      // Trigger send after a short delay to allow state to update
+      setTimeout(() => {
+        handleSend(externalInput);
+        onExternalInputProcessed?.();
+      }, 100);
+    }
+  }, [externalInput]);
 
-    const userMessage: Message = { role: 'user', content: input };
+  const handleSend = async (overrideInput?: string) => {
+    const messageContent = overrideInput || input;
+    if (!messageContent.trim() || loading) return;
+
+    const userMessage: Message = { role: 'user', content: messageContent };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
@@ -340,7 +355,7 @@ export const AIChat = ({ diagnosesContext, workspaceFiles }: AIChatProps) => {
             placeholder="Type your message..."
             disabled={loading}
           />
-          <Button onClick={handleSend} disabled={loading || !input.trim()}>
+          <Button onClick={() => handleSend()} disabled={loading || !input.trim()}>
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
