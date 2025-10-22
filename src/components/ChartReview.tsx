@@ -326,7 +326,7 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
                   disabled={!section.response}
                   aria-label="View document"
                 >
-                  <Eye className="w-4 h-4 text-primary" />
+                  <Eye className="w-4 h-4 text-white" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -339,7 +339,7 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
                   disabled={!section.response}
                   aria-label="Download Word document"
                 >
-                  <Download className="w-4 h-4 text-primary" />
+                  <Download className="w-4 h-4 text-white" />
                 </Button>
               </>
             
