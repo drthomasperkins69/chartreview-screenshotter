@@ -535,6 +535,7 @@ export const PDFViewer = ({
     shouldStopScanRef.current = false;
     const totalPages = end - start + 1;
     let successCount = 0;
+    const diagnosesToSave: { pageNum: number; diagnosis: string }[] = [];
     
     try {
       toast(`Starting AI scan from page ${start} to ${end} (${totalPages} pages)...`);
@@ -614,13 +615,13 @@ export const PDFViewer = ({
           }
 
           if (data?.diagnosis) {
-            // Wait for the diagnosis to be saved to PDF before continuing
-            await handleSaveToDatabase(currentFileIndex, pageNum, data.diagnosis);
+            // Collect diagnosis to save at the end
+            diagnosesToSave.push({ pageNum, diagnosis: data.diagnosis });
             successCount++;
             
             // Show success only if not stopping
             if (!shouldStopScanRef.current) {
-              toast.success(`Diagnosis "${data.diagnosis}" saved to ${currentFile.name}, page ${pageNum}`, { duration: 2000 });
+              toast.success(`Diagnosis "${data.diagnosis}" found for page ${pageNum}`, { duration: 2000 });
             }
           }
 
@@ -635,8 +636,16 @@ export const PDFViewer = ({
         }
       }
 
+      // Save all diagnoses to database at once
+      if (diagnosesToSave.length > 0 && !shouldStopScanRef.current) {
+        toast.info("Saving all diagnoses to database...");
+        for (const { pageNum, diagnosis } of diagnosesToSave) {
+          await handleSaveToDatabase(currentFileIndex, pageNum, diagnosis);
+        }
+      }
+
       if (!shouldStopScanRef.current) {
-        toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to PDF.`);
+        toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to database.`);
       }
     } catch (error) {
       console.error("Error in auto-scan:", error);
