@@ -2785,9 +2785,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Delete all instances of "${diagnosis}"?`)) {
-                                  handleDeleteDiagnosis(diagnosis);
-                                }
+                                handleDeleteDiagnosis(diagnosis);
                               }}
                               className="h-8 w-8 p-0 hover:text-destructive"
                               aria-label="Delete diagnosis"
