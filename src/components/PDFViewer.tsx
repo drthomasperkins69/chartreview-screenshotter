@@ -440,11 +440,18 @@ export const PDFViewer = ({
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
   const shouldStopScanRef = useRef(false);
+  const [startPage, setStartPage] = useState(1);
+  const [endPage, setEndPage] = useState(numPages);
 
   // Sync input when switching pages/files
   useEffect(() => {
     setDiagnosisInput(currentDiagnosis);
   }, [currentPage, currentFileIndex, currentDiagnosis]);
+
+  // Update endPage when numPages changes (switching files)
+  useEffect(() => {
+    setEndPage(numPages);
+  }, [numPages]);
 
   // Wrap onDiagnosisChange to track file updates
   const handleSaveToDatabase = useCallback(async (fileIndex: number, pageNum: number, diagnosis: string) => {
@@ -515,25 +522,34 @@ export const PDFViewer = ({
       return;
     }
 
+    // Validate page range
+    const start = Math.max(1, Math.min(startPage, numPages));
+    const end = Math.max(start, Math.min(endPage, numPages));
+    
+    if (start > end) {
+      toast.error("Start page must be less than or equal to end page");
+      return;
+    }
+
     setIsAutoScanning(true);
     shouldStopScanRef.current = false;
-    const totalPages = numPages;
+    const totalPages = end - start + 1;
     let successCount = 0;
     
     try {
-      toast(`Starting AI scan of ${totalPages} pages...`);
+      toast(`Starting AI scan from page ${start} to ${end} (${totalPages} pages)...`);
 
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      for (let pageNum = start; pageNum <= end; pageNum++) {
         // Check if scan should stop before starting new page
         if (shouldStopScanRef.current) {
-          toast.info(`Scan stopped after page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+          toast.info(`Scan stopped after page ${pageNum - 1}. ${successCount} pages diagnosed.`);
           break;
         }
 
         try {
           // Show progress only if not stopping
           if (!shouldStopScanRef.current) {
-            toast.info(`Scanning page ${pageNum}/${totalPages}...`, { duration: 1000 });
+            toast.info(`Scanning page ${pageNum}/${end}...`, { duration: 1000 });
           }
           
           // Render the page to canvas to get image
@@ -541,7 +557,7 @@ export const PDFViewer = ({
           
           // Check again after async operation
           if (shouldStopScanRef.current) {
-            toast.info(`Scan stopped after page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+            toast.info(`Scan stopped after page ${pageNum - 1}. ${successCount} pages diagnosed.`);
             break;
           }
           
@@ -563,7 +579,7 @@ export const PDFViewer = ({
 
           // Check again after render
           if (shouldStopScanRef.current) {
-            toast.info(`Scan stopped after page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+            toast.info(`Scan stopped after page ${pageNum - 1}. ${successCount} pages diagnosed.`);
             break;
           }
 
@@ -585,7 +601,7 @@ export const PDFViewer = ({
 
           // Check after edge function call
           if (shouldStopScanRef.current) {
-            toast.info(`Scan stopped after page ${pageNum}/${totalPages}. ${successCount} pages diagnosed.`);
+            toast.info(`Scan stopped after page ${pageNum}. ${successCount} pages diagnosed.`);
             break;
           }
 
@@ -773,15 +789,44 @@ export const PDFViewer = ({
               {isAutoScanning ? (
                 <>
                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Auto-scanning {numPages} pages...
+                  Auto-scanning...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  AI Auto-Scan All Pages ({numPages} pages)
+                  AI Auto-Scan Pages
                 </>
               )}
             </Button>
+            
+            {/* Page range inputs */}
+            <div className="flex gap-2 items-center">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-1 block">Start Page</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={numPages}
+                  value={startPage}
+                  onChange={(e) => setStartPage(Math.max(1, parseInt(e.target.value) || 1))}
+                  disabled={isAutoScanning}
+                  className="w-full px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-1 block">End Page</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={numPages}
+                  value={endPage}
+                  onChange={(e) => setEndPage(Math.max(1, parseInt(e.target.value) || numPages))}
+                  disabled={isAutoScanning}
+                  className="w-full px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                />
+              </div>
+            </div>
+            
             {isAutoScanning && (
               <Button
                 onClick={() => {
