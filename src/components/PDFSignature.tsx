@@ -3179,6 +3179,9 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             aiResponse={chartReviewResponse}
             onResponseProcessed={handleChartReviewResponseProcessed}
             isProcessing={!!chartReviewLabel}
+            workspaceId={selectedWorkspace?.id}
+            userId={user?.id}
+            onFileAdded={refreshFiles}
           />
         </div>
 

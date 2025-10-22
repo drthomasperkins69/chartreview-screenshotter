@@ -3,16 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings, FileText, Download, Loader2 } from "lucide-react";
+import { Settings, FileText, Download, Loader2, FileArchive, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
+import { uploadPdfToStorage } from "@/utils/supabaseStorage";
 
 interface ChartReviewProps {
   onSendInstruction: (instruction: string, label: string) => void;
   aiResponse?: { label: string; content: string } | null;
   onResponseProcessed?: () => void;
   isProcessing?: boolean;
+  workspaceId?: string;
+  userId?: string;
+  onFileAdded?: () => void;
 }
 
 interface ChartSection {
@@ -33,11 +37,13 @@ const DEFAULT_SECTIONS: ChartSection[] = [
   { id: "timelines", label: "Timelines", instruction: "Create a chronological timeline of significant medical events." },
 ];
 
-export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed, isProcessing }: ChartReviewProps) => {
+export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed, isProcessing, workspaceId, userId, onFileAdded }: ChartReviewProps) => {
   const [sections, setSections] = useState<ChartSection[]>(DEFAULT_SECTIONS);
   const [editingSection, setEditingSection] = useState<ChartSection | null>(null);
   const [tempInstruction, setTempInstruction] = useState("");
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [isCombining, setIsCombining] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Handle AI response when it comes back
   useEffect(() => {
@@ -139,6 +145,147 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
     }
   };
 
+  const handleCombineReports = async () => {
+    const sectionsWithResponses = sections.filter(s => s.response);
+    
+    if (sectionsWithResponses.length === 0) {
+      toast.error("No reports to combine. Generate some sections first.");
+      return;
+    }
+
+    setIsCombining(true);
+    try {
+      const children: any[] = [
+        new Paragraph({
+          text: "Chart Review",
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
+        }),
+        new Paragraph({
+          text: "",
+          spacing: { after: 400 },
+        }),
+      ];
+
+      sectionsWithResponses.forEach((section, index) => {
+        // Add section heading
+        children.push(
+          new Paragraph({
+            text: section.label,
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: index > 0 ? 400 : 0, after: 200 },
+          })
+        );
+
+        // Add section content
+        section.response!.split('\n\n').forEach(para => {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: para,
+                  size: 24,
+                }),
+              ],
+              spacing: { after: 200 },
+            })
+          );
+        });
+      });
+
+      const doc = new Document({
+        sections: [{ properties: {}, children }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, 'Chart_Review_Combined.docx');
+      toast.success("Combined report downloaded");
+    } catch (error) {
+      console.error("Error combining reports:", error);
+      toast.error("Failed to combine reports");
+    } finally {
+      setIsCombining(false);
+    }
+  };
+
+  const handleAddToWorkspace = async () => {
+    if (!workspaceId || !userId) {
+      toast.error("Workspace not available");
+      return;
+    }
+
+    const sectionsWithResponses = sections.filter(s => s.response);
+    
+    if (sectionsWithResponses.length === 0) {
+      toast.error("No reports to add. Generate some sections first.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Create the combined Word document
+      const children: any[] = [
+        new Paragraph({
+          text: "Chart Review",
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
+        }),
+        new Paragraph({
+          text: "",
+          spacing: { after: 400 },
+        }),
+      ];
+
+      sectionsWithResponses.forEach((section, index) => {
+        children.push(
+          new Paragraph({
+            text: section.label,
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: index > 0 ? 400 : 0, after: 200 },
+          })
+        );
+
+        section.response!.split('\n\n').forEach(para => {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: para,
+                  size: 24,
+                }),
+              ],
+              spacing: { after: 200 },
+            })
+          );
+        });
+      });
+
+      const doc = new Document({
+        sections: [{ properties: {}, children }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const fileName = 'Chart_Review.docx';
+
+      // Upload to workspace
+      const filePath = await uploadPdfToStorage(blob, fileName, workspaceId, userId);
+      
+      if (filePath) {
+        toast.success("Chart Review added to workspace");
+        onFileAdded?.();
+      } else {
+        toast.error("Failed to add to workspace");
+      }
+    } catch (error) {
+      console.error("Error adding to workspace:", error);
+      toast.error("Failed to add to workspace");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <Card className="p-4 mb-4">
       <div className="flex items-center gap-2 mb-4">
@@ -216,6 +363,45 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
             </Dialog>
           </div>
         ))}
+      </div>
+      
+      <div className="flex gap-2 mt-4 pt-4 border-t">
+        <Button
+          onClick={handleCombineReports}
+          disabled={isCombining || isProcessing}
+          variant="outline"
+          className="flex-1"
+        >
+          {isCombining ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Combining...
+            </>
+          ) : (
+            <>
+              <FileArchive className="w-4 h-4 mr-2" />
+              Combine All Reports
+            </>
+          )}
+        </Button>
+        
+        <Button
+          onClick={handleAddToWorkspace}
+          disabled={isUploading || isProcessing || !workspaceId}
+          className="flex-1"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="w-4 h-4 mr-2" />
+              Add to Workspace
+            </>
+          )}
+        </Button>
       </div>
     </Card>
   );
