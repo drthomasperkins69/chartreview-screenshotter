@@ -896,6 +896,17 @@ export const PDFViewer = ({
           </div>
         ) : (
           <>
+            {/* Left Navigation Arrow */}
+            <Button
+              onClick={prevPage}
+              disabled={currentPage === 1}
+              variant="outline"
+              size="icon"
+              className="absolute left-8 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full shadow-lg"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </Button>
+            
             <canvas
               ref={canvasRef}
               className="shadow-medium border cursor-pointer hover:shadow-lg transition-shadow"
@@ -905,6 +916,17 @@ export const PDFViewer = ({
               }}
               onClick={handleCanvasClick}
             />
+            
+            {/* Right Navigation Arrow */}
+            <Button
+              onClick={nextPage}
+              disabled={currentPage === numPages}
+              variant="outline"
+              size="icon"
+              className="absolute right-8 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full shadow-lg"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </Button>
           </>
         )}
       </div>

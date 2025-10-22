@@ -30,9 +30,9 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload, Sparkles, CheckCircle2 } from "lucide-react";
+import { FolderOpen, Plus, LogOut, User, Trash2, FileText, ChevronRight, ChevronDown, Upload, Sparkles, CheckCircle2, X } from "lucide-react";
 import dvaLogo from "@/assets/dva-logo.png";
-import { uploadPdfToStorage } from "@/utils/supabaseStorage";
+import { uploadPdfToStorage, deletePdfFromStorage } from "@/utils/supabaseStorage";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -206,6 +206,25 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
     fileInputRefs.current[workspaceId]?.click();
   };
 
+  const handleDeleteFile = async (e: React.MouseEvent, fileId: string, filePath: string, fileName: string) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
+
+    try {
+      const success = await deletePdfFromStorage(filePath, fileId);
+      
+      if (success) {
+        toast.success('File deleted successfully');
+        await refreshFiles();
+      } else {
+        toast.error('Failed to delete file');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete file');
+    }
+  };
+
   return (
     <Sidebar className="border-r">
       <SidebarHeader className="border-b p-4">
@@ -354,19 +373,28 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
                               ) : (
                                 <div className="space-y-1">
                                    {filesForWorkspace.map((file) => (
-                                    <Button
-                                      key={file.id}
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full justify-start text-xs h-8"
-                                      onClick={() => onFileSelect?.(file.id, file.file_path, file.file_name)}
-                                    >
-                                      <FileText className="h-3 w-3 mr-2" />
-                                      <span className="truncate flex-1 text-left">{file.file_name}</span>
-                                      {file.ocr_completed && (
-                                        <CheckCircle2 className="h-3 w-3 ml-1 text-green-500 flex-shrink-0" />
-                                      )}
-                                    </Button>
+                                    <div key={file.id} className="flex items-center gap-1 group">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 justify-start text-xs h-8"
+                                        onClick={() => onFileSelect?.(file.id, file.file_path, file.file_name)}
+                                      >
+                                        <FileText className="h-3 w-3 mr-2" />
+                                        <span className="truncate flex-1 text-left">{file.file_name}</span>
+                                        {file.ocr_completed && (
+                                          <CheckCircle2 className="h-3 w-3 ml-1 text-green-500 flex-shrink-0" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                        onClick={(e) => handleDeleteFile(e, file.id, file.file_path, file.file_name)}
+                                      >
+                                        <X className="h-3 w-3 text-destructive" />
+                                      </Button>
+                                    </div>
                                   ))}
                                 </div>
                               )}
