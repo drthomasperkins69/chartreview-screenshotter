@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
 import { uploadPdfToStorage } from "@/utils/supabaseStorage";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChartReviewProps {
   onSendInstruction: (instruction: string, label: string) => void;
@@ -46,6 +47,39 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
   const [isCombining, setIsCombining] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [viewingSection, setViewingSection] = useState<ChartSection | null>(null);
+  const [isLoadingInstructions, setIsLoadingInstructions] = useState(true);
+
+  // Load custom instructions from database on mount
+  useEffect(() => {
+    const loadInstructions = async () => {
+      if (!userId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('chart_review_sections')
+          .select('section_id, instruction')
+          .eq('user_id', userId);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          // Merge custom instructions with defaults
+          const customInstructions = new Map(data.map(d => [d.section_id, d.instruction]));
+          
+          setSections(DEFAULT_SECTIONS.map(section => ({
+            ...section,
+            instruction: customInstructions.get(section.id) || section.instruction
+          })));
+        }
+      } catch (error) {
+        console.error('Error loading instructions:', error);
+      } finally {
+        setIsLoadingInstructions(false);
+      }
+    };
+
+    loadInstructions();
+  }, [userId]);
 
   // Handle AI response when it comes back
   useEffect(() => {
@@ -69,17 +103,37 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
     setTempInstruction(section.instruction);
   };
 
-  const handleSaveInstruction = () => {
-    if (!editingSection) return;
+  const handleSaveInstruction = async () => {
+    if (!editingSection || !userId) return;
 
-    setSections(sections.map(s => 
-      s.id === editingSection.id 
-        ? { ...s, instruction: tempInstruction }
-        : s
-    ));
-    
-    toast.success(`Instruction updated for ${editingSection.label}`);
-    setEditingSection(null);
+    try {
+      // Save to database
+      const { error } = await supabase
+        .from('chart_review_sections')
+        .upsert({
+          user_id: userId,
+          section_id: editingSection.id,
+          instruction: tempInstruction,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,section_id'
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      setSections(sections.map(s => 
+        s.id === editingSection.id 
+          ? { ...s, instruction: tempInstruction }
+          : s
+      ));
+      
+      toast.success(`Instruction saved for ${editingSection.label}`);
+      setEditingSection(null);
+    } catch (error) {
+      console.error('Error saving instruction:', error);
+      toast.error('Failed to save instruction');
+    }
   };
 
   const handleExecuteInstruction = (section: ChartSection) => {
