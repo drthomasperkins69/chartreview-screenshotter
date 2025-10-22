@@ -439,7 +439,7 @@ export const PDFViewer = ({
   const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
-  const [shouldStopScan, setShouldStopScan] = useState(false);
+  const shouldStopScanRef = useRef(false);
 
   // Sync input when switching pages/files
   useEffect(() => {
@@ -516,7 +516,7 @@ export const PDFViewer = ({
     }
 
     setIsAutoScanning(true);
-    setShouldStopScan(false);
+    shouldStopScanRef.current = false;
     const totalPages = numPages;
     let successCount = 0;
     
@@ -524,18 +524,27 @@ export const PDFViewer = ({
       toast(`Starting AI scan of ${totalPages} pages...`);
 
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        // Check if scan should stop
-        if (shouldStopScan) {
-          toast.info(`Scan stopped at page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+        // Check if scan should stop before starting new page
+        if (shouldStopScanRef.current) {
+          toast.info(`Scan stopped after page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
           break;
         }
 
         try {
-          // Show progress
-          toast.info(`Scanning page ${pageNum}/${totalPages}...`, { duration: 1000 });
+          // Show progress only if not stopping
+          if (!shouldStopScanRef.current) {
+            toast.info(`Scanning page ${pageNum}/${totalPages}...`, { duration: 1000 });
+          }
           
           // Render the page to canvas to get image
           const page = await pdf.getPage(pageNum);
+          
+          // Check again after async operation
+          if (shouldStopScanRef.current) {
+            toast.info(`Scan stopped after page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+            break;
+          }
+          
           const viewport = page.getViewport({ scale: 1.2 });
           
           // Create temporary canvas for this page
@@ -551,6 +560,12 @@ export const PDFViewer = ({
             viewport: viewport,
             canvas: tempCanvas,
           }).promise;
+
+          // Check again after render
+          if (shouldStopScanRef.current) {
+            toast.info(`Scan stopped after page ${pageNum - 1}/${totalPages}. ${successCount} pages diagnosed.`);
+            break;
+          }
 
           const pageImage = tempCanvas.toDataURL('image/jpeg', 0.85);
           
@@ -568,9 +583,17 @@ export const PDFViewer = ({
             }
           });
 
+          // Check after edge function call
+          if (shouldStopScanRef.current) {
+            toast.info(`Scan stopped after page ${pageNum}/${totalPages}. ${successCount} pages diagnosed.`);
+            break;
+          }
+
           if (error) {
             console.error(`AI suggestion error for page ${pageNum}:`, error);
-            toast.error(`Page ${pageNum} failed`, { duration: 2000 });
+            if (!shouldStopScanRef.current) {
+              toast.error(`Page ${pageNum} failed`, { duration: 2000 });
+            }
             continue;
           }
 
@@ -578,6 +601,11 @@ export const PDFViewer = ({
             // Wait for the diagnosis to be saved to PDF before continuing
             await handleSaveToDatabase(currentFileIndex, pageNum, data.diagnosis);
             successCount++;
+            
+            // Show success only if not stopping
+            if (!shouldStopScanRef.current) {
+              toast.success(`Diagnosis "${data.diagnosis}" saved to ${currentFile.name}, page ${pageNum}`, { duration: 2000 });
+            }
           }
 
           // Small delay to avoid rate limiting
@@ -585,19 +613,23 @@ export const PDFViewer = ({
 
         } catch (pageError) {
           console.error(`Error processing page ${pageNum}:`, pageError);
-          toast.error(`Error on page ${pageNum}`, { duration: 2000 });
+          if (!shouldStopScanRef.current) {
+            toast.error(`Error on page ${pageNum}`, { duration: 2000 });
+          }
         }
       }
 
-      if (!shouldStopScan) {
+      if (!shouldStopScanRef.current) {
         toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to PDF.`);
       }
     } catch (error) {
       console.error("Error in auto-scan:", error);
-      toast.error("Auto-scan failed");
+      if (!shouldStopScanRef.current) {
+        toast.error("Auto-scan failed");
+      }
     } finally {
       setIsAutoScanning(false);
-      setShouldStopScan(false);
+      shouldStopScanRef.current = false;
     }
   };
 
@@ -752,7 +784,10 @@ export const PDFViewer = ({
             </Button>
             {isAutoScanning && (
               <Button
-                onClick={() => setShouldStopScan(true)}
+                onClick={() => {
+                  shouldStopScanRef.current = true;
+                  toast.info("Stopping scan after current page finishes...");
+                }}
                 size="sm"
                 variant="destructive"
                 className="gap-2 w-full"
