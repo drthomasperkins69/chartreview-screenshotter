@@ -1412,9 +1412,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       const combinedPdfBytes = await combinedPdf.save();
       const combinedBlob = new Blob([combinedPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       
-      // Generate filename with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `combined-all-diagnoses-${timestamp}.pdf`;
+      // Generate filename
+      const filename = 'CLAIMS.pdf';
       
       // Upload to workspace if available
       if (selectedWorkspace && user) {
