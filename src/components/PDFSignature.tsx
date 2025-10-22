@@ -205,6 +205,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [isAutoScanningAll, setIsAutoScanningAll] = useState(false);
   const [editingDiagnosis, setEditingDiagnosis] = useState<string | null>(null);
   const [editDiagnosisValue, setEditDiagnosisValue] = useState<string>("");
+  const [mergingDiagnosis, setMergingDiagnosis] = useState<string | null>(null);
   const [generatingForm, setGeneratingForm] = useState<string | null>(null);
   const [diagnosisForms, setDiagnosisForms] = useState<Record<string, {
     medicalDiagnosis: string;
@@ -1283,6 +1284,56 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     });
 
     toast.success(`Deleted diagnosis "${diagnosisToDelete}"`);
+  }, [workspaceDiagnoses, deleteDiagnosis]);
+
+  const handleMergeDiagnoses = useCallback(async (sourceDiagnosis: string, targetDiagnosis: string) => {
+    if (sourceDiagnosis === targetDiagnosis) {
+      toast.error("Cannot merge a diagnosis with itself");
+      setMergingDiagnosis(null);
+      return;
+    }
+
+    // Find and delete the source diagnosis from the database
+    const sourceDiagnosisRecord = workspaceDiagnoses.find(d => d.diagnosis_name === sourceDiagnosis);
+    if (sourceDiagnosisRecord) {
+      await deleteDiagnosis(sourceDiagnosisRecord.id);
+    }
+
+    // Update local state - merge source into target
+    setPageDiagnoses(prev => {
+      const updated = { ...prev };
+      
+      Object.keys(updated).forEach(key => {
+        const diagnoses = updated[key].split(',').map(d => d.trim());
+        
+        if (diagnoses.includes(sourceDiagnosis)) {
+          // Replace source with target, avoiding duplicates
+          const updatedDiagnoses = diagnoses
+            .map(d => d === sourceDiagnosis ? targetDiagnosis : d)
+            .filter((d, index, arr) => arr.indexOf(d) === index); // Remove duplicates
+          
+          updated[key] = updatedDiagnoses.join(', ');
+        }
+      });
+      
+      return updated;
+    });
+
+    // Merge the form data if both exist
+    setDiagnosisForms(prev => {
+      const updated = { ...prev };
+      if (prev[sourceDiagnosis]) {
+        // If target doesn't have form data, use source's
+        if (!prev[targetDiagnosis]) {
+          updated[targetDiagnosis] = prev[sourceDiagnosis];
+        }
+        delete updated[sourceDiagnosis];
+      }
+      return updated;
+    });
+
+    setMergingDiagnosis(null);
+    toast.success(`Merged "${sourceDiagnosis}" into "${targetDiagnosis}"`);
   }, [workspaceDiagnoses, deleteDiagnosis]);
 
   const handleGenerateDiagnosisForm = useCallback(async (diagnosis: string) => {
@@ -2792,6 +2843,51 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
+                            {mergingDiagnosis === diagnosis ? (
+                              <Select
+                                onValueChange={(targetDiagnosis) => {
+                                  handleMergeDiagnoses(diagnosis, targetDiagnosis);
+                                }}
+                                onOpenChange={(open) => {
+                                  if (!open) setMergingDiagnosis(null);
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger 
+                                  className="h-8 w-[180px] z-50"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <SelectValue placeholder="Merge into..." />
+                                </SelectTrigger>
+                                <SelectContent className="z-[100] bg-background border shadow-lg">
+                                  {Object.keys(diagnosisGroups)
+                                    .filter(d => d !== diagnosis)
+                                    .sort((a, b) => a.localeCompare(b))
+                                    .map((otherDiagnosis) => (
+                                      <SelectItem 
+                                        key={otherDiagnosis} 
+                                        value={otherDiagnosis}
+                                        className="cursor-pointer"
+                                      >
+                                        {otherDiagnosis}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMergingDiagnosis(diagnosis);
+                                }}
+                                className="h-8 px-2 hover:text-primary"
+                                aria-label="Merge diagnosis"
+                              >
+                                <span className="text-xs">Merge</span>
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
