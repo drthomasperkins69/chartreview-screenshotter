@@ -1286,6 +1286,58 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     toast.success(`Deleted diagnosis "${diagnosisToDelete}"`);
   }, [workspaceDiagnoses, deleteDiagnosis]);
 
+  const handleCombineAllPDFs = async () => {
+    if (pdfFiles.length === 0) {
+      toast.error("No PDFs to combine");
+      return;
+    }
+
+    try {
+      toast.info(`Combining ${pdfFiles.length} PDF file(s)...`);
+      
+      // Create a new PDF document
+      const combinedPdf = await PDFDocument.create();
+      
+      // Loop through each PDF file and copy all pages
+      for (let i = 0; i < pdfFiles.length; i++) {
+        const file = pdfFiles[i];
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        
+        // Copy all pages from this PDF
+        const copiedPages = await combinedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        copiedPages.forEach(page => combinedPdf.addPage(page));
+      }
+      
+      // Save the combined PDF
+      const combinedPdfBytes = await combinedPdf.save();
+      const combinedBlob = new Blob([combinedPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `combined-all-files-${timestamp}.pdf`;
+      
+      // Upload to workspace if available
+      if (selectedWorkspace && user) {
+        await uploadPdfToStorage(combinedBlob, filename, selectedWorkspace.id, user.id);
+        await refreshFiles();
+        toast.success(`Combined PDF "${filename}" added to workspace!`);
+      } else {
+        // If no workspace, just download
+        const url = URL.createObjectURL(combinedBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success("Combined PDF downloaded!");
+      }
+    } catch (error) {
+      console.error("Error combining PDFs:", error);
+      toast.error("Failed to combine PDFs");
+    }
+  };
+
   const handleMergeDiagnoses = useCallback(async (sourceDiagnosis: string, targetDiagnosis: string) => {
     if (sourceDiagnosis === targetDiagnosis) {
       toast.error("Cannot merge a diagnosis with itself");
@@ -2715,15 +2767,26 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         <Card className="mt-4 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold">Diagnosis Tracker</h3>
-              <Button
-                onClick={handleDownloadAllAsZip}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <FileArchive className="w-4 h-4" />
-                Download All as ZIP
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleCombineAllPDFs}
+                  variant="default"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Combine All PDFs
+                </Button>
+                <Button
+                  onClick={handleDownloadAllAsZip}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <FileArchive className="w-4 h-4" />
+                  Download All as ZIP
+                </Button>
+              </div>
             </div>
           <div className="space-y-2">
             {(() => {
