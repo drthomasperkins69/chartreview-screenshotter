@@ -314,26 +314,34 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
               )}
             </Button>
             
-            {section.response && (
               <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setViewingSection(section)}
-                  title="View document"
+                  onClick={() => {
+                    if (!section.response) return;
+                    setViewingSection(section);
+                  }}
+                  title={section.response ? "View document" : "No content yet"}
+                  disabled={!section.response}
+                  aria-label="View document"
                 >
-                  <Eye className="w-4 h-4 text-blue-600" />
+                  <Eye className="w-4 h-4 text-primary" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleDownloadWord(section)}
-                  title="Download Word document"
+                  onClick={() => {
+                    if (!section.response) return;
+                    handleDownloadWord(section);
+                  }}
+                  title={section.response ? "Download Word document" : "No content yet"}
+                  disabled={!section.response}
+                  aria-label="Download Word document"
                 >
-                  <Download className="w-4 h-4 text-green-600" />
+                  <Download className="w-4 h-4 text-primary" />
                 </Button>
               </>
-            )}
             
             <Dialog open={editingSection?.id === section.id} onOpenChange={(open) => !open && setEditingSection(null)}>
               <DialogTrigger asChild>
