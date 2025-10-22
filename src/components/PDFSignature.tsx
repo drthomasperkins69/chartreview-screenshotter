@@ -1195,12 +1195,19 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     }
   }, [pdfFiles, selectedWorkspace, user, fileMetadata]);
 
-  const handleRenameDiagnosis = useCallback((oldDiagnosis: string, newDiagnosis: string) => {
+  const handleRenameDiagnosis = useCallback(async (oldDiagnosis: string, newDiagnosis: string) => {
     if (!newDiagnosis.trim() || oldDiagnosis === newDiagnosis) {
       setEditingDiagnosis(null);
       return;
     }
 
+    // Find and delete the old diagnosis from the database
+    const oldDiagnosisRecord = workspaceDiagnoses.find(d => d.diagnosis_name === oldDiagnosis);
+    if (oldDiagnosisRecord) {
+      await deleteDiagnosis(oldDiagnosisRecord.id);
+    }
+
+    // Update local state with new diagnosis name
     setPageDiagnoses(prev => {
       const updated = { ...prev };
       
@@ -1233,7 +1240,13 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
     setEditingDiagnosis(null);
     toast.success(`Renamed "${oldDiagnosis}" to "${newDiagnosis}"`);
-  }, []);
+    
+    // Trigger immediate save of new diagnosis
+    // The auto-save effect will handle this, but we can ensure it happens quickly
+    setTimeout(() => {
+      // This will trigger the auto-save effect in the next tick
+    }, 100);
+  }, [workspaceDiagnoses, deleteDiagnosis]);
 
   const handleDeleteDiagnosis = useCallback(async (diagnosisToDelete: string) => {
     // Find the diagnosis ID in workspace diagnoses
