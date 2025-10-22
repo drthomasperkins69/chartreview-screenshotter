@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings, FileText, Download, Loader2, FileArchive, Upload } from "lucide-react";
+import { Settings, FileText, Download, Loader2, FileArchive, Upload, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from "docx";
 import { saveAs } from "file-saver";
 import { uploadPdfToStorage } from "@/utils/supabaseStorage";
@@ -44,6 +45,7 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [isCombining, setIsCombining] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [viewingSection, setViewingSection] = useState<ChartSection | null>(null);
 
   // Handle AI response when it comes back
   useEffect(() => {
@@ -313,14 +315,24 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
             </Button>
             
             {section.response && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDownloadWord(section)}
-                title="Download Word document"
-              >
-                <Download className="w-4 h-4 text-green-600" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setViewingSection(section)}
+                  title="View document"
+                >
+                  <Eye className="w-4 h-4 text-blue-600" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDownloadWord(section)}
+                  title="Download Word document"
+                >
+                  <Download className="w-4 h-4 text-green-600" />
+                </Button>
+              </>
             )}
             
             <Dialog open={editingSection?.id === section.id} onOpenChange={(open) => !open && setEditingSection(null)}>
@@ -364,6 +376,23 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
           </div>
         ))}
       </div>
+
+      {/* View Document Dialog */}
+      <Dialog open={!!viewingSection} onOpenChange={(open) => !open && setViewingSection(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{viewingSection?.label}</DialogTitle>
+            <DialogDescription>
+              Generated content preview
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] mt-4">
+            <div className="prose prose-sm max-w-none p-4 whitespace-pre-wrap">
+              {viewingSection?.response}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
       
       <div className="flex gap-2 mt-4 pt-4 border-t">
         <Button
