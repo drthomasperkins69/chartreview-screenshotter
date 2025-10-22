@@ -1287,26 +1287,125 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   }, [workspaceDiagnoses, deleteDiagnosis]);
 
   const handleCombineAllPDFs = async () => {
-    if (pdfFiles.length === 0) {
-      toast.error("No PDFs to combine");
+    // Get all unique individual diagnoses by splitting comma-separated values
+    const allIndividualDiagnoses = new Set<string>();
+    Object.values(pageDiagnoses).forEach(diagnosisString => {
+      if (diagnosisString?.trim()) {
+        diagnosisString.split(',').forEach(d => {
+          const trimmed = d.trim();
+          if (trimmed) allIndividualDiagnoses.add(trimmed);
+        });
+      }
+    });
+    
+    if (allIndividualDiagnoses.size === 0) {
+      toast.error("No diagnoses to combine");
       return;
     }
 
     try {
-      toast.info(`Combining ${pdfFiles.length} PDF file(s)...`);
+      toast.info(`Combining all diagnoses into one PDF...`);
       
-      // Create a new PDF document
+      // Create a single PDF document
       const combinedPdf = await PDFDocument.create();
+      const boldFont = await combinedPdf.embedFont(StandardFonts.HelveticaBold);
       
-      // Loop through each PDF file and copy all pages
-      for (let i = 0; i < pdfFiles.length; i++) {
-        const file = pdfFiles[i];
-        const arrayBuffer = await file.arrayBuffer();
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
+      // Sort diagnoses alphabetically
+      const sortedDiagnoses = Array.from(allIndividualDiagnoses).sort((a, b) => a.localeCompare(b));
+      
+      // Process each diagnosis
+      for (const diagnosis of sortedDiagnoses) {
+        // Add cover page for this diagnosis
+        const coverPage = combinedPdf.addPage([595, 842]);
+        const fontSize = 36;
+        const textWidth = boldFont.widthOfTextAtSize(diagnosis, fontSize);
+        const x = (595 - textWidth) / 2;
+        const y = 421; // Center vertically
         
-        // Copy all pages from this PDF
-        const copiedPages = await combinedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-        copiedPages.forEach(page => combinedPdf.addPage(page));
+        coverPage.drawText(diagnosis, {
+          x,
+          y,
+          size: fontSize,
+          font: boldFont,
+          color: rgb(0, 0, 0),
+        });
+        
+        // Get all pages that contain this diagnosis
+        const pagesForDiagnosis = Object.entries(pageDiagnoses)
+          .filter(([_, diagnosisString]) => {
+            if (!diagnosisString?.trim()) return false;
+            const individualDiagnoses = diagnosisString.split(',').map(d => d.trim());
+            return individualDiagnoses.includes(diagnosis);
+          })
+          .map(([key]) => key);
+        
+        // Capture and add pages for this diagnosis
+        const selectedContent = await captureSelectedPages(pagesForDiagnosis);
+        
+        for (const content of selectedContent) {
+          if (content.image) {
+            try {
+              const screenshotPage = combinedPdf.addPage([595, 842]);
+              
+              screenshotPage.drawText(`${content.fileName} - Page ${content.pageNum}`, {
+                x: 50,
+                y: 792,
+                size: 10,
+                font: boldFont,
+                color: rgb(0, 0, 0),
+              });
+              
+              const pageDiagnosis = pageDiagnoses[`${content.fileIndex}-${content.pageNum}`];
+              if (pageDiagnosis && pageDiagnosis.trim()) {
+                screenshotPage.drawText(`Diagnosis: ${pageDiagnosis}`, {
+                  x: 50,
+                  y: 775,
+                  size: 9,
+                  color: rgb(0.2, 0.2, 0.2),
+                });
+              }
+              
+              const imageBytes = content.image.split(',')[1];
+              const imageData = Uint8Array.from(atob(imageBytes), c => c.charCodeAt(0));
+              
+              let embeddedImage;
+              if (content.image.includes('image/png')) {
+                embeddedImage = await combinedPdf.embedPng(imageData);
+              } else {
+                embeddedImage = await combinedPdf.embedJpg(imageData);
+              }
+              
+              const imgWidth = embeddedImage.width;
+              const imgHeight = embeddedImage.height;
+              const maxImageWidth = 495;
+              const maxImageHeight = 700;
+              
+              let scaledWidth = imgWidth;
+              let scaledHeight = imgHeight;
+              
+              if (imgWidth > maxImageWidth || imgHeight > maxImageHeight) {
+                const widthRatio = maxImageWidth / imgWidth;
+                const heightRatio = maxImageHeight / imgHeight;
+                const scale = Math.min(widthRatio, heightRatio);
+                
+                scaledWidth = imgWidth * scale;
+                scaledHeight = imgHeight * scale;
+              }
+              
+              const imgX = (595 - scaledWidth) / 2;
+              const imgY = 762 - scaledHeight;
+              
+              screenshotPage.drawImage(embeddedImage, {
+                x: imgX,
+                y: imgY,
+                width: scaledWidth,
+                height: scaledHeight,
+              });
+            } catch (error) {
+              console.error(`Failed to add screenshot for page ${content.pageNum}:`, error);
+            }
+          }
+        }
       }
       
       // Save the combined PDF
@@ -1315,13 +1414,13 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `combined-all-files-${timestamp}.pdf`;
+      const filename = `combined-all-diagnoses-${timestamp}.pdf`;
       
       // Upload to workspace if available
       if (selectedWorkspace && user) {
         await uploadPdfToStorage(combinedBlob, filename, selectedWorkspace.id, user.id);
         await refreshFiles();
-        toast.success(`Combined PDF "${filename}" added to workspace!`);
+        toast.success(`Combined PDF "${filename}" added to workspace with ${sortedDiagnoses.length} diagnoses!`);
       } else {
         // If no workspace, just download
         const url = URL.createObjectURL(combinedBlob);
