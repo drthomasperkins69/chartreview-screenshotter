@@ -87,7 +87,7 @@ interface PDFContent {
 
 export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; path: string; name: string } | null }) => {
   const { user } = useAuth();
-  const { selectedWorkspace, refreshFiles, workspaceFiles, saveDiagnosis, workspaceDiagnoses } = useWorkspace();
+  const { selectedWorkspace, refreshFiles, workspaceFiles, saveDiagnosis, workspaceDiagnoses, deleteDiagnosis, refreshDiagnoses } = useWorkspace();
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [fileMetadata, setFileMetadata] = useState<Map<string, { id: string; path: string }>>(new Map());
   const [currentPdfIndex, setCurrentPdfIndex] = useState<number>(0);
@@ -1236,7 +1236,16 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     toast.success(`Renamed "${oldDiagnosis}" to "${newDiagnosis}"`);
   }, []);
 
-  const handleDeleteDiagnosis = useCallback((diagnosisToDelete: string) => {
+  const handleDeleteDiagnosis = useCallback(async (diagnosisToDelete: string) => {
+    // Find the diagnosis ID in workspace diagnoses
+    const diagnosisToRemove = workspaceDiagnoses.find(d => d.diagnosis_name === diagnosisToDelete);
+    
+    // Delete from database first
+    if (diagnosisToRemove) {
+      await deleteDiagnosis(diagnosisToRemove.id);
+    }
+    
+    // Update local state
     setPageDiagnoses(prev => {
       const updated = { ...prev };
       
@@ -1262,7 +1271,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     });
 
     toast.success(`Deleted diagnosis "${diagnosisToDelete}"`);
-  }, []);
+  }, [workspaceDiagnoses, deleteDiagnosis]);
 
   const handleGenerateDiagnosisForm = useCallback(async (diagnosis: string) => {
     setGeneratingForm(diagnosis);
