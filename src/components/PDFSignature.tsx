@@ -96,9 +96,19 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   // Load all workspace files into PDF viewer and check OCR status
   useEffect(() => {
     const loadWorkspaceFiles = async () => {
-      if (!selectedWorkspace || !workspaceFiles.length) return;
+      if (!selectedWorkspace) {
+        // Clear files when no workspace is selected
+        setPdfFiles([]);
+        setFileMetadata(new Map());
+        setOcrCompletedFiles(new Set());
+        setCurrentPdfIndex(0);
+        return;
+      }
+      
+      if (!workspaceFiles.length) return;
       
       try {
+        toast.info('Loading workspace files...');
         const loadedFiles: File[] = [];
         const metadata = new Map<string, { id: string; path: string }>();
         const completedFiles = new Set<number>();
@@ -121,24 +131,13 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           }
         }
         
-        setPdfFiles(prev => {
-          const existing = new Set(prev.map(f => f.name));
-          const merged = [...prev];
-          loadedFiles.forEach(f => {
-            if (!existing.has(f.name)) merged.push(f);
-          });
-          return merged;
-        });
-        setFileMetadata(prev => {
-          const next = new Map(prev);
-          metadata.forEach((v, k) => next.set(k, v));
-          return next;
-        });
-        setOcrCompletedFiles(prev => {
-          const next = new Set(prev);
-          completedFiles.forEach(i => next.add(i));
-          return next;
-        });
+        // Replace all files with workspace files (don't merge)
+        setPdfFiles(loadedFiles);
+        setFileMetadata(metadata);
+        setOcrCompletedFiles(completedFiles);
+        setCurrentPdfIndex(0);
+        
+        toast.success(`Loaded ${loadedFiles.length} file(s) from workspace`);
       } catch (error) {
         console.error('Error loading workspace files:', error);
         toast.error('Some workspace files could not be loaded. They may have been deleted from storage.');
