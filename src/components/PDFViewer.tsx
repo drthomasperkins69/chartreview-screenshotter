@@ -769,6 +769,11 @@ export const PDFViewer = ({
         for (const { pageNum, diagnosis } of diagnosesToSave) {
           try {
             await handleSaveToDatabase(currentFileIndex, pageNum, diagnosis);
+            
+            // If this is the current page, update the textarea immediately
+            if (pageNum === currentPage) {
+              setDiagnosisInput(diagnosis);
+            }
           } catch (saveError) {
             console.error(`Failed to save diagnosis for page ${pageNum}:`, saveError);
           }
