@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles, RefreshCw } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles, RefreshCw, Square } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
@@ -995,16 +995,19 @@ export const PDFViewer = ({
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <Button
-                onClick={handleAutoScanAll}
-                disabled={isAutoScanning || isAISuggesting}
+                onClick={isAutoScanning ? () => {
+                  shouldStopScanRef.current = true;
+                  toast.info("Stopping scan after current page finishes...");
+                } : handleAutoScanAll}
+                disabled={isAISuggesting}
                 size="sm"
-                variant="outline"
+                variant={isAutoScanning ? "destructive" : "outline"}
                 className="gap-2 w-full"
               >
                 {isAutoScanning ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    Auto-scanning...
+                    <Square className="w-4 h-4" />
+                    Stop Scan
                   </>
                 ) : (
                   <>
@@ -1069,19 +1072,6 @@ export const PDFViewer = ({
               </div>
             </div>
             
-            {isAutoScanning && (
-              <Button
-                onClick={() => {
-                  shouldStopScanRef.current = true;
-                  toast.info("Stopping scan after current page finishes...");
-                }}
-                size="sm"
-                variant="destructive"
-                className="gap-2 w-full"
-              >
-                Stop Scan
-              </Button>
-            )}
           </div>
           
           {/* File Status Info */}
