@@ -17,7 +17,7 @@ import { AIChat } from "./AIChat";
 import { ChartReview } from "./ChartReview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit, ZoomIn } from "lucide-react";
+import { FileText, Download, Upload, Search, CheckCircle2, Clock, Sparkles, Trash2, FileArchive, ChevronDown, ChevronRight, Loader2, FileEdit, ZoomIn, ClipboardList } from "lucide-react";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { createClient } from "@supabase/supabase-js";
@@ -3174,12 +3174,26 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                               disabled={generatingForm === diagnosis}
                               className="h-8 w-8 p-0 hover:text-primary"
                               aria-label="Generate diagnosis form"
+                              title="Create Diagnosis Form"
                             >
                               {generatingForm === diagnosis ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
-                                <FileEdit className="w-4 h-4" />
+                                <FileText className="w-4 h-4" />
                               )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toast.info("Diagnostic Assessment feature coming soon");
+                              }}
+                              className="h-8 w-8 p-0 hover:text-primary"
+                              aria-label="Create diagnostic assessment"
+                              title="Create Diagnostic Assessment"
+                            >
+                              <ClipboardList className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"

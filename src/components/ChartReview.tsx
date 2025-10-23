@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings, FileText, Download, Loader2, FileArchive, Upload, Eye, Clipboard } from "lucide-react";
+import { Settings, FileText, Download, Loader2, FileArchive, Upload, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from "docx";
@@ -521,89 +521,6 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
         </DialogContent>
       </Dialog>
       
-      {/* Diagnosis Tracker Section */}
-      {diagnoses.length > 0 && (() => {
-        // Deduplicate diagnoses by name (case-insensitive)
-        const uniqueDiagnoses = Array.from(
-          new Map(
-            diagnoses.map(d => [d.diagnosis_name.trim().toLowerCase(), d])
-          ).values()
-        );
-        
-        return (
-          <div className="mt-6 pt-6 border-t">
-            <h3 className="text-lg font-semibold mb-4">Diagnosis Tracker</h3>
-            <div className="space-y-2">
-              {uniqueDiagnoses.map((diagnosis) => (
-                <div key={diagnosis.id} className="flex items-center gap-2 p-3 border rounded-lg">
-                  <span className="flex-1 font-medium">{diagnosis.diagnosis_name}</span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        const instruction = diagnosisInstructions[diagnosis.id] || 'Generate a comprehensive diagnosis form based on the medical records for this diagnosis.';
-                        onSendInstruction(instruction, `Diagnosis Form: ${diagnosis.diagnosis_name}`);
-                      }}
-                      disabled={isProcessing}
-                      title="Create Diagnosis Form"
-                    >
-                      <FileText className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => toast.info("Diagnostic Assessment feature coming soon")}
-                      disabled={isProcessing}
-                      title="Create Diagnostic Assessment"
-                    >
-                      <Clipboard className="w-4 h-4" />
-                    </Button>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditingDiagnosis({ id: diagnosis.id, name: diagnosis.diagnosis_name });
-                            setTempDiagnosisInstruction(
-                              diagnosisInstructions[diagnosis.id] || 
-                              'Generate a comprehensive diagnosis form based on the medical records for this diagnosis.'
-                            );
-                          }}
-                          title="Edit Instructions"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit Instruction for {diagnosis.diagnosis_name}</DialogTitle>
-                          <DialogDescription>
-                            Customize the instruction for generating this diagnosis form.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Textarea
-                          value={tempDiagnosisInstruction}
-                          onChange={(e) => setTempDiagnosisInstruction(e.target.value)}
-                          rows={6}
-                          className="mt-4"
-                        />
-                        <div className="flex gap-2 mt-4">
-                          <Button onClick={handleSaveDiagnosisInstruction} className="flex-1">
-                            Save Instruction
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
       <div className="flex gap-2 mt-4 pt-4 border-t">
         <Button
           onClick={handleCombineReports}
