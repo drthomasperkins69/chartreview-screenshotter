@@ -61,12 +61,12 @@ async function handleLovableAI(messages: any[], model: string, workspaceFiles: a
   // Build workspace files context
   let workspaceContext = '';
   if (workspaceFiles.length > 0) {
-    workspaceContext = '\n\n--- Workspace Files Available ---\n';
-    workspaceContext += `You have access to ${workspaceFiles.length} files in this workspace:\n`;
+    workspaceContext = '\n\n--- Workspace Files Loaded ---\n';
+    workspaceContext += `ALL ${workspaceFiles.length} files in this workspace are ALREADY LOADED and accessible:\n`;
     workspaceFiles.forEach((file: any, idx: number) => {
       workspaceContext += `${idx + 1}. ${file.file_name}${file.page_count ? ` (${file.page_count} pages)` : ''}\n`;
     });
-    workspaceContext += '\nYou can reference and discuss any of these files when helping the user.\n';
+    workspaceContext += '\nIMPORTANT: Do NOT ask which files to look at. All files are already accessible through RAG search.\n';
     workspaceContext += '--- End Workspace Files ---\n\n';
   }
 
@@ -74,10 +74,11 @@ async function handleLovableAI(messages: any[], model: string, workspaceFiles: a
   const hasSystemMessage = messages.length > 0 && messages[0].role === 'system';
   const systemMessage = {
     role: 'system',
-    content: 'You are a medical AI assistant with access to patient medical documents in this workspace.' + workspaceContext + 
+    content: 'You are a medical AI assistant with FULL ACCESS to all patient medical documents in this workspace.' + workspaceContext + 
              'When medical document context is provided (marked as "RAG Context" or "Direct Context"), use it to answer questions accurately. ' +
-             'You can reference any of the workspace files listed above. ' +
-             'If no context is provided but the user asks about documents, let them know they need to select diagnoses from the tracker first.'
+             'All workspace files are already loaded and searchable - NEVER ask the user which files to look at. ' +
+             'Answer questions directly using the document context provided. ' +
+             'If specific context is not provided but the user asks about documents, you can still reference the files listed above.'
   };
   
   const messagesWithSystem = hasSystemMessage ? messages : [systemMessage, ...messages];
@@ -115,12 +116,12 @@ async function handleClaude(messages: any[], model: string, workspaceFiles: any[
   // Build workspace files context and prepend to first user message
   let workspaceContext = '';
   if (workspaceFiles.length > 0) {
-    workspaceContext = '--- Workspace Files Available ---\n';
-    workspaceContext += `You have access to ${workspaceFiles.length} files in this workspace:\n`;
+    workspaceContext = '--- Workspace Files Loaded ---\n';
+    workspaceContext += `ALL ${workspaceFiles.length} files in this workspace are ALREADY LOADED:\n`;
     workspaceFiles.forEach((file: any, idx: number) => {
       workspaceContext += `${idx + 1}. ${file.file_name}${file.page_count ? ` (${file.page_count} pages)` : ''}\n`;
     });
-    workspaceContext += '\nYou can reference and discuss any of these files when helping the user.\n';
+    workspaceContext += '\nIMPORTANT: Do NOT ask which files to look at. All files are already accessible.\n';
     workspaceContext += '--- End Workspace Files ---\n\n';
   }
 
@@ -145,7 +146,7 @@ async function handleClaude(messages: any[], model: string, workspaceFiles: any[
     body: JSON.stringify({
       model: model || 'claude-sonnet-4-20250514',
       max_tokens: 4096,
-      system: 'You are a medical AI assistant with access to patient medical documents in this workspace. When medical document context is provided, use it to answer questions accurately.',
+      system: 'You are a medical AI assistant with FULL ACCESS to all patient medical documents in this workspace. All files are already loaded and searchable - NEVER ask which files to look at. Answer questions directly using the document context provided.',
       messages: modifiedMessages.map(m => ({
         role: m.role === 'user' ? 'user' : 'assistant',
         content: m.content,
@@ -174,12 +175,13 @@ async function handleGemini(messages: any[], model: string, workspaceFiles: any[
   // Build workspace files context
   let workspaceContext = '';
   if (workspaceFiles.length > 0) {
-    workspaceContext = '--- Workspace Files Available ---\n';
-    workspaceContext += `You have access to ${workspaceFiles.length} files in this workspace:\n`;
+    workspaceContext = '--- Workspace Files Loaded ---\n';
+    workspaceContext += `ALL ${workspaceFiles.length} files are ALREADY LOADED:\n`;
     workspaceFiles.forEach((file: any, idx: number) => {
       workspaceContext += `${idx + 1}. ${file.file_name}${file.page_count ? ` (${file.page_count} pages)` : ''}\n`;
     });
-    workspaceContext += '\n--- End Workspace Files ---\n\n';
+    workspaceContext += '\nIMPORTANT: Do NOT ask which files to look at. All files are accessible.\n';
+    workspaceContext += '--- End Workspace Files ---\n\n';
   }
 
   // Prepend workspace context to first user message
@@ -201,7 +203,7 @@ async function handleGemini(messages: any[], model: string, workspaceFiles: any[
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         system_instruction: {
-          parts: [{ text: 'You are a medical AI assistant with access to patient medical documents in this workspace.' }]
+          parts: [{ text: 'You are a medical AI assistant with FULL ACCESS to all patient medical documents in this workspace. All files are already loaded - NEVER ask which files to look at. Answer questions directly.' }]
         },
         contents: modifiedMessages.map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
@@ -232,12 +234,13 @@ async function handleGrok(messages: any[], model: string, workspaceFiles: any[])
   // Build workspace files context
   let workspaceContext = '';
   if (workspaceFiles.length > 0) {
-    workspaceContext = '--- Workspace Files Available ---\n';
-    workspaceContext += `You have access to ${workspaceFiles.length} files in this workspace:\n`;
+    workspaceContext = '--- Workspace Files Loaded ---\n';
+    workspaceContext += `ALL ${workspaceFiles.length} files are ALREADY LOADED:\n`;
     workspaceFiles.forEach((file: any, idx: number) => {
       workspaceContext += `${idx + 1}. ${file.file_name}${file.page_count ? ` (${file.page_count} pages)` : ''}\n`;
     });
-    workspaceContext += '\n--- End Workspace Files ---\n\n';
+    workspaceContext += '\nIMPORTANT: Do NOT ask which files to look at. All files are accessible.\n';
+    workspaceContext += '--- End Workspace Files ---\n\n';
   }
 
   // Prepend workspace context to first user message
@@ -284,12 +287,13 @@ async function handlePerplexity(messages: any[], model: string, workspaceFiles: 
   // Build workspace files context
   let workspaceContext = '';
   if (workspaceFiles.length > 0) {
-    workspaceContext = '--- Workspace Files Available ---\n';
-    workspaceContext += `You have access to ${workspaceFiles.length} files in this workspace:\n`;
+    workspaceContext = '--- Workspace Files Loaded ---\n';
+    workspaceContext += `ALL ${workspaceFiles.length} files are ALREADY LOADED:\n`;
     workspaceFiles.forEach((file: any, idx: number) => {
       workspaceContext += `${idx + 1}. ${file.file_name}${file.page_count ? ` (${file.page_count} pages)` : ''}\n`;
     });
-    workspaceContext += '\n--- End Workspace Files ---\n\n';
+    workspaceContext += '\nIMPORTANT: Do NOT ask which files to look at. All files are accessible.\n';
+    workspaceContext += '--- End Workspace Files ---\n\n';
   }
 
   // Prepend workspace context to first user message
@@ -339,12 +343,13 @@ async function handleOpenAI(messages: any[], model: string, workspaceFiles: any[
   // Build workspace files context
   let workspaceContext = '';
   if (workspaceFiles.length > 0) {
-    workspaceContext = '--- Workspace Files Available ---\n';
-    workspaceContext += `You have access to ${workspaceFiles.length} files in this workspace:\n`;
+    workspaceContext = '--- Workspace Files Loaded ---\n';
+    workspaceContext += `ALL ${workspaceFiles.length} files are ALREADY LOADED:\n`;
     workspaceFiles.forEach((file: any, idx: number) => {
       workspaceContext += `${idx + 1}. ${file.file_name}${file.page_count ? ` (${file.page_count} pages)` : ''}\n`;
     });
-    workspaceContext += '\n--- End Workspace Files ---\n\n';
+    workspaceContext += '\nIMPORTANT: Do NOT ask which files to look at. All files are accessible.\n';
+    workspaceContext += '--- End Workspace Files ---\n\n';
   }
 
   // Prepend workspace context to first user message
