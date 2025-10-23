@@ -494,7 +494,8 @@ export const PDFViewer = ({
   };
 
   const isCurrentPageSelected = selectedPagesForExtraction?.has(`${currentFileIndex}-${currentPage}`) || false;
-  const currentDiagnosis = pageDiagnoses[`${currentFileIndex}-${currentPage}`] || "";
+  const pageKey = `${currentFileIndex}-${currentPage}`;
+  const currentDiagnosis = pageDiagnoses[pageKey] || "";
   const [diagnosisInput, setDiagnosisInput] = useState(currentDiagnosis);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
@@ -502,12 +503,11 @@ export const PDFViewer = ({
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(numPages);
 
-  // Sync input when pageDiagnoses changes or when switching pages/files
+  // Sync input when diagnosis for current page changes
   useEffect(() => {
-    const pageKey = `${currentFileIndex}-${currentPage}`;
-    const diagnosis = pageDiagnoses[pageKey] || "";
-    setDiagnosisInput(diagnosis);
-  }, [pageDiagnoses, currentPage, currentFileIndex]);
+    console.log(`Syncing diagnosis for page ${currentPage}: "${currentDiagnosis}"`);
+    setDiagnosisInput(currentDiagnosis);
+  }, [currentDiagnosis, currentPage, currentFileIndex]);
 
   // Update endPage when numPages changes (switching files)
   useEffect(() => {
