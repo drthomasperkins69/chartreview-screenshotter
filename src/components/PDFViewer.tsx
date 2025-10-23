@@ -930,6 +930,16 @@ export const PDFViewer = ({
               Save
             </Button>
           </div>
+          
+          {/* Display current diagnosis from database */}
+          {currentDiagnosis && (
+            <div className="mb-2 p-3 bg-muted/50 rounded-md border">
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                Saved Diagnosis for Page {currentPage}:
+              </p>
+              <p className="text-sm">{currentDiagnosis}</p>
+            </div>
+          )}
           <div className="mt-2">
             <Button
               onClick={() => handleSaveToDatabase(currentFileIndex, currentPage, diagnosisInput)}
