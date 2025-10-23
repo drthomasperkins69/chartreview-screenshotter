@@ -176,7 +176,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       .from("workspace_diagnoses")
       .select("*")
       .eq("workspace_id", selectedWorkspace.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(1000);
 
     if (error) {
       console.error("Error fetching diagnoses:", error);
