@@ -15,6 +15,41 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 // @ts-ignore - assign worker instance to workerPort
 pdfjsLib.GlobalWorkerOptions.workerPort = new pdfjsWorker();
 
+// Levenshtein distance for fuzzy matching
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  return matrix[len1][len2];
+};
+
+// Calculate similarity score (0 to 1, where 1 is exact match)
+const similarityScore = (str1: string, str2: string): number => {
+  const maxLen = Math.max(str1.length, str2.length);
+  if (maxLen === 0) return 1.0;
+  const distance = levenshteinDistance(str1.toLowerCase(), str2.toLowerCase());
+  return 1 - distance / maxLen;
+};
+
 interface KeywordMatch {
   page: number;
   keyword: string;
@@ -174,15 +209,39 @@ export const PDFViewer = ({
               .map((item: any) => item.str)
               .join(' ');
 
+            // Extract words from page text
+            const pageWords = pageText.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+
             for (const term of searchTerms) {
-              // Use word boundaries to match exact words only
-              const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-              const count = (pageText.match(regex) || []).length;
-              if (count > 0) {
+              const searchTerm = term.toLowerCase();
+              let matchCount = 0;
+              
+              // For date searches, use exact matching
+              if (dateSearch.trim()) {
+                const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                matchCount = (pageText.match(regex) || []).length;
+              } else {
+                // For keyword searches, use fuzzy matching
+                // Threshold: 0.85 similarity (allows 1-2 character differences)
+                const SIMILARITY_THRESHOLD = 0.85;
+                
+                for (const word of pageWords) {
+                  // Clean word of punctuation
+                  const cleanWord = word.replace(/[^\w]/g, '');
+                  if (cleanWord.length === 0) continue;
+                  
+                  const similarity = similarityScore(searchTerm, cleanWord);
+                  if (similarity >= SIMILARITY_THRESHOLD) {
+                    matchCount++;
+                  }
+                }
+              }
+              
+              if (matchCount > 0) {
                 matches.push({ 
                   page: pageNum, 
                   keyword: term, 
-                  count,
+                  count: matchCount,
                   fileName: file.name,
                   fileIndex 
                 });
