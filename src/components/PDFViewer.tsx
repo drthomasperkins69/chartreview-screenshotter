@@ -502,10 +502,12 @@ export const PDFViewer = ({
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(numPages);
 
-  // Sync input when switching pages/files
+  // Sync input when pageDiagnoses changes or when switching pages/files
   useEffect(() => {
-    setDiagnosisInput(currentDiagnosis);
-  }, [currentPage, currentFileIndex, currentDiagnosis]);
+    const pageKey = `${currentFileIndex}-${currentPage}`;
+    const diagnosis = pageDiagnoses[pageKey] || "";
+    setDiagnosisInput(diagnosis);
+  }, [pageDiagnoses, currentPage, currentFileIndex]);
 
   // Update endPage when numPages changes (switching files)
   useEffect(() => {
