@@ -610,7 +610,9 @@ export const PDFViewer = ({
 
       if (data?.diagnosis) {
         setDiagnosisInput(data.diagnosis);
-        toast.success("AI diagnosis suggested!");
+        // Immediately save to database for persistence
+        await handleSaveToDatabase(currentFileIndex, currentPage, data.diagnosis);
+        toast.success("AI diagnosis saved!");
       } else {
         toast.error("No diagnosis suggestion received");
       }
@@ -724,6 +726,11 @@ export const PDFViewer = ({
             // Collect diagnosis to save at the end
             diagnosesToSave.push({ pageNum, diagnosis: data.diagnosis });
             successCount++;
+            
+            // Update textarea if this is the current page
+            if (pageNum === currentPage) {
+              setDiagnosisInput(data.diagnosis);
+            }
             
             // Show success only if not stopping
             if (!shouldStopScanRef.current) {
