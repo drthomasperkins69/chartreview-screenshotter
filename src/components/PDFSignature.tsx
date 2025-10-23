@@ -199,6 +199,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
+  const [activeTab, setActiveTab] = useState("categories");
   const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [scanningFiles, setScanningFiles] = useState<Set<number>>(new Set());
   const [pageDiagnoses, setPageDiagnoses] = useState<Record<string, string>>({});
@@ -370,6 +371,13 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     
     fetchCategories();
   }, []);
+
+  // Auto-switch to Matches tab when search results are found
+  useEffect(() => {
+    if (keywordMatches.length > 0 && activeTab === "categories") {
+      setActiveTab("matches");
+    }
+  }, [keywordMatches.length, activeTab]);
 
   const handleFileSelect = useCallback((file: File) => {
     if (file.type !== "application/pdf") {
@@ -2614,10 +2622,10 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                 {/* Right Panel: AI Assistant, Matches & Search Categories in Tabs */}
                 <ResizablePanel defaultSize={35} minSize={20} maxSize={50} collapsible>
                   <Card className="h-full rounded-none border-0 flex flex-col">
-                    <Tabs defaultValue="categories" className="h-full flex flex-col">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
                       <TabsList className="w-full rounded-none border-b grid grid-cols-3">
                         <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
-                        <TabsTrigger value="matches">Matches ({selectedPagesForExtraction.size})</TabsTrigger>
+                        <TabsTrigger value="matches">Matches ({keywordMatches.length})</TabsTrigger>
                         <TabsTrigger value="categories">Search</TabsTrigger>
                       </TabsList>
                       
