@@ -526,6 +526,43 @@ export const PDFViewer = ({
     }
   }, [onDiagnosisChange]);
 
+  // Extract top-of-page text from rendered PDF (best-effort)
+  const extractDiagnosisFromPdf = useCallback(async (pageNum: number): Promise<string | null> => {
+    try {
+      if (!pdf) return null;
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1 });
+      const height = viewport.height;
+      const textContent: any = await page.getTextContent();
+      const items: any[] = textContent.items || [];
+      const topBand = height * 0.85;
+      const topItems = items
+        .map((it) => ({ str: it.str as string, x: it.transform?.[4] ?? 0, y: it.transform?.[5] ?? 0 }))
+        .filter((it) => !!it.str && it.y >= topBand);
+      if (topItems.length === 0) return null;
+      topItems.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+      const lines: string[] = [];
+      let currentY: number | null = null;
+      let currentLine: string[] = [];
+      for (const it of topItems) {
+        if (currentY === null || Math.abs(it.y - currentY) <= 6) {
+          currentY = currentY === null ? it.y : currentY;
+          currentLine.push(it.str.trim());
+        } else {
+          lines.push(currentLine.join(' '));
+          currentY = it.y;
+          currentLine = [it.str.trim()];
+        }
+      }
+      if (currentLine.length) lines.push(currentLine.join(' '));
+      const text = lines.join(' ').replace(/\s{2,}/g, ' ').trim();
+      return text || null;
+    } catch (e) {
+      console.error('extractDiagnosisFromPdf error:', e);
+      return null;
+    }
+  }, [pdf]);
+
   const handleAISuggest = async () => {
     if (!canvasRef.current || !currentFile) {
       toast.error("Unable to capture page");
@@ -801,18 +838,30 @@ export const PDFViewer = ({
               Diagnosis for Page {currentPage}:
             </label>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 const pageKey = `${currentFileIndex}-${currentPage}`;
-                const diagnosis = pageDiagnoses[pageKey] || "";
-                setDiagnosisInput(diagnosis);
-                toast.success(diagnosis ? `Loaded diagnosis: "${diagnosis}"` : "No diagnosis found for this page");
+                const stateDiagnosis = pageDiagnoses[pageKey] || "";
+                if (stateDiagnosis) {
+                  setDiagnosisInput(stateDiagnosis);
+                  toast.success(`Loaded diagnosis from state`);
+                  return;
+                }
+                const extracted = await extractDiagnosisFromPdf(currentPage);
+                if (extracted) {
+                  setDiagnosisInput(extracted);
+                  // Also propagate so tracker sees it
+                  await handleSaveToDatabase(currentFileIndex, currentPage, extracted);
+                  toast.success("Loaded diagnosis from PDF");
+                } else {
+                  toast.info("No diagnosis found on this page");
+                }
               }}
               size="sm"
               variant="outline"
               className="gap-2"
             >
               <RefreshCw className="w-4 h-4" />
-              Refresh
+              Load From PDF
             </Button>
           </div>
           <div className="flex gap-2 mb-2">
@@ -887,30 +936,21 @@ export const PDFViewer = ({
               </Button>
               
               <Button
-                onClick={() => {
-                  let foundCount = 0;
-                  const allDiagnoses: string[] = [];
-                  
+                onClick={async () => {
+                  if (!pdf) return toast.error("PDF not loaded");
+                  let updated = 0;
                   for (let page = 1; page <= numPages; page++) {
-                    const pageKey = `${currentFileIndex}-${page}`;
-                    const diagnosis = pageDiagnoses[pageKey];
-                    if (diagnosis) {
-                      foundCount++;
-                      allDiagnoses.push(`Page ${page}: ${diagnosis}`);
+                    const extracted = await extractDiagnosisFromPdf(page);
+                    if (extracted) {
+                      await handleSaveToDatabase(currentFileIndex, page, extracted);
+                      if (page === currentPage) setDiagnosisInput(extracted);
+                      updated++;
                     }
                   }
-                  
-                  if (foundCount > 0) {
-                    toast.success(`Found ${foundCount} diagnoses across all pages`, {
-                      description: allDiagnoses.slice(0, 3).join('\n') + (allDiagnoses.length > 3 ? '\n...' : ''),
-                      duration: 5000
-                    });
-                    // Refresh current page
-                    const pageKey = `${currentFileIndex}-${currentPage}`;
-                    const diagnosis = pageDiagnoses[pageKey] || "";
-                    setDiagnosisInput(diagnosis);
+                  if (updated > 0) {
+                    toast.success(`Loaded diagnoses from PDF for ${updated} page(s)`);
                   } else {
-                    toast.info("No diagnoses found for any pages in this file");
+                    toast.info("No diagnosis text found in top area on any page");
                   }
                 }}
                 size="sm"
@@ -918,7 +958,7 @@ export const PDFViewer = ({
                 className="gap-2 w-full"
               >
                 <RefreshCw className="w-4 h-4" />
-                Check All Pages
+                Load All From PDF
               </Button>
             </div>
             
