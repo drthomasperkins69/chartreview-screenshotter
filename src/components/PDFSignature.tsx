@@ -594,6 +594,160 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     }
   }, [pdfFiles, selectedPagesForExtraction]);
 
+  const handleDownloadMatchedPages = useCallback(async () => {
+    if (selectedPagesForExtraction.size === 0) {
+      toast.error("No pages selected for extraction");
+      return;
+    }
+    
+    try {
+      toast.info("Creating PDF with matched pages and cover page...");
+      
+      // Collect all active search terms
+      const activeSearchTerms: string[] = [];
+      
+      // Add custom keywords if present
+      if (keywords.trim()) {
+        activeSearchTerms.push(...keywords.split(',').map(k => k.trim()).filter(k => k));
+      }
+      
+      // Add checked category terms
+      searchCategories.forEach(category => {
+        if (category.checked && category.terms.trim()) {
+          activeSearchTerms.push(`${category.label}: ${category.terms}`);
+        }
+      });
+      
+      // Create PDF document
+      const newPdfDoc = await PDFDocument.create();
+      const boldFont = await newPdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const regularFont = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+      
+      // Add cover page
+      const coverPage = newPdfDoc.addPage([595, 842]); // A4 size
+      const { width, height } = coverPage.getSize();
+      
+      // Title
+      const title = "Keyword Search Results";
+      const titleSize = 28;
+      const titleWidth = boldFont.widthOfTextAtSize(title, titleSize);
+      coverPage.drawText(title, {
+        x: (width - titleWidth) / 2,
+        y: height - 100,
+        size: titleSize,
+        font: boldFont,
+      });
+      
+      // Search terms section
+      const searchTermsTitle = "Search Terms:";
+      const searchTermsSize = 16;
+      coverPage.drawText(searchTermsTitle, {
+        x: 50,
+        y: height - 160,
+        size: searchTermsSize,
+        font: boldFont,
+      });
+      
+      // List all search terms
+      let yPosition = height - 190;
+      const termSize = 12;
+      const lineHeight = 20;
+      
+      activeSearchTerms.forEach((term, index) => {
+        if (yPosition < 100) {
+          // If we run out of space, stop adding terms
+          return;
+        }
+        
+        const termText = `• ${term}`;
+        coverPage.drawText(termText, {
+          x: 70,
+          y: yPosition,
+          size: termSize,
+          font: regularFont,
+        });
+        yPosition -= lineHeight;
+      });
+      
+      // Pages count
+      const pagesText = `Total Pages: ${selectedPagesForExtraction.size}`;
+      coverPage.drawText(pagesText, {
+        x: 50,
+        y: yPosition - 30,
+        size: 14,
+        font: boldFont,
+      });
+      
+      // Date generated
+      const dateText = `Generated: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })}`;
+      coverPage.drawText(dateText, {
+        x: 50,
+        y: 50,
+        size: 10,
+        font: regularFont,
+      });
+      
+      // Add all selected pages from the PDFs
+      const pagesByFile = new Map<number, number[]>();
+      Array.from(selectedPagesForExtraction).forEach(key => {
+        const [fileIndexStr, pageStr] = key.split('-');
+        const fileIndex = parseInt(fileIndexStr);
+        const page = parseInt(pageStr);
+        
+        if (!pagesByFile.has(fileIndex)) {
+          pagesByFile.set(fileIndex, []);
+        }
+        pagesByFile.get(fileIndex)!.push(page);
+      });
+      
+      const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
+      
+      for (const fileIndex of sortedFileIndices) {
+        const pages = pagesByFile.get(fileIndex)!.sort((a, b) => a - b);
+        const file = pdfFiles[fileIndex];
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        
+        for (const pageNum of pages) {
+          const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+          newPdfDoc.addPage(copiedPage);
+        }
+      }
+      
+      // Generate filename from search terms
+      let filename = "keyword-matches";
+      if (activeSearchTerms.length > 0) {
+        // Take first 3 search terms and sanitize for filename
+        const termsForFilename = activeSearchTerms
+          .slice(0, 3)
+          .map(term => term.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase())
+          .join('_');
+        filename = `matches-${termsForFilename}`;
+      }
+      filename = `${filename}-${Date.now()}.pdf`;
+      
+      // Download the PDF
+      const pdfBytes = await newPdfDoc.save();
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success(`Downloaded PDF with cover page and ${selectedPagesForExtraction.size} matched page(s)!`);
+    } catch (error) {
+      console.error("Error creating matched pages PDF:", error);
+      toast.error("Failed to create PDF");
+    }
+  }, [pdfFiles, selectedPagesForExtraction, keywords, searchCategories]);
+
   const handleRemovePdf = useCallback((index: number) => {
     setPdfFiles(prev => prev.filter((_, i) => i !== index));
     if (currentPdfIndex >= index && currentPdfIndex > 0) {
@@ -2798,6 +2952,16 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                       className="h-8"
                     >
                       Clear All
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleDownloadMatchedPages}
+                      className="h-8 gap-2"
+                      disabled={selectedPagesForExtraction.size === 0}
+                    >
+                      <FileText className="w-4 h-4" />
+                      Download Matches PDF
                     </Button>
                     <label className="text-sm text-muted-foreground cursor-pointer flex items-center gap-2">
                       <input
