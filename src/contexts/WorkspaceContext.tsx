@@ -62,20 +62,38 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
 
   const refreshWorkspaces = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user, skipping workspace refresh");
+      return;
+    }
 
-    const { data, error } = await supabase
-      .from("patient_workspaces")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("patient_workspaces")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching workspaces:", error);
-      toast.error("Failed to load workspaces");
-    } else {
+      if (error) {
+        console.error("Error fetching workspaces:", error);
+        toast.error("Failed to load workspaces. Please refresh the page.");
+        return;
+      }
+      
+      console.log(`Loaded ${data?.length || 0} workspaces`);
       setWorkspaces(data || []);
-      if (data && data.length > 0 && !selectedWorkspace) {
-        setSelectedWorkspace(data[0]);
+      
+      // Restore previously selected workspace or select first one
+      const savedWorkspaceId = localStorage.getItem('selectedWorkspaceId');
+      if (data && data.length > 0) {
+        const workspaceToSelect = savedWorkspaceId 
+          ? data.find(w => w.id === savedWorkspaceId) || data[0]
+          : data[0];
+        
+        if (!selectedWorkspace || selectedWorkspace.id !== workspaceToSelect.id) {
+          console.log(`Selecting workspace: ${workspaceToSelect.name}`);
+          setSelectedWorkspace(workspaceToSelect);
+          localStorage.setItem('selectedWorkspaceId', workspaceToSelect.id);
+        }
       }
       
       // Fetch files and diagnoses for all workspaces
@@ -120,8 +138,12 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         setAllWorkspaceFiles(filesMap);
         setAllWorkspaceDiagnoses(diagnosesMap);
       }
+    } catch (error) {
+      console.error("Unexpected error fetching workspaces:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const refreshFiles = async () => {
@@ -269,12 +291,23 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user) {
+      console.log("User authenticated, refreshing workspaces");
       refreshWorkspaces();
+    } else {
+      console.log("No user, clearing workspace data");
+      setWorkspaces([]);
+      setSelectedWorkspace(null);
+      setWorkspaceFiles([]);
+      setWorkspaceDiagnoses([]);
+      setAllWorkspaceFiles({});
+      setAllWorkspaceDiagnoses({});
+      localStorage.removeItem('selectedWorkspaceId');
     }
   }, [user]);
 
   useEffect(() => {
     if (selectedWorkspace) {
+      console.log(`Selected workspace changed: ${selectedWorkspace.name}`);
       refreshFiles();
       refreshDiagnoses();
     }
@@ -283,7 +316,11 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const selectWorkspace = (workspaceId: string) => {
     const workspace = workspaces.find((w) => w.id === workspaceId);
     if (workspace) {
+      console.log(`Selecting workspace: ${workspace.name} (${workspaceId})`);
       setSelectedWorkspace(workspace);
+      setWorkspaceFiles(allWorkspaceFiles[workspaceId] || []);
+      setWorkspaceDiagnoses(allWorkspaceDiagnoses[workspaceId] || []);
+      localStorage.setItem('selectedWorkspaceId', workspaceId);
     }
   };
 
