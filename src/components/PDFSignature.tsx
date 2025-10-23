@@ -2612,9 +2612,9 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                 <ResizableHandle withHandle />
 
                 {/* Right Panel: AI Assistant, Matches & Search Categories in Tabs */}
-                <ResizablePanel defaultSize={0} minSize={20} maxSize={50} collapsible>
+                <ResizablePanel defaultSize={35} minSize={20} maxSize={50} collapsible>
                   <Card className="h-full rounded-none border-0 flex flex-col">
-                    <Tabs defaultValue="assistant" className="h-full flex flex-col">
+                    <Tabs defaultValue="categories" className="h-full flex flex-col">
                       <TabsList className="w-full rounded-none border-b grid grid-cols-3">
                         <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
                         <TabsTrigger value="matches">Matches ({selectedPagesForExtraction.size})</TabsTrigger>
