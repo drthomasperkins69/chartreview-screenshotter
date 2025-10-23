@@ -523,9 +523,11 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
       
       {/* Diagnosis Forms Section */}
       {diagnoses.length > 0 && (() => {
-        // Deduplicate diagnoses by ID
+        // Deduplicate diagnoses by name (case-insensitive)
         const uniqueDiagnoses = Array.from(
-          new Map(diagnoses.map(d => [d.id, d])).values()
+          new Map(
+            diagnoses.map(d => [d.diagnosis_name.trim().toLowerCase(), d])
+          ).values()
         );
         
         return (
@@ -589,9 +591,11 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
 
       {/* Diagnostic Assessment Section */}
       {diagnoses.length > 0 && (() => {
-        // Deduplicate diagnoses by ID
+        // Deduplicate diagnoses by name (case-insensitive)
         const uniqueDiagnoses = Array.from(
-          new Map(diagnoses.map(d => [d.id, d])).values()
+          new Map(
+            diagnoses.map(d => [d.diagnosis_name.trim().toLowerCase(), d])
+          ).values()
         );
         
         return (
