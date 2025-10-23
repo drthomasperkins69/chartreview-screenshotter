@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { pageImage, pageText, fileName, pageNum, model } = await req.json();
+    const { pageImage, pageText, fileName, pageNum, model = "gemini-2.5-flash" } = await req.json();
 
     if (!pageImage && !pageText) {
       return new Response(
@@ -20,7 +20,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Analyzing page ${pageNum} from ${fileName}`);
+    console.log(`Analyzing page ${pageNum} from ${fileName} using model: ${model}`);
 
     let diagnosis: string;
 
@@ -88,11 +88,23 @@ serve(async (req) => {
       const data = await response.json();
       diagnosis = data.content[0].text.trim();
     } else {
-      // Use Lovable AI Gateway for Gemini
+      // Use Lovable AI Gateway for all other models
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         throw new Error("LOVABLE_API_KEY is not configured");
       }
+
+      // Map model names to full Lovable AI model identifiers
+      const modelMap: Record<string, string> = {
+        "gemini-2.5-pro": "google/gemini-2.5-pro",
+        "gemini-2.5-flash": "google/gemini-2.5-flash",
+        "gemini-2.5-flash-lite": "google/gemini-2.5-flash-lite",
+        "gpt-5": "openai/gpt-5",
+        "gpt-5-mini": "openai/gpt-5-mini",
+        "gpt-5-nano": "openai/gpt-5-nano",
+      };
+
+      const lovableModel = modelMap[model] || "google/gemini-2.5-flash";
 
       const messages: any[] = [
         {
@@ -139,7 +151,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: lovableModel,
           messages,
           max_tokens: 500,
           temperature: 0.3,

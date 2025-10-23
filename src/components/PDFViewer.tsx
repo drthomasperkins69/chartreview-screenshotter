@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -504,6 +505,7 @@ export const PDFViewer = ({
   const shouldStopScanRef = useRef(false);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(numPages);
+  const [selectedModel, setSelectedModel] = useState<string>("gemini-2.5-flash");
 
   // Sync input when diagnosis for current page changes
   useEffect(() => {
@@ -594,7 +596,8 @@ export const PDFViewer = ({
           pageImage,
           pageText,
           fileName: currentFile.name,
-          pageNum: currentPage
+          pageNum: currentPage,
+          model: selectedModel
         }
       });
 
@@ -713,7 +716,8 @@ export const PDFViewer = ({
                 pageImage,
                 pageText,
                 fileName: currentFile.name,
-                pageNum: pageNum
+                pageNum: pageNum,
+                model: selectedModel
               }
             }),
             new Promise<{ data: null, error: Error }>((_, reject) => 
@@ -885,6 +889,23 @@ export const PDFViewer = ({
             <label htmlFor="diagnosis-input" className="text-sm font-medium">
               Diagnosis for Page {currentPage}:
             </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">AI Model:</span>
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                  <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                  <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                  <SelectItem value="gpt-5">GPT-5</SelectItem>
+                  <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
+                  <SelectItem value="gpt-5-nano">GPT-5 Nano</SelectItem>
+                  <SelectItem value="claude">Claude Sonnet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               onClick={async () => {
                 const pageKey = `${currentFileIndex}-${currentPage}`;
