@@ -3182,6 +3182,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             workspaceId={selectedWorkspace?.id}
             userId={user?.id}
             onFileAdded={refreshFiles}
+            diagnoses={workspaceDiagnoses}
           />
         </div>
 

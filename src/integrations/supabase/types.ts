@@ -41,6 +41,33 @@ export type Database = {
         }
         Relationships: []
       }
+      diagnosis_form_instructions: {
+        Row: {
+          created_at: string
+          diagnosis_id: string
+          id: string
+          instruction: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          diagnosis_id: string
+          id?: string
+          instruction?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          diagnosis_id?: string
+          id?: string
+          instruction?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       document_embeddings: {
         Row: {
           chunk_index: number

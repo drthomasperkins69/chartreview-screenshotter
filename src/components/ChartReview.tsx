@@ -19,6 +19,7 @@ interface ChartReviewProps {
   workspaceId?: string;
   userId?: string;
   onFileAdded?: () => void;
+  diagnoses?: Array<{ id: string; diagnosis_name: string }>;
 }
 
 interface ChartSection {
@@ -39,7 +40,7 @@ const DEFAULT_SECTIONS: ChartSection[] = [
   { id: "timelines", label: "Timelines", instruction: "Create a chronological timeline of significant medical events." },
 ];
 
-export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed, isProcessing, workspaceId, userId, onFileAdded }: ChartReviewProps) => {
+export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed, isProcessing, workspaceId, userId, onFileAdded, diagnoses = [] }: ChartReviewProps) => {
   const [sections, setSections] = useState<ChartSection[]>(DEFAULT_SECTIONS);
   const [editingSection, setEditingSection] = useState<ChartSection | null>(null);
   const [tempInstruction, setTempInstruction] = useState("");
@@ -48,6 +49,11 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
   const [isUploading, setIsUploading] = useState(false);
   const [viewingSection, setViewingSection] = useState<ChartSection | null>(null);
   const [isLoadingInstructions, setIsLoadingInstructions] = useState(true);
+  
+  // Diagnosis forms state
+  const [diagnosisInstructions, setDiagnosisInstructions] = useState<Record<string, string>>({});
+  const [editingDiagnosis, setEditingDiagnosis] = useState<{ id: string; name: string } | null>(null);
+  const [tempDiagnosisInstruction, setTempDiagnosisInstruction] = useState("");
 
   // Load custom instructions from database on mount
   useEffect(() => {
@@ -80,6 +86,34 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
 
     loadInstructions();
   }, [userId]);
+
+  // Load diagnosis form instructions
+  useEffect(() => {
+    const loadDiagnosisInstructions = async () => {
+      if (!userId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('diagnosis_form_instructions')
+          .select('diagnosis_id, instruction')
+          .eq('user_id', userId);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const instructionsMap: Record<string, string> = {};
+          data.forEach(d => {
+            instructionsMap[d.diagnosis_id] = d.instruction;
+          });
+          setDiagnosisInstructions(instructionsMap);
+        }
+      } catch (error) {
+        console.error('Error loading diagnosis instructions:', error);
+      }
+    };
+
+    loadDiagnosisInstructions();
+  }, [userId, diagnoses]);
 
   // Handle AI response when it comes back
   useEffect(() => {
@@ -133,6 +167,37 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
     } catch (error) {
       console.error('Error saving instruction:', error);
       toast.error('Failed to save instruction');
+    }
+  };
+
+  const handleSaveDiagnosisInstruction = async () => {
+    if (!editingDiagnosis || !userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('diagnosis_form_instructions')
+        .upsert({
+          user_id: userId,
+          diagnosis_id: editingDiagnosis.id,
+          instruction: tempDiagnosisInstruction,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,diagnosis_id'
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      setDiagnosisInstructions(prev => ({
+        ...prev,
+        [editingDiagnosis.id]: tempDiagnosisInstruction
+      }));
+      
+      toast.success(`Instruction saved for ${editingDiagnosis.name}`);
+      setEditingDiagnosis(null);
+    } catch (error) {
+      console.error('Error saving diagnosis instruction:', error);
+      toast.error('Failed to save diagnosis instruction');
     }
   };
 
@@ -456,6 +521,85 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
         </DialogContent>
       </Dialog>
       
+      {/* Diagnosis Forms Section */}
+      {diagnoses.length > 0 && (
+        <div className="mt-6 pt-6 border-t">
+          <h3 className="text-lg font-semibold mb-4">Diagnosis Forms</h3>
+          <div className="space-y-2">
+            {diagnoses.map((diagnosis) => (
+              <div key={diagnosis.id} className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    const instruction = diagnosisInstructions[diagnosis.id] || 'Generate a comprehensive diagnosis form based on the medical records for this diagnosis.';
+                    onSendInstruction(instruction, `Diagnosis Form: ${diagnosis.diagnosis_name}`);
+                  }}
+                  disabled={isProcessing}
+                  className="flex-1 bg-primary hover:bg-primary/90"
+                >
+                  {diagnosis.diagnosis_name}
+                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditingDiagnosis({ id: diagnosis.id, name: diagnosis.diagnosis_name });
+                        setTempDiagnosisInstruction(
+                          diagnosisInstructions[diagnosis.id] || 
+                          'Generate a comprehensive diagnosis form based on the medical records for this diagnosis.'
+                        );
+                      }}
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Instruction for {diagnosis.diagnosis_name}</DialogTitle>
+                      <DialogDescription>
+                        Customize the instruction for generating this diagnosis form.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                      value={tempDiagnosisInstruction}
+                      onChange={(e) => setTempDiagnosisInstruction(e.target.value)}
+                      rows={6}
+                      className="mt-4"
+                    />
+                    <div className="flex gap-2 mt-4">
+                      <Button onClick={handleSaveDiagnosisInstruction} className="flex-1">
+                        Save Instruction
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Diagnostic Assessment Section */}
+      {diagnoses.length > 0 && (
+        <div className="mt-6 pt-6 border-t">
+          <h3 className="text-lg font-semibold mb-4">Diagnostic Assessment</h3>
+          <div className="space-y-2">
+            {diagnoses.map((diagnosis) => (
+              <Button
+                key={diagnosis.id}
+                onClick={() => toast.info("Diagnostic Assessment feature coming soon")}
+                disabled={isProcessing}
+                variant="outline"
+                className="w-full"
+              >
+                Create Diagnostic Assessment: {diagnosis.diagnosis_name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 mt-4 pt-4 border-t">
         <Button
           onClick={handleCombineReports}
