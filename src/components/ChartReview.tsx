@@ -113,7 +113,7 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
     };
 
     loadDiagnosisInstructions();
-  }, [userId, diagnoses]);
+  }, [userId]);
 
   // Handle AI response when it comes back
   useEffect(() => {
@@ -522,12 +522,18 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
       </Dialog>
       
       {/* Diagnosis Forms Section */}
-      {diagnoses.length > 0 && (
-        <div className="mt-6 pt-6 border-t">
-          <h3 className="text-lg font-semibold mb-4">Diagnosis Forms</h3>
-          <div className="space-y-2">
-            {diagnoses.map((diagnosis) => (
-              <div key={diagnosis.id} className="flex items-center gap-2">
+      {diagnoses.length > 0 && (() => {
+        // Deduplicate diagnoses by ID
+        const uniqueDiagnoses = Array.from(
+          new Map(diagnoses.map(d => [d.id, d])).values()
+        );
+        
+        return (
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-lg font-semibold mb-4">Diagnosis Forms</h3>
+            <div className="space-y-2">
+              {uniqueDiagnoses.map((diagnosis) => (
+                <div key={diagnosis.id} className="flex items-center gap-2">
                 <Button
                   onClick={() => {
                     const instruction = diagnosisInstructions[diagnosis.id] || 'Generate a comprehensive diagnosis form based on the medical records for this diagnosis.';
@@ -575,30 +581,38 @@ export const ChartReview = ({ onSendInstruction, aiResponse, onResponseProcessed
                   </DialogContent>
                 </Dialog>
               </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Diagnostic Assessment Section */}
-      {diagnoses.length > 0 && (
-        <div className="mt-6 pt-6 border-t">
-          <h3 className="text-lg font-semibold mb-4">Diagnostic Assessment</h3>
-          <div className="space-y-2">
-            {diagnoses.map((diagnosis) => (
-              <Button
-                key={diagnosis.id}
-                onClick={() => toast.info("Diagnostic Assessment feature coming soon")}
-                disabled={isProcessing}
-                variant="outline"
-                className="w-full"
-              >
-                Create Diagnostic Assessment: {diagnosis.diagnosis_name}
-              </Button>
-            ))}
+      {diagnoses.length > 0 && (() => {
+        // Deduplicate diagnoses by ID
+        const uniqueDiagnoses = Array.from(
+          new Map(diagnoses.map(d => [d.id, d])).values()
+        );
+        
+        return (
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-lg font-semibold mb-4">Diagnostic Assessment</h3>
+            <div className="space-y-2">
+              {uniqueDiagnoses.map((diagnosis) => (
+                <Button
+                  key={diagnosis.id}
+                  onClick={() => toast.info("Diagnostic Assessment feature coming soon")}
+                  disabled={isProcessing}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Create Diagnostic Assessment: {diagnosis.diagnosis_name}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="flex gap-2 mt-4 pt-4 border-t">
         <Button
