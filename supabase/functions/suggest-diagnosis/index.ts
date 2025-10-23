@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +23,26 @@ serve(async (req) => {
 
     console.log(`Analyzing page ${pageNum} from ${fileName} using model: ${model}`);
 
+    // Initialize Supabase client to query reference documents
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+    // Query reference documents for context
+    let referenceContext = "";
+    try {
+      const { data: refDocs } = await supabaseClient
+        .from("reference_documents")
+        .select("file_name, description")
+        .eq("is_active", true);
+      
+      if (refDocs && refDocs.length > 0) {
+        referenceContext = `\n\nIMPORTANT: Reference documents are available for validation (${refDocs.map(d => d.file_name).join(", ")}). Consider standard diagnosis formats and terminology from these references when analyzing.`;
+      }
+    } catch (err) {
+      console.error("Error fetching reference docs:", err);
+    }
+
     let diagnosis: string;
 
     if (model === "claude") {
@@ -37,12 +58,12 @@ serve(async (req) => {
       if (pageText && pageText.trim()) {
         userContent.push({
           type: "text",
-          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses using this EXACT format: "Side Joint - Diagnosis" (e.g., "Right Ankle - Sprain", "Left Knee - Osteoarthritis"). NEVER use "Bilateral" - if both sides are affected, list each side separately (e.g., "Right Knee - Arthritis, Left Knee - Arthritis"). Use descriptive medical condition names, NO ICD codes. Maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.`
+          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses using this EXACT format: "Side Joint - Diagnosis" (e.g., "Right Ankle - Sprain", "Left Knee - Osteoarthritis"). NEVER use "Bilateral" - if both sides are affected, list each side separately (e.g., "Right Knee - Arthritis, Left Knee - Arthritis"). Use descriptive medical condition names, NO ICD codes. Maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.${referenceContext}`
         });
       } else {
         userContent.push({
           type: "text",
-          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list using format: "Side Joint - Diagnosis" (e.g., "Right Shoulder - Tendinopathy"). NEVER use "Bilateral" - list each side separately. NO ICD codes. Maximum 3-5 diagnoses.`
+          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list using format: "Side Joint - Diagnosis" (e.g., "Right Shoulder - Tendinopathy"). NEVER use "Bilateral" - list each side separately. NO ICD codes. Maximum 3-5 diagnoses.${referenceContext}`
         });
       }
 
@@ -109,7 +130,7 @@ serve(async (req) => {
       const messages: any[] = [
         {
           role: "system",
-          content: "You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses using this EXACT format: 'Side Joint - Diagnosis' (e.g., 'Right Ankle - Sprain', 'Left Knee - Osteoarthritis'). NEVER use 'Bilateral' - if both sides are affected, list each side separately. Use PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names. Keep it concise - maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format."
+          content: `You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses using this EXACT format: 'Side Joint - Diagnosis' (e.g., 'Right Ankle - Sprain', 'Left Knee - Osteoarthritis'). NEVER use 'Bilateral' - if both sides are affected, list each side separately. Use PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names. Keep it concise - maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.${referenceContext}`
         }
       ];
 
