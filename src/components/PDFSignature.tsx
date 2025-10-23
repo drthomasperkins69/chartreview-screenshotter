@@ -372,12 +372,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     fetchCategories();
   }, []);
 
-  // Auto-switch to Matches tab when search results are found
-  useEffect(() => {
-    if (keywordMatches.length > 0 && activeTab === "categories") {
-      setActiveTab("matches");
-    }
-  }, [keywordMatches.length, activeTab]);
 
   const handleFileSelect = useCallback((file: File) => {
     if (file.type !== "application/pdf") {
@@ -2623,9 +2617,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                 <ResizablePanel defaultSize={35} minSize={20} maxSize={50} collapsible>
                   <Card className="h-full rounded-none border-0 flex flex-col">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-                      <TabsList className="w-full rounded-none border-b grid grid-cols-3">
+                      <TabsList className="w-full rounded-none border-b grid grid-cols-2">
                         <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
-                        <TabsTrigger value="matches">Matches ({keywordMatches.length})</TabsTrigger>
                         <TabsTrigger value="categories">Search</TabsTrigger>
                       </TabsList>
                       
@@ -2642,118 +2635,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                             />
                           </div>
                         </ScrollArea>
-                      </TabsContent>
-                      
-                      <TabsContent value="matches" className="flex-1 mt-0 p-0 h-full">
-                        <div className="p-4 flex flex-col h-full">
-                        {keywordMatches.length > 0 ? (
-                      <>
-                        <div className="space-y-2 mb-3">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold">
-                              Matches Found ({selectedPagesForExtraction.size})
-                            </h3>
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={selectAllPages}
-                              className="h-7 text-xs"
-                            >
-                              Select All
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={deselectAllPages}
-                              className="h-7 text-xs"
-                            >
-                              Clear
-                            </Button>
-                            <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                checked={autoNavigate}
-                                onChange={(e) => setAutoNavigate(e.target.checked)}
-                                className="w-3 h-3"
-                              />
-                              Auto-nav
-                            </label>
-                          </div>
-                        </div>
-                        <ScrollArea className="flex-1">
-                          <div className="space-y-3 pr-4">
-                            {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
-                              .filter(idx => !isNaN(idx) && idx >= 0)
-                              .sort((a, b) => a - b)
-                              .map((fileIndex) => {
-                                const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
-                                const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
-                                const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
-                                
-                                return (
-                                  <div key={fileIndex} className="space-y-1">
-                                    <div className="text-xs font-semibold text-primary sticky top-0 bg-card py-1">
-                                      📄 {fileName}
-                                    </div>
-                                    {pages.map((page) => {
-                                      const pageMatches = fileMatches.filter(m => m.page === page);
-                                      const selectionKey = `${fileIndex}-${page}`;
-                                      const isSelected = selectedPagesForExtraction.has(selectionKey);
-                                      const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
-                                      
-                                      return (
-                                         <div 
-                                          key={`${fileIndex}-${page}`}
-                                          className={`text-xs p-2 bg-muted rounded flex items-start gap-2 ${
-                                            isCurrent ? 'ring-2 ring-primary' : ''
-                                          }`}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => togglePageSelection(page, fileIndex)}
-                                            className="mt-0.5 w-4 h-4 cursor-pointer flex-shrink-0"
-                                            onClick={(e) => e.stopPropagation()}
-                                          />
-                                          <div 
-                                            className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                                            onClick={() => handlePageClick(page, fileIndex)}
-                                          >
-                                            <div className="font-medium">Page {page}</div>
-                                            {pageMatches.map((match, idx) => (
-                                              <div key={idx} className="text-muted-foreground">
-                                                "{match.keyword}" ({match.count}x)
-                                              </div>
-                                            ))}
-                                          </div>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 flex-shrink-0 hover:text-destructive"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              removeMatchFromList(fileIndex, page);
-                                            }}
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })}
-                           </div>
-                         </ScrollArea>
-                       </>
-                     ) : (
-                       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                         No matches yet. Use AI or search to find pages.
-                       </div>
-                     )}
-                        </div>
                       </TabsContent>
                        
                        <TabsContent value="categories" className="flex-1 mt-0 p-0 h-full">
@@ -2890,8 +2771,120 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                      </Tabs>
                    </Card>
                  </ResizablePanel>
-        </ResizablePanelGroup>
+         </ResizablePanelGroup>
 
+        {/* Matches Section - Dedicated Space Below PDF Canvas */}
+        {keywordMatches.length > 0 && (
+          <Card className="mt-4">
+            <div className="p-4">
+              <div className="space-y-2 mb-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">
+                    Matches Found ({keywordMatches.length})
+                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={selectAllPages}
+                      className="h-8"
+                    >
+                      Select All
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={deselectAllPages}
+                      className="h-8"
+                    >
+                      Clear All
+                    </Button>
+                    <label className="text-sm text-muted-foreground cursor-pointer flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={autoNavigate}
+                        onChange={(e) => setAutoNavigate(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      Auto-navigate to page
+                    </label>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {selectedPagesForExtraction.size} page{selectedPagesForExtraction.size !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Array.from(new Set(keywordMatches.map(m => m.fileIndex)))
+                  .filter(idx => !isNaN(idx) && idx >= 0)
+                  .sort((a, b) => a - b)
+                  .map((fileIndex) => {
+                    const fileMatches = keywordMatches.filter(m => m.fileIndex === fileIndex);
+                    const fileName = pdfFiles[fileIndex]?.name || fileMatches[0]?.fileName || `Document ${fileIndex + 1}`;
+                    const pages = Array.from(new Set(fileMatches.map(m => m.page))).sort((a, b) => a - b);
+                    
+                    return (
+                      <div key={fileIndex} className="space-y-2">
+                        <div className="text-sm font-semibold text-primary flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          {fileName}
+                        </div>
+                        <div className="space-y-2">
+                          {pages.map((page) => {
+                            const pageMatches = fileMatches.filter(m => m.page === page);
+                            const selectionKey = `${fileIndex}-${page}`;
+                            const isSelected = selectedPagesForExtraction.has(selectionKey);
+                            const isCurrent = selectedPage === page && fileIndex === currentPdfIndex;
+                            
+                            return (
+                              <div 
+                                key={`${fileIndex}-${page}`}
+                                className={`p-3 bg-muted rounded-lg border flex items-start gap-2 transition-all ${
+                                  isCurrent ? 'ring-2 ring-primary' : ''
+                                } ${isSelected ? 'border-primary' : 'border-transparent'}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => togglePageSelection(page, fileIndex)}
+                                  className="mt-1 w-4 h-4 cursor-pointer flex-shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div 
+                                  className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => handlePageClick(page, fileIndex)}
+                                >
+                                  <div className="font-medium text-sm mb-1">Page {page}</div>
+                                  <div className="space-y-0.5">
+                                    {pageMatches.map((match, idx) => (
+                                      <div key={idx} className="text-xs text-muted-foreground">
+                                        "{match.keyword}" ({match.count}x)
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 flex-shrink-0 hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeMatchFromList(fileIndex, page);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Diagnosis Tracker - Full Width */}
         <Card className="mt-4 p-4">
