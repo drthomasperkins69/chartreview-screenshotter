@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, Trash2, Save, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
@@ -796,9 +796,25 @@ export const PDFViewer = ({
       {/* Diagnosis Input - Above PDF */}
       {onDiagnosisChange && (
         <div className="border-b bg-toolbar-background p-4">
-          <label htmlFor="diagnosis-input" className="block text-sm font-medium mb-2">
-            Diagnosis for Page {currentPage}:
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="diagnosis-input" className="text-sm font-medium">
+              Diagnosis for Page {currentPage}:
+            </label>
+            <Button
+              onClick={() => {
+                const pageKey = `${currentFileIndex}-${currentPage}`;
+                const diagnosis = pageDiagnoses[pageKey] || "";
+                setDiagnosisInput(diagnosis);
+                toast.success(diagnosis ? `Loaded diagnosis: "${diagnosis}"` : "No diagnosis found for this page");
+              }}
+              size="sm"
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </Button>
+          </div>
           <div className="flex gap-2 mb-2">
             <textarea
               id="diagnosis-input"
@@ -849,25 +865,62 @@ export const PDFViewer = ({
             </Button>
           </div>
           <div className="space-y-2">
-            <Button
-              onClick={handleAutoScanAll}
-              disabled={isAutoScanning || isAISuggesting}
-              size="sm"
-              variant="outline"
-              className="gap-2 w-full"
-            >
-              {isAutoScanning ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Auto-scanning...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  AI Auto-Scan Pages
-                </>
-              )}
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={handleAutoScanAll}
+                disabled={isAutoScanning || isAISuggesting}
+                size="sm"
+                variant="outline"
+                className="gap-2 w-full"
+              >
+                {isAutoScanning ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Auto-scanning...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    AI Auto-Scan
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  let foundCount = 0;
+                  const allDiagnoses: string[] = [];
+                  
+                  for (let page = 1; page <= numPages; page++) {
+                    const pageKey = `${currentFileIndex}-${page}`;
+                    const diagnosis = pageDiagnoses[pageKey];
+                    if (diagnosis) {
+                      foundCount++;
+                      allDiagnoses.push(`Page ${page}: ${diagnosis}`);
+                    }
+                  }
+                  
+                  if (foundCount > 0) {
+                    toast.success(`Found ${foundCount} diagnoses across all pages`, {
+                      description: allDiagnoses.slice(0, 3).join('\n') + (allDiagnoses.length > 3 ? '\n...' : ''),
+                      duration: 5000
+                    });
+                    // Refresh current page
+                    const pageKey = `${currentFileIndex}-${currentPage}`;
+                    const diagnosis = pageDiagnoses[pageKey] || "";
+                    setDiagnosisInput(diagnosis);
+                  } else {
+                    toast.info("No diagnoses found for any pages in this file");
+                  }
+                }}
+                size="sm"
+                variant="outline"
+                className="gap-2 w-full"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Check All Pages
+              </Button>
+            </div>
             
             {/* Page range inputs */}
             <div className="flex gap-2 items-center">
