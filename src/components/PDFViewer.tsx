@@ -83,6 +83,7 @@ interface PDFViewerProps {
   onDiagnosisChange?: (fileIndex: number, pageNum: number, diagnosis: string) => void;
   onDeletePage?: (fileIndex: number, pageNum: number) => void;
   pdfContent?: PDFContent[];
+  refreshDiagnoses?: () => Promise<void>;
 }
 
 export const PDFViewer = ({
@@ -104,6 +105,7 @@ export const PDFViewer = ({
   onDiagnosisChange,
   onDeletePage,
   pdfContent = [],
+  refreshDiagnoses,
 }: PDFViewerProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -612,6 +614,12 @@ export const PDFViewer = ({
         setDiagnosisInput(data.diagnosis);
         // Immediately save to database for persistence
         await handleSaveToDatabase(currentFileIndex, currentPage, data.diagnosis);
+        
+        // Refresh diagnoses from database to ensure they're loaded
+        if (refreshDiagnoses) {
+          await refreshDiagnoses();
+        }
+        
         toast.success("AI diagnosis saved!");
       } else {
         toast.error("No diagnosis suggestion received");
@@ -754,6 +762,11 @@ export const PDFViewer = ({
         toast.info("Saving all diagnoses to database...");
         for (const { pageNum, diagnosis } of diagnosesToSave) {
           await handleSaveToDatabase(currentFileIndex, pageNum, diagnosis);
+        }
+        
+        // Refresh diagnoses from database to ensure they're loaded
+        if (refreshDiagnoses) {
+          await refreshDiagnoses();
         }
       }
 

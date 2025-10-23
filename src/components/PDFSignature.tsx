@@ -2760,6 +2760,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                         onDiagnosisChange={handleDiagnosisChange}
                         onDeletePage={removeMatchFromList}
                         pdfContent={pdfContent}
+                        refreshDiagnoses={refreshDiagnoses}
                       />
                     )}
                   </Card>
