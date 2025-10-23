@@ -535,17 +535,25 @@ export const PDFViewer = ({
       const height = viewport.height;
       const textContent: any = await page.getTextContent();
       const items: any[] = textContent.items || [];
-      const topBand = height * 0.85;
-      const topItems = items
-        .map((it) => ({ str: it.str as string, x: it.transform?.[4] ?? 0, y: it.transform?.[5] ?? 0 }))
-        .filter((it) => !!it.str && it.y >= topBand);
+      // Widen search band to be robust
+      const topBand = height * 0.7; // top 30%
+      let topItems = items
+        .map((it) => ({ str: (it.str as string) || '', x: it.transform?.[4] ?? 0, y: it.transform?.[5] ?? 0 }))
+        .filter((it) => it.str.trim().length > 0 && it.y >= topBand);
+      // Fallback: top 50%
+      if (topItems.length === 0) {
+        const band50 = height * 0.5;
+        topItems = items
+          .map((it) => ({ str: (it.str as string) || '', x: it.transform?.[4] ?? 0, y: it.transform?.[5] ?? 0 }))
+          .filter((it) => it.str.trim().length > 0 && it.y >= band50);
+      }
       if (topItems.length === 0) return null;
       topItems.sort((a, b) => (b.y - a.y) || (a.x - b.x));
       const lines: string[] = [];
       let currentY: number | null = null;
       let currentLine: string[] = [];
       for (const it of topItems) {
-        if (currentY === null || Math.abs(it.y - currentY) <= 6) {
+        if (currentY === null || Math.abs(it.y - currentY) <= 8) {
           currentY = currentY === null ? it.y : currentY;
           currentLine.push(it.str.trim());
         } else {
@@ -555,7 +563,7 @@ export const PDFViewer = ({
         }
       }
       if (currentLine.length) lines.push(currentLine.join(' '));
-      const text = lines.join(' ').replace(/\s{2,}/g, ' ').trim();
+      const text = lines.slice(0, 2).join(' ').replace(/\s{2,}/g, ' ').trim();
       return text || null;
     } catch (e) {
       console.error('extractDiagnosisFromPdf error:', e);
