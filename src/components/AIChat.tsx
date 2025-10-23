@@ -90,7 +90,7 @@ export const AIChat = ({ diagnosesContext, workspaceFiles, externalInput, onExte
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState('lovable');
+  const [provider, setProvider] = useState('claude');
   const [model, setModel] = useState('');
 
   const currentProvider = AI_PROVIDERS.find(p => p.value === provider);

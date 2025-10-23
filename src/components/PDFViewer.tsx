@@ -505,7 +505,7 @@ export const PDFViewer = ({
   const shouldStopScanRef = useRef(false);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(numPages);
-  const [selectedModel, setSelectedModel] = useState<string>("gemini-2.5-flash");
+  const [selectedModel, setSelectedModel] = useState<string>("claude");
 
   // Sync input when diagnosis for current page changes
   useEffect(() => {
