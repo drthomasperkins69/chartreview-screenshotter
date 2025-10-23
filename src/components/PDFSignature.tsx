@@ -2952,7 +2952,21 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                       onClick={deselectAllPages}
                       className="h-8"
                     >
-                      Clear All
+                      Clear Selections
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => {
+                        setKeywordMatches([]);
+                        setMatchingPages(new Set());
+                        setSelectedPagesForExtraction(new Set());
+                        toast.success("All matches deleted");
+                      }}
+                      className="h-8 gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete All Matches
                     </Button>
                     <Button
                       variant="default"
