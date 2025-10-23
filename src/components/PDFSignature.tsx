@@ -3092,13 +3092,18 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                     diagnosisGroups[diagnosis] = [];
                   }
                   
+                  // Check for duplicates before adding
                   const [fileIndex, pageNum] = key.split('-').map(Number);
-                  diagnosisGroups[diagnosis].push({
-                    key,
-                    fileIndex,
-                    pageNum,
-                    fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
-                  });
+                  const isDuplicate = diagnosisGroups[diagnosis].some(p => p.key === key);
+                  
+                  if (!isDuplicate) {
+                    diagnosisGroups[diagnosis].push({
+                      key,
+                      fileIndex,
+                      pageNum,
+                      fileName: pdfFiles[fileIndex]?.name || `Document ${fileIndex + 1}`
+                    });
+                  }
                 });
               });
               

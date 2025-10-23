@@ -706,15 +706,20 @@ export const PDFViewer = ({
           const fileContent = pdfContent.find(p => p.fileIndex === currentFileIndex);
           const pageText = fileContent?.pages.find(p => p.pageNum === pageNum)?.text || "";
 
-          // Call edge function
-          const { data, error } = await supabase.functions.invoke('suggest-diagnosis', {
-            body: {
-              pageImage,
-              pageText,
-              fileName: currentFile.name,
-              pageNum: pageNum
-            }
-          });
+          // Call edge function with timeout protection
+          const { data, error } = await Promise.race([
+            supabase.functions.invoke('suggest-diagnosis', {
+              body: {
+                pageImage,
+                pageText,
+                fileName: currentFile.name,
+                pageNum: pageNum
+              }
+            }),
+            new Promise<{ data: null, error: Error }>((_, reject) => 
+              setTimeout(() => reject(new Error('Request timeout')), 30000)
+            )
+          ]).catch(err => ({ data: null, error: err }));
 
           // Check after edge function call
           if (shouldStopScanRef.current) {
@@ -754,6 +759,7 @@ export const PDFViewer = ({
           if (!shouldStopScanRef.current) {
             toast.error(`Error on page ${pageNum}`, { duration: 2000 });
           }
+          // Continue with next page instead of failing entire scan
         }
       }
 
@@ -761,12 +767,20 @@ export const PDFViewer = ({
       if (diagnosesToSave.length > 0 && !shouldStopScanRef.current) {
         toast.info("Saving all diagnoses to database...");
         for (const { pageNum, diagnosis } of diagnosesToSave) {
-          await handleSaveToDatabase(currentFileIndex, pageNum, diagnosis);
+          try {
+            await handleSaveToDatabase(currentFileIndex, pageNum, diagnosis);
+          } catch (saveError) {
+            console.error(`Failed to save diagnosis for page ${pageNum}:`, saveError);
+          }
         }
         
         // Refresh diagnoses from database to ensure they're loaded
         if (refreshDiagnoses) {
-          await refreshDiagnoses();
+          try {
+            await refreshDiagnoses();
+          } catch (refreshError) {
+            console.error('Failed to refresh diagnoses:', refreshError);
+          }
         }
       }
 
@@ -774,11 +788,12 @@ export const PDFViewer = ({
         toast.success(`Auto-scan complete! ${successCount}/${totalPages} pages diagnosed and saved to database.`);
       }
     } catch (error) {
-      console.error("Error in auto-scan:", error);
+      console.error("Fatal error in auto-scan:", error);
       if (!shouldStopScanRef.current) {
-        toast.error("Auto-scan failed");
+        toast.error("Auto-scan failed - please try again");
       }
     } finally {
+      // Always clean up state, even if there was an error
       setIsAutoScanning(false);
       shouldStopScanRef.current = false;
     }
