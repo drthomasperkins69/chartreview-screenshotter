@@ -70,6 +70,7 @@ interface PDFViewerProps {
   currentFileIndex: number;
   keywords: string;
   dateSearch: string;
+  referenceSearch: string;
   matchingPages: Set<number>;
   isSearching: boolean;
   onKeywordMatchesDetected: (matches: KeywordMatch[]) => void;
@@ -92,6 +93,7 @@ export const PDFViewer = ({
   currentFileIndex,
   keywords,
   dateSearch,
+  referenceSearch,
   matchingPages,
   isSearching,
   onKeywordMatchesDetected,
@@ -181,10 +183,144 @@ export const PDFViewer = ({
     // Scanning is now triggered manually via the triggerScan callback
   }, [triggerScan]);
 
+  // Function to generate multiple date format variations
+  const generateDateFormats = (dateInput: string): string[] => {
+    const formats: string[] = [];
+    
+    // Try to parse the date
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      // If can't parse, just search for the raw input
+      return [dateInput];
+    }
+
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const year = date.getFullYear();
+    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const monthName = monthNames[month - 1];
+    const monthNameShort = monthNamesShort[month - 1];
+    
+    const padZero = (num: number) => num.toString().padStart(2, '0');
+
+    // Generate all common date formats
+    formats.push(
+      // MM/DD/YYYY variations
+      `${padZero(month)}/${padZero(day)}/${year}`,
+      `${month}/${day}/${year}`,
+      `${padZero(month)}/${day}/${year}`,
+      `${month}/${padZero(day)}/${year}`,
+      
+      // DD/MM/YYYY variations
+      `${padZero(day)}/${padZero(month)}/${year}`,
+      `${day}/${month}/${year}`,
+      `${padZero(day)}/${month}/${year}`,
+      `${day}/${padZero(month)}/${year}`,
+      
+      // YYYY-MM-DD variations
+      `${year}-${padZero(month)}-${padZero(day)}`,
+      `${year}-${month}-${day}`,
+      
+      // Month DD, YYYY
+      `${monthName} ${padZero(day)}, ${year}`,
+      `${monthName} ${day}, ${year}`,
+      `${monthNameShort} ${padZero(day)}, ${year}`,
+      `${monthNameShort} ${day}, ${year}`,
+      
+      // DD Month YYYY
+      `${padZero(day)} ${monthName} ${year}`,
+      `${day} ${monthName} ${year}`,
+      `${padZero(day)} ${monthNameShort} ${year}`,
+      `${day} ${monthNameShort} ${year}`,
+      
+      // MM-DD-YYYY variations
+      `${padZero(month)}-${padZero(day)}-${year}`,
+      `${month}-${day}-${year}`,
+      
+      // DD-MM-YYYY variations
+      `${padZero(day)}-${padZero(month)}-${year}`,
+      `${day}-${month}-${year}`,
+      
+      // Month DD YYYY (no comma)
+      `${monthName} ${padZero(day)} ${year}`,
+      `${monthName} ${day} ${year}`,
+      `${monthNameShort} ${padZero(day)} ${year}`,
+      `${monthNameShort} ${day} ${year}`,
+      
+      // YYYY/MM/DD
+      `${year}/${padZero(month)}/${padZero(day)}`,
+      `${year}/${month}/${day}`,
+      
+      // DD.MM.YYYY (European)
+      `${padZero(day)}.${padZero(month)}.${year}`,
+      `${day}.${month}.${year}`
+    );
+
+    return [...new Set(formats)]; // Remove duplicates
+  };
+
+  // Function to parse references and extract dates + keywords
+  const parseReferences = (references: string): string[] => {
+    const terms: string[] = [];
+    const lines = references.split('\n').filter(l => l.trim());
+    
+    for (const line of lines) {
+      // Extract date patterns from the line
+      // Matches: "12 February 2019", "13 December 2021", "2022", "06 March 2023"
+      const datePatterns = [
+        /\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/gi,
+        /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/gi,
+        /\b\d{4}\b/g, // Just year
+        /\b\d{1,2}\s+\w+\s+\d{4}\b/gi, // DD Month YYYY
+      ];
+      
+      for (const pattern of datePatterns) {
+        const dateMatches = line.match(pattern);
+        if (dateMatches) {
+          for (const dateMatch of dateMatches) {
+            // Generate multiple formats for the date
+            try {
+              const date = new Date(dateMatch);
+              if (!isNaN(date.getTime())) {
+                terms.push(...generateDateFormats(date.toISOString().split('T')[0]));
+              }
+            } catch {
+              // If can't parse, just add the raw date string
+              terms.push(dateMatch);
+            }
+          }
+        }
+      }
+      
+      // Extract keywords from the line (split by comma)
+      const parts = line.split(',').map(p => p.trim()).filter(p => p);
+      for (const part of parts) {
+        // Skip the date parts we already extracted
+        let isDatePart = false;
+        for (const pattern of datePatterns) {
+          if (pattern.test(part)) {
+            isDatePart = true;
+            break;
+          }
+        }
+        if (!isDatePart && part.length > 2) {
+          terms.push(part.toLowerCase());
+        }
+      }
+    }
+    
+    return [...new Set(terms)]; // Remove duplicates
+  };
+
   useEffect(() => {
     const searchKeywords = async () => {
       if (files.length === 0 || !isSearching) return;
-      if (!keywords.trim() && !dateSearch.trim()) return;
+      if (!keywords.trim() && !dateSearch.trim() && !referenceSearch.trim()) return;
 
       const matches: KeywordMatch[] = [];
 
@@ -196,10 +332,13 @@ export const PDFViewer = ({
           const arrayBuffer = await file.arrayBuffer();
           const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
 
-          // Generate date format variations if searching by date
+          // Generate search terms based on input type
           let searchTerms: string[] = [];
           
-          if (dateSearch.trim()) {
+          if (referenceSearch.trim()) {
+            // Parse references and extract dates + keywords
+            searchTerms = parseReferences(referenceSearch);
+          } else if (dateSearch.trim()) {
             searchTerms = generateDateFormats(dateSearch);
           } else if (keywords.trim()) {
             searchTerms = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
@@ -219,8 +358,8 @@ export const PDFViewer = ({
               const searchTerm = term.toLowerCase();
               let matchCount = 0;
               
-              // For date searches, use exact matching
-              if (dateSearch.trim()) {
+              // For date or reference searches, use exact matching
+              if (dateSearch.trim() || referenceSearch.trim()) {
                 const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
                 matchCount = (pageText.match(regex) || []).length;
               } else {
@@ -259,89 +398,8 @@ export const PDFViewer = ({
       onKeywordMatchesDetected(matches);
     };
 
-    // Function to generate multiple date format variations
-    const generateDateFormats = (dateInput: string): string[] => {
-      const formats: string[] = [];
-      
-      // Try to parse the date
-      const date = new Date(dateInput);
-      if (isNaN(date.getTime())) {
-        // If can't parse, just search for the raw input
-        return [dateInput];
-      }
-
-      const month = date.getMonth() + 1;
-      const day = date.getDate();
-      const year = date.getFullYear();
-      
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'];
-      const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
-      const monthName = monthNames[month - 1];
-      const monthNameShort = monthNamesShort[month - 1];
-      
-      const padZero = (num: number) => num.toString().padStart(2, '0');
-
-      // Generate all common date formats
-      formats.push(
-        // MM/DD/YYYY variations
-        `${padZero(month)}/${padZero(day)}/${year}`,
-        `${month}/${day}/${year}`,
-        `${padZero(month)}/${day}/${year}`,
-        `${month}/${padZero(day)}/${year}`,
-        
-        // DD/MM/YYYY variations
-        `${padZero(day)}/${padZero(month)}/${year}`,
-        `${day}/${month}/${year}`,
-        `${padZero(day)}/${month}/${year}`,
-        `${day}/${padZero(month)}/${year}`,
-        
-        // YYYY-MM-DD variations
-        `${year}-${padZero(month)}-${padZero(day)}`,
-        `${year}-${month}-${day}`,
-        
-        // Month DD, YYYY
-        `${monthName} ${padZero(day)}, ${year}`,
-        `${monthName} ${day}, ${year}`,
-        `${monthNameShort} ${padZero(day)}, ${year}`,
-        `${monthNameShort} ${day}, ${year}`,
-        
-        // DD Month YYYY
-        `${padZero(day)} ${monthName} ${year}`,
-        `${day} ${monthName} ${year}`,
-        `${padZero(day)} ${monthNameShort} ${year}`,
-        `${day} ${monthNameShort} ${year}`,
-        
-        // MM-DD-YYYY variations
-        `${padZero(month)}-${padZero(day)}-${year}`,
-        `${month}-${day}-${year}`,
-        
-        // DD-MM-YYYY variations
-        `${padZero(day)}-${padZero(month)}-${year}`,
-        `${day}-${month}-${year}`,
-        
-        // Month DD YYYY (no comma)
-        `${monthName} ${padZero(day)} ${year}`,
-        `${monthName} ${day} ${year}`,
-        `${monthNameShort} ${padZero(day)} ${year}`,
-        `${monthNameShort} ${day} ${year}`,
-        
-        // YYYY/MM/DD
-        `${year}/${padZero(month)}/${padZero(day)}`,
-        `${year}/${month}/${day}`,
-        
-        // DD.MM.YYYY (European)
-        `${padZero(day)}.${padZero(month)}.${year}`,
-        `${day}.${month}.${year}`
-      );
-
-      return [...new Set(formats)]; // Remove duplicates
-    };
-
     searchKeywords();
-  }, [files, keywords, dateSearch, isSearching, onKeywordMatchesDetected]);
+  }, [files, keywords, dateSearch, referenceSearch, isSearching, onKeywordMatchesDetected]);
 
   // Function to extract and format dates from text using regex
   const extractDatesFromText = (text: string): string[] => {

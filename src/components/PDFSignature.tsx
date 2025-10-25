@@ -185,6 +185,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
   const [searchDate, setSearchDate] = useState<string>("");
+  const [referenceSearch, setReferenceSearch] = useState<string>("");
   const [pdfContent, setPdfContent] = useState<PDFContent[]>([]);
   const [searchCategories, setSearchCategories] = useState<Array<{
     id: number;
@@ -533,13 +534,13 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   }, [currentPdfIndex, pdfFiles.length]);
 
   const handleSearch = useCallback(() => {
-    if (!keywords.trim() && !searchDate) {
-      toast("Please enter keywords or select a date to search");
+    if (!keywords.trim() && !searchDate && !referenceSearch.trim()) {
+      toast("Please enter keywords, select a date, or enter references to search");
       return;
     }
     setIsSearching(true);
-    toast(searchDate ? "Searching for date and keywords..." : "Searching for keywords...");
-  }, [keywords, searchDate]);
+    toast(referenceSearch ? "Searching references..." : searchDate ? "Searching for date and keywords..." : "Searching for keywords...");
+  }, [keywords, searchDate, referenceSearch]);
 
   const handleDownload = useCallback(async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -2747,6 +2748,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                         currentFileIndex={currentPdfIndex}
                         keywords={keywords}
                         dateSearch={searchDate}
+                        referenceSearch={referenceSearch}
                         matchingPages={matchingPages}
                         isSearching={isSearching}
                         onKeywordMatchesDetected={handleKeywordMatchesDetected}
@@ -2899,7 +2901,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                                     </p>
                                   </div>
 
-                                  <div>
+                                   <div>
                                     <Label htmlFor="searchDate" className="text-sm font-medium mb-2 block">
                                       Search by Date
                                     </Label>
@@ -2914,7 +2916,23 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                                       Searches for dates in multiple formats (MM/DD/YYYY, DD/MM/YYYY, Month DD, YYYY, etc.)
                                     </p>
                                   </div>
-                                  
+
+                                  <div>
+                                    <Label htmlFor="referenceSearch" className="text-sm font-medium mb-2 block">
+                                      Search by References
+                                    </Label>
+                                    <Textarea
+                                      id="referenceSearch"
+                                      placeholder="Paste references here, e.g.:&#10;12 February 2019, PCL-C Assessment, Medical Officer, Mental Health&#10;2022, Submarine Deployment Medical Record"
+                                      value={referenceSearch}
+                                      onChange={(e) => setReferenceSearch(e.target.value)}
+                                      className="min-h-[80px]"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Extracts dates and keywords from reference entries automatically
+                                    </p>
+                                  </div>
+                                   
                                   <div className="flex gap-2">
                                    {suggestedKeywords && (
                                      <Button 
@@ -2927,14 +2945,14 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                                      </Button>
                                    )}
                                    
-                                    <Button 
-                                      onClick={handleSearch} 
-                                      className="gap-2"
-                                      disabled={isSearching || (!keywords.trim() && !searchDate) || pdfFiles.length === 0}
-                                    >
-                                      <Search className="w-4 h-4" />
-                                      {isSearching ? "Searching..." : "Search"}
-                                     </Button>
+                                     <Button 
+                                       onClick={handleSearch} 
+                                       className="gap-2"
+                                       disabled={isSearching || (!keywords.trim() && !searchDate && !referenceSearch.trim()) || pdfFiles.length === 0}
+                                     >
+                                       <Search className="w-4 h-4" />
+                                       {isSearching ? "Searching..." : "Search"}
+                                      </Button>
                                   </div>
                                 </div>
                              </div>
