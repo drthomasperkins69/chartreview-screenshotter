@@ -199,6 +199,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [selectedPagesForExtraction, setSelectedPagesForExtraction] = useState<Set<string>>(new Set());
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchResults, setBatchResults] = useState<Map<string, Blob>>(new Map());
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
   const [activeTab, setActiveTab] = useState("categories");
@@ -541,6 +543,125 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     setIsSearching(true);
     toast(referenceSearch ? "Searching references..." : searchDate ? "Searching for date and keywords..." : "Searching for keywords...");
   }, [keywords, searchDate, referenceSearch]);
+
+  const handleBatchSearch = useCallback(async () => {
+    if (!keywords.trim() && !searchDate && !referenceSearch.trim()) {
+      toast("Please enter keywords, select a date, or enter references to search");
+      return;
+    }
+
+    setIsBatchProcessing(true);
+    setBatchResults(new Map());
+    
+    try {
+      const searchTerms = keywords.split(',').map(k => k.trim()).filter(k => k);
+      
+      if (searchTerms.length === 0 && !searchDate && !referenceSearch.trim()) {
+        toast("No valid search terms found");
+        setIsBatchProcessing(false);
+        return;
+      }
+
+      toast(`Processing ${searchTerms.length} search${searchTerms.length !== 1 ? 'es' : ''}...`);
+      
+      const results = new Map<string, Blob>();
+      
+      // Process each keyword separately
+      for (const term of searchTerms) {
+        // Trigger search for this term
+        const tempMatches: KeywordMatch[] = [];
+        
+        // Search through all PDFs for this term
+        for (let fileIndex = 0; fileIndex < pdfFiles.length; fileIndex++) {
+          const fileContent = pdfContent.find(pc => pc.fileIndex === fileIndex);
+          if (!fileContent) continue;
+          
+          for (const page of fileContent.pages) {
+            if (page.text.toLowerCase().includes(term.toLowerCase())) {
+              tempMatches.push({
+                page: page.pageNum,
+                keyword: term,
+                count: 1,
+                fileName: pdfFiles[fileIndex].name,
+                fileIndex
+              });
+            }
+          }
+        }
+        
+        // Create PDF for this term if matches found
+        if (tempMatches.length > 0) {
+          const newPdfDoc = await PDFDocument.create();
+          
+          const pagesByFile = new Map<number, number[]>();
+          tempMatches.forEach(match => {
+            if (!pagesByFile.has(match.fileIndex)) {
+              pagesByFile.set(match.fileIndex, []);
+            }
+            if (!pagesByFile.get(match.fileIndex)!.includes(match.page)) {
+              pagesByFile.get(match.fileIndex)!.push(match.page);
+            }
+          });
+          
+          const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
+          
+          for (const fileIndex of sortedFileIndices) {
+            const pages = pagesByFile.get(fileIndex)!.sort((a, b) => a - b);
+            const file = pdfFiles[fileIndex];
+            
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await PDFDocument.load(arrayBuffer);
+            
+            for (const pageNum of pages) {
+              const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+              newPdfDoc.addPage(copiedPage);
+            }
+          }
+          
+          const pdfBytes = await newPdfDoc.save();
+          const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+          results.set(term, blob);
+        }
+      }
+      
+      setBatchResults(results);
+      toast(`Created ${results.size} PDF${results.size !== 1 ? 's' : ''} from batch search!`);
+    } catch (error) {
+      console.error("Batch search error:", error);
+      toast("Failed to process batch search");
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }, [keywords, searchDate, referenceSearch, pdfFiles, pdfContent]);
+
+  const handleDownloadBatchZip = useCallback(async () => {
+    if (batchResults.size === 0) {
+      toast("No batch results to download");
+      return;
+    }
+
+    try {
+      const zip = new JSZip();
+      
+      for (const [term, blob] of batchResults.entries()) {
+        const safeFileName = term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        zip.file(`${safeFileName}.pdf`, blob);
+      }
+      
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `batch-search-results-${Date.now()}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast(`Downloaded ZIP with ${batchResults.size} PDF${batchResults.size !== 1 ? 's' : ''}!`);
+    } catch (error) {
+      console.error("Error creating ZIP:", error);
+      toast("Failed to create ZIP file");
+    }
+  }, [batchResults]);
 
   const handleDownload = useCallback(async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -2880,85 +3001,12 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                                        </div>
                                      ))}
                                    </div>
-                                 </div>
-                               </div>
-
-                                {/* Main Search Input */}
-                                <div className="pt-4 border-t space-y-4">
-                                  <div>
-                                    <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
-                                      Search Keywords
-                                    </Label>
-                                    <Input
-                                      id="keywords"
-                                      placeholder="e.g., contract, invoice, report"
-                                      value={keywords}
-                                      onChange={(e) => setKeywords(e.target.value)}
-                                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      Separate multiple keywords with commas
-                                    </p>
-                                  </div>
-
-                                   <div>
-                                    <Label htmlFor="searchDate" className="text-sm font-medium mb-2 block">
-                                      Search by Date
-                                    </Label>
-                                    <Input
-                                      id="searchDate"
-                                      type="date"
-                                      value={searchDate}
-                                      onChange={(e) => setSearchDate(e.target.value)}
-                                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      Searches for dates in multiple formats (MM/DD/YYYY, DD/MM/YYYY, Month DD, YYYY, etc.)
-                                    </p>
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="referenceSearch" className="text-sm font-medium mb-2 block">
-                                      Search by References
-                                    </Label>
-                                    <Textarea
-                                      id="referenceSearch"
-                                      placeholder="Paste references here, e.g.:&#10;12 February 2019, PCL-C Assessment, Medical Officer, Mental Health&#10;2022, Submarine Deployment Medical Record"
-                                      value={referenceSearch}
-                                      onChange={(e) => setReferenceSearch(e.target.value)}
-                                      className="min-h-[80px]"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      Extracts dates and keywords from reference entries automatically
-                                    </p>
-                                  </div>
-                                   
-                                  <div className="flex gap-2">
-                                   {suggestedKeywords && (
-                                     <Button 
-                                       onClick={useSuggestedKeywords}
-                                       variant="outline"
-                                       className="gap-2"
-                                       size="sm"
-                                     >
-                                       Use Keywords
-                                     </Button>
-                                   )}
-                                   
-                                     <Button 
-                                       onClick={handleSearch} 
-                                       className="gap-2"
-                                       disabled={isSearching || (!keywords.trim() && !searchDate && !referenceSearch.trim()) || pdfFiles.length === 0}
-                                     >
-                                       <Search className="w-4 h-4" />
-                                       {isSearching ? "Searching..." : "Search"}
-                                      </Button>
                                   </div>
                                 </div>
-                             </div>
-                           </div>
-                         </ScrollArea>
-                       </TabsContent>
+                              </div>
+                            </div>
+                          </ScrollArea>
+                        </TabsContent>
                      </Tabs>
                    </Card>
                  </ResizablePanel>
@@ -3100,6 +3148,105 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
             </div>
           </Card>
         )}
+
+        {/* Keyword Search Section - Above Diagnosis Tracker */}
+        <Card className="mt-4">
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Search Keywords & Batch Process</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
+                  Search by Keywords
+                </Label>
+                <Input
+                  id="keywords"
+                  placeholder="e.g. pain, surgery, diagnosis"
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Separate multiple keywords with commas
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="searchDate" className="text-sm font-medium mb-2 block">
+                  Search by Date
+                </Label>
+                <Input
+                  id="searchDate"
+                  type="date"
+                  value={searchDate}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Searches for dates in multiple formats (MM/DD/YYYY, DD/MM/YYYY, Month DD, YYYY, etc.)
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="referenceSearch" className="text-sm font-medium mb-2 block">
+                  Search by References
+                </Label>
+                <Textarea
+                  id="referenceSearch"
+                  placeholder="Paste references here, e.g.:&#10;12 February 2019, PCL-C Assessment, Medical Officer, Mental Health&#10;2022, Submarine Deployment Medical Record"
+                  value={referenceSearch}
+                  onChange={(e) => setReferenceSearch(e.target.value)}
+                  className="min-h-[80px]"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Extracts dates and keywords from reference entries automatically
+                </p>
+              </div>
+              
+              <div className="flex gap-2 flex-wrap">
+                {suggestedKeywords && (
+                  <Button 
+                    onClick={useSuggestedKeywords}
+                    variant="outline"
+                    className="gap-2"
+                    size="sm"
+                  >
+                    Use Keywords
+                  </Button>
+                )}
+                
+                <Button 
+                  onClick={handleSearch} 
+                  className="gap-2"
+                  disabled={isSearching || (!keywords.trim() && !searchDate && !referenceSearch.trim()) || pdfFiles.length === 0}
+                >
+                  <Search className="w-4 h-4" />
+                  {isSearching ? "Searching..." : "Search"}
+                </Button>
+
+                <Button 
+                  onClick={handleBatchSearch} 
+                  variant="secondary"
+                  className="gap-2"
+                  disabled={isBatchProcessing || !keywords.trim() || pdfFiles.length === 0}
+                >
+                  <FileArchive className="w-4 h-4" />
+                  {isBatchProcessing ? "Processing..." : "Batch Search All"}
+                </Button>
+
+                {batchResults.size > 0 && (
+                  <Button 
+                    onClick={handleDownloadBatchZip} 
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download ZIP ({batchResults.size} PDFs)
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
 
         {/* Diagnosis Tracker - Full Width */}
         <Card className="mt-4 p-4">
