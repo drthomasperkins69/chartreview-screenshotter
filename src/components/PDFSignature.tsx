@@ -184,6 +184,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   }, [selectedFile, pdfFiles.length, fileMetadata]);
   const [keywords, setKeywords] = useState<string>("");
   const [suggestedKeywords, setSuggestedKeywords] = useState<string>("");
+  const [searchDate, setSearchDate] = useState<string>("");
   const [pdfContent, setPdfContent] = useState<PDFContent[]>([]);
   const [searchCategories, setSearchCategories] = useState<Array<{
     id: number;
@@ -532,13 +533,13 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   }, [currentPdfIndex, pdfFiles.length]);
 
   const handleSearch = useCallback(() => {
-    if (!keywords.trim()) {
-      toast("Please enter keywords to search");
+    if (!keywords.trim() && !searchDate) {
+      toast("Please enter keywords or select a date to search");
       return;
     }
     setIsSearching(true);
-    toast("Searching for keywords...");
-  }, [keywords]);
+    toast(searchDate ? "Searching for date and keywords..." : "Searching for keywords...");
+  }, [keywords, searchDate]);
 
   const handleDownload = useCallback(async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -2745,7 +2746,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                         files={pdfFiles}
                         currentFileIndex={currentPdfIndex}
                         keywords={keywords}
-                        dateSearch=""
+                        dateSearch={searchDate}
                         matchingPages={matchingPages}
                         isSearching={isSearching}
                         onKeywordMatchesDetected={handleKeywordMatchesDetected}
@@ -2880,21 +2881,41 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                                  </div>
                                </div>
 
-                               {/* Main Search Input */}
-                               <div className="pt-4 border-t">
-                                 <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
-                                   Search Keywords
-                                 </Label>
-                                 <Input
-                                   id="keywords"
-                                   placeholder="e.g., contract, invoice, report"
-                                   value={keywords}
-                                   onChange={(e) => setKeywords(e.target.value)}
-                                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                   className="mb-2"
-                                 />
-                                 
-                                 <div className="flex gap-2">
+                                {/* Main Search Input */}
+                                <div className="pt-4 border-t space-y-4">
+                                  <div>
+                                    <Label htmlFor="keywords" className="text-sm font-medium mb-2 block">
+                                      Search Keywords
+                                    </Label>
+                                    <Input
+                                      id="keywords"
+                                      placeholder="e.g., contract, invoice, report"
+                                      value={keywords}
+                                      onChange={(e) => setKeywords(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Separate multiple keywords with commas
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor="searchDate" className="text-sm font-medium mb-2 block">
+                                      Search by Date
+                                    </Label>
+                                    <Input
+                                      id="searchDate"
+                                      type="date"
+                                      value={searchDate}
+                                      onChange={(e) => setSearchDate(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Searches for dates in multiple formats (MM/DD/YYYY, DD/MM/YYYY, Month DD, YYYY, etc.)
+                                    </p>
+                                  </div>
+                                  
+                                  <div className="flex gap-2">
                                    {suggestedKeywords && (
                                      <Button 
                                        onClick={useSuggestedKeywords}
@@ -2906,19 +2927,16 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                                      </Button>
                                    )}
                                    
-                                   <Button 
-                                     onClick={handleSearch} 
-                                     className="gap-2"
-                                     disabled={isSearching || !keywords.trim() || pdfFiles.length === 0}
-                                   >
-                                     <Search className="w-4 h-4" />
-                                     {isSearching ? "Searching..." : "Search"}
-                                   </Button>
-                                 </div>
-                                 <p className="text-xs text-muted-foreground mt-2">
-                                   Separate multiple keywords with commas
-                                 </p>
-                               </div>
+                                    <Button 
+                                      onClick={handleSearch} 
+                                      className="gap-2"
+                                      disabled={isSearching || (!keywords.trim() && !searchDate) || pdfFiles.length === 0}
+                                    >
+                                      <Search className="w-4 h-4" />
+                                      {isSearching ? "Searching..." : "Search"}
+                                     </Button>
+                                  </div>
+                                </div>
                              </div>
                            </div>
                          </ScrollArea>
