@@ -3201,6 +3201,88 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                   Extracts dates and keywords from reference entries automatically
                 </p>
               </div>
+
+              {/* Body Regions */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Body Regions</h3>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 border rounded-lg p-3">
+                  {searchCategories.filter(cat => BODY_PART_IDS.includes(cat.id)).map((category) => (
+                    <div key={category.id} className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id={`category-${category.id}`}
+                        checked={category.checked}
+                        onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                        className="mt-1 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <Label 
+                          htmlFor={`category-${category.id}`} 
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          {category.label}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Keywords"
+                            value={category.terms}
+                            onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                            className="text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => saveCategoryTerms(category.id)}
+                            className="whitespace-nowrap"
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Conditions */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-primary">Conditions</h3>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 border rounded-lg p-3">
+                  {searchCategories.filter(cat => CONDITION_IDS.includes(cat.id)).map((category) => (
+                    <div key={category.id} className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id={`category-${category.id}`}
+                        checked={category.checked}
+                        onChange={(e) => handleCategoryCheckbox(category.id, e.target.checked)}
+                        className="mt-1 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <Label 
+                          htmlFor={`category-${category.id}`} 
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          {category.label}
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Keywords"
+                            value={category.terms}
+                            onChange={(e) => updateCategoryTerms(category.id, e.target.value)}
+                            className="text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => saveCategoryTerms(category.id)}
+                            className="whitespace-nowrap"
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               
               <div className="flex gap-2 flex-wrap">
                 {suggestedKeywords && (
