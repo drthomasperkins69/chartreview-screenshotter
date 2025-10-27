@@ -576,6 +576,43 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       
       let totalMatchedPages = 0;
       
+      // Import pdfjs
+      const pdfjsLib = await import("pdfjs-dist");
+      
+      // Levenshtein distance for fuzzy matching (same as PDFViewer)
+      const levenshteinDistance = (str1: string, str2: string): number => {
+        const len1 = str1.length;
+        const len2 = str2.length;
+        const matrix: number[][] = [];
+
+        for (let i = 0; i <= len1; i++) {
+          matrix[i] = [i];
+        }
+        for (let j = 0; j <= len2; j++) {
+          matrix[0][j] = j;
+        }
+
+        for (let i = 1; i <= len1; i++) {
+          for (let j = 1; j <= len2; j++) {
+            const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j - 1] + cost
+            );
+          }
+        }
+
+        return matrix[len1][len2];
+      };
+
+      const similarityScore = (str1: string, str2: string): number => {
+        const maxLen = Math.max(str1.length, str2.length);
+        if (maxLen === 0) return 1.0;
+        const distance = levenshteinDistance(str1.toLowerCase(), str2.toLowerCase());
+        return 1 - distance / maxLen;
+      };
+      
       // Process each category
       for (const { category, terms } of allSearchTerms) {
         // Add category separator page
@@ -598,55 +635,73 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
           color: rgb(0.3, 0.3, 0.3),
         });
         
+        // Collect all matching pages for this category
+        const categoryMatches = new Map<number, Set<number>>(); // fileIndex -> Set of page numbers
+        
         // Process each term in this category
         for (const term of terms) {
-          const tempMatches: KeywordMatch[] = [];
+          const searchTerm = term.toLowerCase();
           
-          // Search through all PDFs for this term
+          // Search through all PDFs for this term using fuzzy matching like PDFViewer
           for (let fileIndex = 0; fileIndex < pdfFiles.length; fileIndex++) {
-            const fileContent = pdfContent.find(pc => pc.fileIndex === fileIndex);
-            if (!fileContent) continue;
+            const file = pdfFiles[fileIndex];
             
-            for (const page of fileContent.pages) {
-              if (page.text.toLowerCase().includes(term.toLowerCase())) {
-                tempMatches.push({
-                  page: page.pageNum,
-                  keyword: term,
-                  count: 1,
-                  fileName: pdfFiles[fileIndex].name,
-                  fileIndex
-                });
+            try {
+              const arrayBuffer = await file.arrayBuffer();
+              const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+              
+              for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                const page = await pdfDoc.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items
+                  .map((item: any) => item.str)
+                  .join(' ');
+                
+                // Extract words from page text
+                const pageWords = pageText.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+                
+                // Use fuzzy matching with 0.85 threshold (same as PDFViewer)
+                const SIMILARITY_THRESHOLD = 0.85;
+                let matchFound = false;
+                
+                for (const word of pageWords) {
+                  const cleanWord = word.replace(/[^\w]/g, '');
+                  if (cleanWord.length === 0) continue;
+                  
+                  const similarity = similarityScore(searchTerm, cleanWord);
+                  if (similarity >= SIMILARITY_THRESHOLD) {
+                    matchFound = true;
+                    break;
+                  }
+                }
+                
+                if (matchFound) {
+                  if (!categoryMatches.has(fileIndex)) {
+                    categoryMatches.set(fileIndex, new Set());
+                  }
+                  categoryMatches.get(fileIndex)!.add(pageNum);
+                }
               }
+            } catch (error) {
+              console.error(`Error searching file ${file.name}:`, error);
             }
           }
+        }
+        
+        // Add all matched pages for this category to the combined PDF
+        const sortedFileIndices = Array.from(categoryMatches.keys()).sort((a, b) => a - b);
+        
+        for (const fileIndex of sortedFileIndices) {
+          const pages = Array.from(categoryMatches.get(fileIndex)!).sort((a, b) => a - b);
+          const file = pdfFiles[fileIndex];
           
-          // Add matched pages to combined PDF
-          if (tempMatches.length > 0) {
-            const pagesByFile = new Map<number, number[]>();
-            tempMatches.forEach(match => {
-              if (!pagesByFile.has(match.fileIndex)) {
-                pagesByFile.set(match.fileIndex, []);
-              }
-              if (!pagesByFile.get(match.fileIndex)!.includes(match.page)) {
-                pagesByFile.get(match.fileIndex)!.push(match.page);
-              }
-            });
-            
-            const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
-            
-            for (const fileIndex of sortedFileIndices) {
-              const pages = pagesByFile.get(fileIndex)!.sort((a, b) => a - b);
-              const file = pdfFiles[fileIndex];
-              
-              const arrayBuffer = await file.arrayBuffer();
-              const pdfDoc = await PDFDocument.load(arrayBuffer);
-              
-              for (const pageNum of pages) {
-                const [copiedPage] = await combinedPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
-                combinedPdfDoc.addPage(copiedPage);
-                totalMatchedPages++;
-              }
-            }
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfDoc = await PDFDocument.load(arrayBuffer);
+          
+          for (const pageNum of pages) {
+            const [copiedPage] = await combinedPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+            combinedPdfDoc.addPage(copiedPage);
+            totalMatchedPages++;
           }
         }
       }
@@ -668,7 +723,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     } finally {
       setIsBatchProcessing(false);
     }
-  }, [searchCategories, pdfFiles, pdfContent]);
+  }, [searchCategories, pdfFiles]);
 
 
   const handleDownload = useCallback(async () => {
