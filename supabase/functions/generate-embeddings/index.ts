@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const requestSchema = z.object({
+  fileId: z.string().uuid(),
+  content: z.string().max(100000),
+  pageNumber: z.number().int().positive()
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,14 +19,8 @@ serve(async (req) => {
   }
 
   try {
-    const { fileId, content, pageNumber } = await req.json();
-
-    if (!fileId || !content || pageNumber === undefined) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields: fileId, content, pageNumber' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const rawBody = await req.json();
+    const { fileId, content, pageNumber } = requestSchema.parse(rawBody);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -31,7 +32,6 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Split content into chunks (max 1000 chars per chunk)
     const chunkSize = 1000;
     const chunks: string[] = [];
     
@@ -41,12 +41,10 @@ serve(async (req) => {
 
     console.log(`Generating embeddings for ${chunks.length} chunks from file ${fileId}, page ${pageNumber}`);
 
-    // Generate embeddings for each chunk using Lovable AI
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       
       try {
-        // Use text-embedding-3-small model via Lovable AI
         const embeddingResponse = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
           method: "POST",
           headers: {
@@ -68,7 +66,6 @@ serve(async (req) => {
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
 
-        // Store embedding in database
         const { error: insertError } = await supabase
           .from('document_embeddings')
           .insert({
@@ -95,6 +92,14 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in generate-embeddings:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1,9 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const contentSchema = z.object({
+  pageNumber: z.number().int().positive(),
+  text: z.string().max(50000).optional(),
+  image: z.string().max(10 * 1024 * 1024).optional()
+});
+
+const requestSchema = z.object({
+  instructions: z.string().min(1).max(5000),
+  selectedContent: z.array(contentSchema).min(1).max(50),
+  sopContent: z.string().max(100000).optional(),
+  model: z.string().max(50).default('gemini')
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,16 +25,9 @@ serve(async (req) => {
   }
 
   try {
-    const { instructions, selectedContent, sopContent, model = "gemini" } = await req.json();
+    const rawBody = await req.json();
+    const { instructions, selectedContent, sopContent, model } = requestSchema.parse(rawBody);
 
-    if (!instructions || !selectedContent || selectedContent.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Instructions and selected content are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Log what we received
     console.log(`Received ${selectedContent.length} pages`);
     console.log(`Pages with images: ${selectedContent.filter((p: any) => p.image).length}`);
     console.log(`Pages with text: ${selectedContent.filter((p: any) => p.text && p.text.trim()).length}`);
@@ -236,6 +243,14 @@ IMPORTANT: ${selectedContent.length} page image(s) are attached below. These con
     }
   } catch (error) {
     console.error("Error in generate-diagnostic-assessment:", error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

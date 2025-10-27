@@ -1,10 +1,26 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const messageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().max(50000)
+});
+
+const requestSchema = z.object({
+  provider: z.enum(['lovable', 'claude', 'gemini', 'grok', 'perplexity', 'openai']),
+  messages: z.array(messageSchema).min(1).max(50),
+  model: z.string().max(50).optional(),
+  workspaceFiles: z.array(z.object({
+    file_name: z.string(),
+    page_count: z.number().optional()
+  })).max(100).optional()
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +28,9 @@ serve(async (req) => {
   }
 
   try {
-    const { provider, messages, model, workspaceFiles = [] } = await req.json();
+    const rawBody = await req.json();
+    const { provider, messages, model: rawModel, workspaceFiles = [] } = requestSchema.parse(rawBody);
+    const model = rawModel || 'default';
     console.log(`Processing ${provider} chat request with model: ${model}`);
     console.log(`Workspace files available: ${workspaceFiles.length}`);
 
@@ -46,6 +64,14 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Chat error:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
       JSON.stringify({ error: errorMessage }),

@@ -1,10 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const requestSchema = z.object({
+  diagnosis: z.string().min(1).max(500),
+  pdfContent: z.string().max(200000)
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,14 +18,8 @@ serve(async (req) => {
   }
 
   try {
-    const { diagnosis, pdfContent } = await req.json();
-    
-    if (!diagnosis || !pdfContent) {
-      return new Response(
-        JSON.stringify({ error: 'Missing diagnosis or pdfContent' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const rawBody = await req.json();
+    const { diagnosis, pdfContent } = requestSchema.parse(rawBody);
 
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) {
@@ -31,7 +31,6 @@ serve(async (req) => {
 
     console.log('Generating diagnosis form for:', diagnosis);
 
-    // Prepare the prompt for Claude
     const systemPrompt = `You are a medical documentation assistant helping to fill out a DVA (Department of Veterans' Affairs) Diagnosis Form. Based on the provided medical records and diagnosis, extract and organize relevant information to complete the form fields.
 
 Return the information in this exact JSON format:
@@ -85,10 +84,8 @@ Analyze these medical records and extract information for a DVA Diagnosis Form.`
     
     console.log('Claude response:', aiContent);
 
-    // Parse JSON from Claude response
     let formData;
     try {
-      // Extract JSON from markdown code blocks if present
       const jsonMatch = aiContent.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
                        aiContent.match(/(\{[\s\S]*\})/);
       formData = JSON.parse(jsonMatch ? jsonMatch[1] : aiContent);
@@ -100,16 +97,14 @@ Analyze these medical records and extract information for a DVA Diagnosis Form.`
       );
     }
 
-    // Create PDF
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     const { width, height } = page.getSize();
     let yPosition = height - 50;
 
-    // Helper function to draw text with wrapping
     const drawText = (text: string, x: number, y: number, size: number, maxWidth: number, currentFont = font) => {
       const words = text.split(' ');
       let line = '';
@@ -136,35 +131,29 @@ Analyze these medical records and extract information for a DVA Diagnosis Form.`
       return currentY;
     };
 
-    // Title
     page.drawText('DVA Diagnosis Form', { x: 50, y: yPosition, size: 20, font: boldFont, color: rgb(0, 0, 0) });
     yPosition -= 40;
 
-    // Medical Diagnosis
     page.drawText('Medical Diagnosis:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
     yPosition -= 20;
     yPosition = drawText(formData.medicalDiagnosis || 'Not specified', 50, yPosition, 10, width - 100);
     yPosition -= 20;
 
-    // Basis for Diagnosis
     page.drawText('Basis for Diagnosis:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
     yPosition -= 20;
     yPosition = drawText(formData.basisForDiagnosis || 'Not specified', 50, yPosition, 10, width - 100);
     yPosition -= 20;
 
-    // Related Conditions
     page.drawText('Related Diagnosed Conditions:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
     yPosition -= 20;
     yPosition = drawText(formData.relatedConditions || 'None specified', 50, yPosition, 10, width - 100);
     yPosition -= 20;
 
-    // Date of Onset
     page.drawText('Approximate Date of Onset:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
     yPosition -= 20;
     page.drawText(formData.dateOfOnset || 'Not specified', { x: 50, y: yPosition, size: 10, font, color: rgb(0, 0, 0) });
     yPosition -= 30;
 
-    // Date of First Consultation
     page.drawText('Date of First Consultation:', { x: 50, y: yPosition, size: 12, font: boldFont, color: rgb(0, 0, 0) });
     yPosition -= 20;
     const today = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -186,6 +175,14 @@ Analyze these medical records and extract information for a DVA Diagnosis Form.`
 
   } catch (error) {
     console.error('Error generating diagnosis form:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

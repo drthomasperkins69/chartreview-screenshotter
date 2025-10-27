@@ -1,10 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const requestSchema = z.object({
+  pageImage: z.string().max(10 * 1024 * 1024).optional(),
+  pageText: z.string().max(50000).optional(),
+  fileName: z.string().max(255),
+  pageNum: z.number().int().positive(),
+  model: z.string().max(50).default('gemini-2.5-flash')
+}).refine(data => data.pageImage || data.pageText, {
+  message: "Either pageImage or pageText must be provided"
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,14 +23,8 @@ serve(async (req) => {
   }
 
   try {
-    const { pageImage, pageText, fileName, pageNum, model = "gemini-2.5-flash" } = await req.json();
-
-    if (!pageImage && !pageText) {
-      return new Response(
-        JSON.stringify({ error: "Page image or text is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const rawBody = await req.json();
+    const { pageImage, pageText, fileName, pageNum, model } = requestSchema.parse(rawBody);
 
     console.log(`Analyzing page ${pageNum} from ${fileName} using model: ${model}`);
 
@@ -211,6 +216,14 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in suggest-diagnosis:", error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

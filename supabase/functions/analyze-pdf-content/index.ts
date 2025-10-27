@@ -1,9 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const requestSchema = z.object({
+  query: z.string().min(1).max(500),
+  pdfContent: z.array(z.any()).max(100),
+  model: z.string().max(50).default('gemini')
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,69 +18,20 @@ serve(async (req) => {
   }
 
   try {
-    const { query, pdfContent, model = "gemini" } = await req.json();
-    
-    if (!query || !pdfContent || !Array.isArray(pdfContent)) {
-      return new Response(
-        JSON.stringify({ error: "Missing query or pdfContent" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const rawBody = await req.json();
+    const { query, pdfContent, model } = requestSchema.parse(rawBody);
 
-    // Build context from PDF content - send ALL text per page
     const pdfContext = pdfContent.map((doc: any) => 
       `Document: ${doc.fileName}\n${doc.pages.map((p: any) => 
         `Page ${p.pageNum}: ${p.text}`
       ).join('\n\n')}`
     ).join('\n\n=== NEXT DOCUMENT ===\n\n');
 
-    // Detect if this is a date-based query
     const isDateQuery = /\b(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(query);
 
     const systemPrompt = isDateQuery 
-      ? `You are a medical document analyzer specialized in finding pages with specific dates.
-
-PRIMARY TASK: Extract dates from the user's query and, for EACH DATE, choose the SINGLE MOST RELEVANT PAGE that contains that date (or an equivalent format). Do not return multiple pages for the same date.
-
-CRITICAL INSTRUCTIONS:
-- Identify explicit dates in the user's query (e.g., "20 March 1989")
-- Consider equivalent formats (e.g., 20/03/1989, 1989-03-20, 20 Mar 89)
-- For each query date, pick ONE best page only. If several pages mention it, choose the one that most clearly references that date and context.
-- Include the matched date for that page as a separate field: matchedDate
-- Do NOT include keyword suggestions for date queries; return an empty array for keywords
-- Do NOT duplicate the same page across multiple entries
-
-Return ONLY valid JSON (no markdown) with this exact structure:
-{
-  "relevantPages": [
-    { "fileIndex": 0, "pageNum": 1, "matchedDate": "1989-03-20 or '20 March 1989'", "reason": "Date: 20/03/1989 - brief description" }
-  ],
-  "keywords": []
-}`
-      : `You are a medical document analyzer specialized in extracting pages relevant to medical conditions and topics.
-
-PRIMARY TASK: Find ALL pages that contain information about the conditions, symptoms, or medical topics mentioned in the query.
-
-KEY INSTRUCTIONS:
-- Match medical conditions, symptoms, diagnoses, treatments, and procedures
-- Be generous in matches - if a page has ANY relevance to the query, include it
-- Extract the specific reasons why each page is relevant
-- Suggest relevant search keywords based on the query
-- Return ONE entry per page (do NOT duplicate pages)
-
-Return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
-{
-  "relevantPages": [
-    {
-      "fileIndex": 0,
-      "pageNum": 1,
-      "reason": "Brief explanation of why this page matches"
-    }
-  ],
-  "keywords": ["keyword1", "keyword2"]
-}
-
-If you find relevant pages, include them. If not, return empty arrays but still valid JSON.`;
+      ? `You are a medical document analyzer specialized in finding pages with specific dates.\n\nPRIMARY TASK: Extract dates from the user's query and, for EACH DATE, choose the SINGLE MOST RELEVANT PAGE that contains that date (or an equivalent format). Do not return multiple pages for the same date.\n\nCRITICAL INSTRUCTIONS:\n- Identify explicit dates in the user's query (e.g., "20 March 1989")\n- Consider equivalent formats (e.g., 20/03/1989, 1989-03-20, 20 Mar 89)\n- For each query date, pick ONE best page only. If several pages mention it, choose the one that most clearly references that date and context.\n- Include the matched date for that page as a separate field: matchedDate\n- Do NOT include keyword suggestions for date queries; return an empty array for keywords\n- Do NOT duplicate the same page across multiple entries\n\nReturn ONLY valid JSON (no markdown) with this exact structure:\n{\n  "relevantPages": [\n    { "fileIndex": 0, "pageNum": 1, "matchedDate": "1989-03-20 or '20 March 1989'", "reason": "Date: 20/03/1989 - brief description" }\n  ],\n  "keywords": []\n}`
+      : `You are a medical document analyzer specialized in extracting pages relevant to medical conditions and topics.\n\nPRIMARY TASK: Find ALL pages that contain information about the conditions, symptoms, or medical topics mentioned in the query.\n\nKEY INSTRUCTIONS:\n- Match medical conditions, symptoms, diagnoses, treatments, and procedures\n- Be generous in matches - if a page has ANY relevance to the query, include it\n- Extract the specific reasons why each page is relevant\n- Suggest relevant search keywords based on the query\n- Return ONE entry per page (do NOT duplicate pages)\n\nReturn ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:\n{\n  "relevantPages": [\n    {\n      "fileIndex": 0,\n      "pageNum": 1,\n      "reason": "Brief explanation of why this page matches"\n    }\n  ],\n  "keywords": ["keyword1", "keyword2"]\n}\n\nIf you find relevant pages, include them. If not, return empty arrays but still valid JSON.`;
 
     const userPrompt = `Query: ${query}\n\n=== PDF CONTENT ===\n${pdfContext}`;
 
@@ -105,7 +63,6 @@ If you find relevant pages, include them. If not, return empty arrays but still 
         }),
       });
     } else {
-      // Gemini
       const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
       if (!GOOGLE_API_KEY) {
         return new Response(
@@ -164,7 +121,6 @@ If you find relevant pages, include them. If not, return empty arrays but still 
     if (model === "claude") {
       aiContent = aiResponse.content[0].text;
     } else {
-      // Gemini
       aiContent = aiResponse.candidates[0].content.parts[0].text;
     }
 
@@ -175,7 +131,6 @@ If you find relevant pages, include them. If not, return empty arrays but still 
       );
     }
 
-    // Parse AI response
     let analysisResult;
     try {
       analysisResult = JSON.parse(aiContent);
@@ -184,7 +139,6 @@ If you find relevant pages, include them. If not, return empty arrays but still 
       console.error("Failed to parse AI response:", aiContent);
       console.error("Parse error:", e);
       
-      // Fallback: try to extract JSON from markdown
       const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
@@ -210,6 +164,14 @@ If you find relevant pages, include them. If not, return empty arrays but still 
 
   } catch (error) {
     console.error("Error in analyze-pdf-content:", error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

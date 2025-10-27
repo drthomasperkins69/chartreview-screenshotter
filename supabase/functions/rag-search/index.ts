@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const requestSchema = z.object({
+  query: z.string().min(1).max(500),
+  fileIds: z.array(z.string().uuid()).max(50).optional(),
+  limit: z.number().int().positive().max(100).default(5)
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,14 +19,8 @@ serve(async (req) => {
   }
 
   try {
-    const { query, fileIds, limit = 5 } = await req.json();
-
-    if (!query) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required field: query' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const rawBody = await req.json();
+    const { query, fileIds, limit } = requestSchema.parse(rawBody);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -33,7 +34,6 @@ serve(async (req) => {
 
     console.log(`Performing RAG search for query: "${query}"`);
 
-    // Generate embedding for the query
     const embeddingResponse = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
       method: "POST",
       headers: {
@@ -55,7 +55,6 @@ serve(async (req) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform vector similarity search with file ID filtering
     const { data: matches, error: searchError } = await supabase.rpc('match_documents', {
       query_embedding: queryEmbedding,
       match_threshold: 0.5,
@@ -76,6 +75,14 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in rag-search:', error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

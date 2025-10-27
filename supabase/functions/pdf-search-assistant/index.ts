@@ -1,9 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const messageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().max(10000)
+});
+
+const requestSchema = z.object({
+  messages: z.array(messageSchema).min(1).max(50),
+  model: z.enum(['claude', 'gemini']).default('gemini')
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,7 +22,8 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model = "gemini" } = await req.json();
+    const rawBody = await req.json();
+    const { messages, model } = requestSchema.parse(rawBody);
     
     const systemMessage = {
       role: "system",
@@ -57,7 +69,6 @@ Be conversational and helpful. Ask clarifying questions if needed.`
         }),
       });
     } else {
-      // Gemini
       const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
       if (!GOOGLE_API_KEY) {
         throw new Error("GOOGLE_API_KEY is not configured");
@@ -119,7 +130,6 @@ Be conversational and helpful. Ask clarifying questions if needed.`
     if (model === "claude") {
       messageContent = data.content[0].text;
     } else {
-      // Gemini
       messageContent = data.candidates[0].content.parts[0].text;
     }
 
@@ -131,6 +141,14 @@ Be conversational and helpful. Ask clarifying questions if needed.`
     );
   } catch (error) {
     console.error("Error in pdf-search-assistant:", error);
+    
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input", details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
