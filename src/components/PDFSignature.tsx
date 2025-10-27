@@ -1369,8 +1369,36 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       [`${fileIndex}-${pageNum}`]: diagnosis
     }));
 
-    // If diagnosis is empty, just update state and return
+    // If diagnosis is empty, delete the diagnosis from page_diagnoses table
     if (!diagnosis.trim()) {
+      if (selectedWorkspace && user) {
+        try {
+          const file = pdfFilesRef.current[fileIndex];
+          if (file) {
+            const metadata = fileMetadata.get(file.name);
+            if (metadata) {
+              // Get file_page record
+              const { data: filePage } = await supabase
+                .from('file_pages')
+                .select('id')
+                .eq('file_id', metadata.id)
+                .eq('page_number', pageNum)
+                .maybeSingle();
+
+              if (filePage) {
+                // Delete any existing diagnosis for this page
+                await supabase
+                  .from('page_diagnoses')
+                  .delete()
+                  .eq('page_id', filePage.id)
+                  .eq('created_by', user.id);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error clearing diagnosis:", error);
+        }
+      }
       toast.success("Diagnosis cleared");
       return;
     }
@@ -1479,9 +1507,67 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
               return next;
             });
           }
+
+          // Save to page_diagnoses table (overwriting any existing diagnosis for this page)
+          try {
+            // First, get or create the file_page record
+            let { data: filePage } = await supabase
+              .from('file_pages')
+              .select('id')
+              .eq('file_id', metadata.id)
+              .eq('page_number', pageNum)
+              .maybeSingle();
+
+            if (!filePage) {
+              // Create file_page if it doesn't exist
+              const { data: newPage, error: pageError } = await supabase
+                .from('file_pages')
+                .insert({
+                  file_id: metadata.id,
+                  page_number: pageNum,
+                  ocr_completed: true
+                })
+                .select()
+                .single();
+
+              if (pageError) throw pageError;
+              filePage = newPage;
+            }
+
+            // Now upsert the diagnosis (this will overwrite any existing diagnosis for this page)
+            const { data: existingDiagnosis } = await supabase
+              .from('page_diagnoses')
+              .select('id')
+              .eq('page_id', filePage.id)
+              .eq('created_by', user.id)
+              .maybeSingle();
+
+            if (existingDiagnosis) {
+              // Update existing diagnosis
+              await supabase
+                .from('page_diagnoses')
+                .update({
+                  diagnosis_text: diagnosis,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingDiagnosis.id);
+            } else {
+              // Insert new diagnosis
+              await supabase
+                .from('page_diagnoses')
+                .insert({
+                  page_id: filePage.id,
+                  diagnosis_text: diagnosis,
+                  created_by: user.id
+                });
+            }
+          } catch (dbError) {
+            console.error("Error saving diagnosis to database:", dbError);
+            toast.error("Failed to save diagnosis to database");
+          }
         }
 
-        // Persist single-page diagnosis to tracker
+        // Also persist to workspace_diagnoses for the diagnosis tracker
         const pageKey = `${fileIndex}-${pageNum}`;
         await saveDiagnosis(diagnosis, [{
           fileId: pageKey,
@@ -1497,7 +1583,7 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       toast.error("Failed to save diagnosis to PDF");
       throw error; // Re-throw to handle in auto-scan
     }
-  }, [pdfFiles, selectedWorkspace, user, fileMetadata]);
+  }, [pdfFiles, selectedWorkspace, user, fileMetadata, saveDiagnosis]);
 
   const handleRenameDiagnosis = useCallback(async (oldDiagnosis: string, newDiagnosis: string) => {
     if (!newDiagnosis.trim() || oldDiagnosis === newDiagnosis) {
