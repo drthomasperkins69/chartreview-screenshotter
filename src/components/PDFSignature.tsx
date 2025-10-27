@@ -198,6 +198,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; message: string } | null>(null);
+  const [batchResultBlob, setBatchResultBlob] = useState<Blob | null>(null);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
   const [activeTab, setActiveTab] = useState("categories");
@@ -543,6 +545,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
   const handleBatchSearch = useCallback(async () => {
     setIsBatchProcessing(true);
+    setBatchProgress(null);
+    setBatchResultBlob(null);
     
     try {
       // Collect all search terms from all categories (body regions + conditions)
@@ -568,6 +572,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
       const totalTerms = allSearchTerms.reduce((sum, cat) => sum + cat.terms.length, 0);
       toast(`Processing ${totalTerms} search term${totalTerms !== 1 ? 's' : ''} across ${allSearchTerms.length} categories...`);
+      
+      setBatchProgress({ current: 0, total: allSearchTerms.length, message: 'Starting batch search...' });
       
       // Create one combined PDF with all results
       const combinedPdfDoc = await PDFDocument.create();
@@ -614,7 +620,15 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
       };
       
       // Process each category
+      let categoryIndex = 0;
       for (const { category, terms } of allSearchTerms) {
+        categoryIndex++;
+        setBatchProgress({ 
+          current: categoryIndex, 
+          total: allSearchTerms.length, 
+          message: `Processing ${category}... (${categoryIndex}/${allSearchTerms.length})` 
+        });
+        
         // Add category separator page
         const separatorPage = combinedPdfDoc.addPage([595, 842]); // A4 size
         const { width, height } = separatorPage.getSize();
@@ -706,17 +720,19 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
         }
       }
       
-      // Save and download the combined PDF
+      // Save the PDF blob for download
+      setBatchProgress({ 
+        current: allSearchTerms.length, 
+        total: allSearchTerms.length, 
+        message: 'Creating PDF...' 
+      });
+      
       const pdfBytes = await combinedPdfDoc.save();
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `batch-search-all-categories-${Date.now()}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      setBatchResultBlob(blob);
       
-      toast(`Downloaded combined PDF with ${totalMatchedPages} matched page${totalMatchedPages !== 1 ? 's' : ''} from ${allSearchTerms.length} categories!`);
+      setBatchProgress(null);
+      toast(`Created combined PDF with ${totalMatchedPages} matched page${totalMatchedPages !== 1 ? 's' : ''} from ${allSearchTerms.length} categories!`);
     } catch (error) {
       console.error("Batch search error:", error);
       toast("Failed to process batch search");
@@ -725,6 +741,21 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     }
   }, [searchCategories, pdfFiles]);
 
+  const handleDownloadBatchResult = useCallback(() => {
+    if (!batchResultBlob) {
+      toast.error("No batch result to download");
+      return;
+    }
+
+    const url = URL.createObjectURL(batchResultBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `batch-search-all-categories-${Date.now()}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success("Batch search PDF downloaded!");
+  }, [batchResultBlob]);
 
   const handleDownload = useCallback(async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -3365,7 +3396,29 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                   <FileArchive className="w-4 h-4" />
                   {isBatchProcessing ? "Processing..." : "Batch Search All"}
                 </Button>
+
+                {batchResultBlob && !isBatchProcessing && (
+                  <Button 
+                    onClick={handleDownloadBatchResult} 
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Batch Result
+                  </Button>
+                )}
               </div>
+
+              {/* Batch Search Progress Bar */}
+              {batchProgress && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-muted-foreground">{batchProgress.message}</span>
+                    <span className="text-muted-foreground">{batchProgress.current}/{batchProgress.total}</span>
+                  </div>
+                  <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-2" />
+                </div>
+              )}
             </div>
           </div>
         </Card>
