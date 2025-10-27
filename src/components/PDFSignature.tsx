@@ -5,13 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { FileUpload } from "./FileUpload";
 import { PDFViewer } from "./PDFViewer";
-import { AISearchAssistant } from "./AISearchAssistant";
 import { PDFPageDialog } from "./PDFPageDialog";
 import { AIChat } from "./AIChat";
 import { ChartReview } from "./ChartReview";
@@ -906,10 +904,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     toast("All PDFs removed");
   }, []);
 
-  const handleKeywordSuggest = useCallback((suggested: string) => {
-    setSuggestedKeywords(suggested);
-  }, []);
-
   const useSuggestedKeywords = useCallback(() => {
     setKeywords(suggestedKeywords);
     toast("Keywords applied - click Search to find matches!");
@@ -1175,35 +1169,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
     }
   }, [searchCategories]);
 
-  const handleAIPageSelection = useCallback((pages: Array<{ fileIndex: number; pageNum: number; reason?: string }>) => {
-    // Create keyword matches for display in the Matches Found panel
-    const matches: KeywordMatch[] = pages.map(p => ({
-      page: p.pageNum,
-      keyword: p.reason || "AI Selected",
-      count: 1,
-      fileName: pdfFiles[p.fileIndex]?.name || `Document ${p.fileIndex + 1}`,
-      fileIndex: p.fileIndex
-    }));
-    
-    // Add to existing matches instead of replacing
-    setKeywordMatches(prev => [...prev, ...matches]);
-    
-    // Add matching pages for current PDF
-    setMatchingPages(prev => {
-      const newPages = new Set(prev);
-      matches
-        .filter(m => m.fileIndex === currentPdfIndex)
-        .forEach(m => newPages.add(m.page));
-      return newPages;
-    });
-    
-    // Add AI-selected pages to existing selections
-    setSelectedPagesForExtraction(prev => {
-      const newSet = new Set(prev);
-      pages.forEach(p => newSet.add(`${p.fileIndex}-${p.pageNum}`));
-      return newSet;
-    });
-  }, [pdfFiles, currentPdfIndex]);
 
   const handlePDFTextExtracted = useCallback((fileIndex: number, fileName: string, pageTexts: Array<{ pageNum: number; text: string }>) => {
     setPdfContent(prev => {
@@ -2994,11 +2959,8 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                 </Card>
               )}
 
-        {/* 2-Panel Layout: PDF Viewer | Right Panel (AI Assistant, Matches, Search Categories) */}
-        <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-300px)] rounded-lg border">
-                {/* Left Panel: PDF Viewer */}
-                <ResizablePanel defaultSize={70} minSize={40}>
-                  <Card className="h-full rounded-none border-0 overflow-hidden">
+        {/* PDF Viewer */}
+        <Card className="min-h-[calc(100vh-300px)] rounded-lg border overflow-hidden">
             {pdfFiles.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center p-6">
                         {!selectedWorkspace && (
@@ -3035,31 +2997,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                       />
                     )}
                   </Card>
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-
-                {/* Right Panel: AI Assistant */}
-                <ResizablePanel defaultSize={35} minSize={20} maxSize={50} collapsible>
-                  <Card className="h-full rounded-none border-0 flex flex-col">
-                    <div className="border-b p-2">
-                      <h3 className="text-sm font-semibold">AI Assistant</h3>
-                    </div>
-                    <ScrollArea className="flex-1">
-                      <div className="p-4">
-                        <AISearchAssistant 
-                          onKeywordSuggest={handleKeywordSuggest}
-                          onPagesSelected={handleAIPageSelection}
-                          currentKeywords={keywords}
-                          pdfContent={pdfContent}
-                          onTriggerAutoScan={handleAutoScanAllPDFs}
-                          isAutoScanning={isAutoScanningAll}
-                        />
-                      </div>
-                    </ScrollArea>
-                  </Card>
-                 </ResizablePanel>
-          </ResizablePanelGroup>
 
          {/* Matches Section - Dedicated Space Below PDF Canvas */}
         {keywordMatches.length > 0 && (
