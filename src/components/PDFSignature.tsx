@@ -198,7 +198,6 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
-  const [batchResults, setBatchResults] = useState<Map<string, Blob>>(new Map());
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
   const [autoNavigate, setAutoNavigate] = useState(true);
   const [activeTab, setActiveTab] = useState("categories");
@@ -543,123 +542,134 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
   }, [keywords, searchDate, referenceSearch]);
 
   const handleBatchSearch = useCallback(async () => {
-    if (!keywords.trim() && !searchDate && !referenceSearch.trim()) {
-      toast("Please enter keywords, select a date, or enter references to search");
-      return;
-    }
-
     setIsBatchProcessing(true);
-    setBatchResults(new Map());
     
     try {
-      const searchTerms = keywords.split(',').map(k => k.trim()).filter(k => k);
+      // Collect all search terms from all categories (body regions + conditions)
+      const allSearchTerms: Array<{ category: string; terms: string[] }> = [];
       
-      if (searchTerms.length === 0 && !searchDate && !referenceSearch.trim()) {
-        toast("No valid search terms found");
+      searchCategories.forEach(category => {
+        if (category.terms.trim()) {
+          const terms = category.terms.split(',').map(t => t.trim()).filter(t => t);
+          if (terms.length > 0) {
+            allSearchTerms.push({
+              category: category.label,
+              terms
+            });
+          }
+        }
+      });
+      
+      if (allSearchTerms.length === 0) {
+        toast("No search categories have terms defined");
         setIsBatchProcessing(false);
         return;
       }
 
-      toast(`Processing ${searchTerms.length} search${searchTerms.length !== 1 ? 'es' : ''}...`);
+      const totalTerms = allSearchTerms.reduce((sum, cat) => sum + cat.terms.length, 0);
+      toast(`Processing ${totalTerms} search term${totalTerms !== 1 ? 's' : ''} across ${allSearchTerms.length} categories...`);
       
-      const results = new Map<string, Blob>();
+      // Create one combined PDF with all results
+      const combinedPdfDoc = await PDFDocument.create();
+      const boldFont = await combinedPdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const regularFont = await combinedPdfDoc.embedFont(StandardFonts.Helvetica);
       
-      // Process each keyword separately
-      for (const term of searchTerms) {
-        // Trigger search for this term
-        const tempMatches: KeywordMatch[] = [];
+      let totalMatchedPages = 0;
+      
+      // Process each category
+      for (const { category, terms } of allSearchTerms) {
+        // Add category separator page
+        const separatorPage = combinedPdfDoc.addPage([595, 842]); // A4 size
+        const { width, height } = separatorPage.getSize();
         
-        // Search through all PDFs for this term
-        for (let fileIndex = 0; fileIndex < pdfFiles.length; fileIndex++) {
-          const fileContent = pdfContent.find(pc => pc.fileIndex === fileIndex);
-          if (!fileContent) continue;
-          
-          for (const page of fileContent.pages) {
-            if (page.text.toLowerCase().includes(term.toLowerCase())) {
-              tempMatches.push({
-                page: page.pageNum,
-                keyword: term,
-                count: 1,
-                fileName: pdfFiles[fileIndex].name,
-                fileIndex
-              });
-            }
-          }
-        }
+        separatorPage.drawText(category, {
+          x: 50,
+          y: height - 100,
+          size: 24,
+          font: boldFont,
+          color: rgb(0.2, 0.2, 0.8),
+        });
         
-        // Create PDF for this term if matches found
-        if (tempMatches.length > 0) {
-          const newPdfDoc = await PDFDocument.create();
+        separatorPage.drawText(`Search Terms: ${terms.join(', ')}`, {
+          x: 50,
+          y: height - 150,
+          size: 12,
+          font: regularFont,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+        
+        // Process each term in this category
+        for (const term of terms) {
+          const tempMatches: KeywordMatch[] = [];
           
-          const pagesByFile = new Map<number, number[]>();
-          tempMatches.forEach(match => {
-            if (!pagesByFile.has(match.fileIndex)) {
-              pagesByFile.set(match.fileIndex, []);
-            }
-            if (!pagesByFile.get(match.fileIndex)!.includes(match.page)) {
-              pagesByFile.get(match.fileIndex)!.push(match.page);
-            }
-          });
-          
-          const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
-          
-          for (const fileIndex of sortedFileIndices) {
-            const pages = pagesByFile.get(fileIndex)!.sort((a, b) => a - b);
-            const file = pdfFiles[fileIndex];
+          // Search through all PDFs for this term
+          for (let fileIndex = 0; fileIndex < pdfFiles.length; fileIndex++) {
+            const fileContent = pdfContent.find(pc => pc.fileIndex === fileIndex);
+            if (!fileContent) continue;
             
-            const arrayBuffer = await file.arrayBuffer();
-            const pdfDoc = await PDFDocument.load(arrayBuffer);
-            
-            for (const pageNum of pages) {
-              const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
-              newPdfDoc.addPage(copiedPage);
+            for (const page of fileContent.pages) {
+              if (page.text.toLowerCase().includes(term.toLowerCase())) {
+                tempMatches.push({
+                  page: page.pageNum,
+                  keyword: term,
+                  count: 1,
+                  fileName: pdfFiles[fileIndex].name,
+                  fileIndex
+                });
+              }
             }
           }
           
-          const pdfBytes = await newPdfDoc.save();
-          const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
-          results.set(term, blob);
+          // Add matched pages to combined PDF
+          if (tempMatches.length > 0) {
+            const pagesByFile = new Map<number, number[]>();
+            tempMatches.forEach(match => {
+              if (!pagesByFile.has(match.fileIndex)) {
+                pagesByFile.set(match.fileIndex, []);
+              }
+              if (!pagesByFile.get(match.fileIndex)!.includes(match.page)) {
+                pagesByFile.get(match.fileIndex)!.push(match.page);
+              }
+            });
+            
+            const sortedFileIndices = Array.from(pagesByFile.keys()).sort((a, b) => a - b);
+            
+            for (const fileIndex of sortedFileIndices) {
+              const pages = pagesByFile.get(fileIndex)!.sort((a, b) => a - b);
+              const file = pdfFiles[fileIndex];
+              
+              const arrayBuffer = await file.arrayBuffer();
+              const pdfDoc = await PDFDocument.load(arrayBuffer);
+              
+              for (const pageNum of pages) {
+                const [copiedPage] = await combinedPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+                combinedPdfDoc.addPage(copiedPage);
+                totalMatchedPages++;
+              }
+            }
+          }
         }
       }
       
-      setBatchResults(results);
-      toast(`Created ${results.size} PDF${results.size !== 1 ? 's' : ''} from batch search!`);
+      // Save and download the combined PDF
+      const pdfBytes = await combinedPdfDoc.save();
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `batch-search-all-categories-${Date.now()}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast(`Downloaded combined PDF with ${totalMatchedPages} matched page${totalMatchedPages !== 1 ? 's' : ''} from ${allSearchTerms.length} categories!`);
     } catch (error) {
       console.error("Batch search error:", error);
       toast("Failed to process batch search");
     } finally {
       setIsBatchProcessing(false);
     }
-  }, [keywords, searchDate, referenceSearch, pdfFiles, pdfContent]);
+  }, [searchCategories, pdfFiles, pdfContent]);
 
-  const handleDownloadBatchZip = useCallback(async () => {
-    if (batchResults.size === 0) {
-      toast("No batch results to download");
-      return;
-    }
-
-    try {
-      const zip = new JSZip();
-      
-      for (const [term, blob] of batchResults.entries()) {
-        const safeFileName = term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        zip.file(`${safeFileName}.pdf`, blob);
-      }
-      
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(zipBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `batch-search-results-${Date.now()}.zip`;
-      link.click();
-      URL.revokeObjectURL(url);
-      
-      toast(`Downloaded ZIP with ${batchResults.size} PDF${batchResults.size !== 1 ? 's' : ''}!`);
-    } catch (error) {
-      console.error("Error creating ZIP:", error);
-      toast("Failed to create ZIP file");
-    }
-  }, [batchResults]);
 
   const handleDownload = useCallback(async () => {
     if (selectedPagesForExtraction.size === 0) {
@@ -3295,22 +3305,11 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                   onClick={handleBatchSearch} 
                   variant="secondary"
                   className="gap-2"
-                  disabled={isBatchProcessing || !keywords.trim() || pdfFiles.length === 0}
+                  disabled={isBatchProcessing || pdfFiles.length === 0}
                 >
                   <FileArchive className="w-4 h-4" />
                   {isBatchProcessing ? "Processing..." : "Batch Search All"}
                 </Button>
-
-                {batchResults.size > 0 && (
-                  <Button 
-                    onClick={handleDownloadBatchZip} 
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download ZIP ({batchResults.size} PDFs)
-                  </Button>
-                )}
               </div>
             </div>
           </div>
