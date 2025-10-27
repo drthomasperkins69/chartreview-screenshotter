@@ -58,12 +58,12 @@ serve(async (req) => {
       if (pageText && pageText.trim()) {
         userContent.push({
           type: "text",
-          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses using this EXACT format: "Side Joint - Diagnosis" (e.g., "Right Ankle - Sprain", "Left Knee - Osteoarthritis"). NEVER use "Bilateral" - if both sides are affected, list each side separately (e.g., "Right Knee - Arthritis, Left Knee - Arthritis"). Use descriptive medical condition names, NO ICD codes. Maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.${referenceContext}`
+          text: `Analyze this medical document from ${fileName}, page ${pageNum}:\n\n${pageText}\n\nProvide ONLY a comma-separated list of diagnoses using this EXACT format: "Side Joint - Diagnosis" (e.g., "Right Ankle - Sprain", "Left Knee - Osteoarthritis"). NEVER use "Bilateral" - if both sides are affected, list each side separately (e.g., "Right Knee - Arthritis, Left Knee - Arthritis"). Use descriptive medical condition names, NO ICD codes. Maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format. IMPORTANT: If the document is illegible, unclear, or does not contain sufficient diagnostic information, return ONLY the word "Nil" with no explanation.${referenceContext}`
         });
       } else {
         userContent.push({
           type: "text",
-          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list using format: "Side Joint - Diagnosis" (e.g., "Right Shoulder - Tendinopathy"). NEVER use "Bilateral" - list each side separately. NO ICD codes. Maximum 3-5 diagnoses.${referenceContext}`
+          text: `Analyze this medical document image from ${fileName}, page ${pageNum} and suggest relevant diagnoses. Return ONLY a comma-separated list using format: "Side Joint - Diagnosis" (e.g., "Right Shoulder - Tendinopathy"). NEVER use "Bilateral" - list each side separately. NO ICD codes. Maximum 3-5 diagnoses. IMPORTANT: If the document is illegible, unclear, or does not contain sufficient diagnostic information, return ONLY the word "Nil" with no explanation.${referenceContext}`
         });
       }
 
@@ -130,7 +130,7 @@ serve(async (req) => {
       const messages: any[] = [
         {
           role: "system",
-          content: `You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses using this EXACT format: 'Side Joint - Diagnosis' (e.g., 'Right Ankle - Sprain', 'Left Knee - Osteoarthritis'). NEVER use 'Bilateral' - if both sides are affected, list each side separately. Use PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names. Keep it concise - maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format.${referenceContext}`
+          content: `You are a medical diagnosis assistant. Analyze the provided medical document page and suggest relevant diagnoses. Return ONLY a comma-separated list of diagnoses using this EXACT format: 'Side Joint - Diagnosis' (e.g., 'Right Ankle - Sprain', 'Left Knee - Osteoarthritis'). NEVER use 'Bilateral' - if both sides are affected, list each side separately. Use PLAIN LANGUAGE - do NOT use ICD-9 or ICD-10 codes. Use descriptive medical condition names. Keep it concise - maximum 3-5 diagnoses. No explanations, just diagnosis names in the specified format. CRITICAL: If the document is illegible, unclear, or does not contain sufficient diagnostic information, return ONLY the word "Nil" with no explanation whatsoever.${referenceContext}`
         }
       ];
 
