@@ -1393,6 +1393,34 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
                   .eq('page_id', filePage.id)
                   .eq('created_by', user.id);
               }
+
+              // Also remove this page from any workspace_diagnoses entries
+              const pageKey = `${fileIndex}-${pageNum}`;
+              const { data: diagRows } = await supabase
+                .from('workspace_diagnoses')
+                .select('id, pages')
+                .eq('workspace_id', selectedWorkspace.id)
+                .eq('created_by', user.id);
+
+              if (diagRows && diagRows.length > 0) {
+                for (const row of diagRows) {
+                  const pages = (row.pages as any[]) || [];
+                  const filtered = pages.filter((p: any) => p?.key !== pageKey);
+                  if (filtered.length !== pages.length) {
+                    if (filtered.length > 0) {
+                      await supabase
+                        .from('workspace_diagnoses')
+                        .update({ pages: filtered, page_count: filtered.length })
+                        .eq('id', row.id);
+                    } else {
+                      await supabase
+                        .from('workspace_diagnoses')
+                        .delete()
+                        .eq('id', row.id);
+                    }
+                  }
+                }
+              }
             }
           }
         } catch (error) {
@@ -1569,6 +1597,39 @@ export const PDFSignature = ({ selectedFile }: { selectedFile?: { id: string; pa
 
         // Also persist to workspace_diagnoses for the diagnosis tracker
         const pageKey = `${fileIndex}-${pageNum}`;
+
+        // Remove this page from any existing diagnoses to ensure overwrite behavior
+        try {
+          const { data: diagRows } = await supabase
+            .from('workspace_diagnoses')
+            .select('id, pages')
+            .eq('workspace_id', selectedWorkspace.id)
+            .eq('created_by', user.id);
+
+          if (diagRows && diagRows.length > 0) {
+            for (const row of diagRows) {
+              const pages = (row.pages as any[]) || [];
+              const filtered = pages.filter((p: any) => p?.key !== pageKey);
+              if (filtered.length !== pages.length) {
+                if (filtered.length > 0) {
+                  await supabase
+                    .from('workspace_diagnoses')
+                    .update({ pages: filtered, page_count: filtered.length })
+                    .eq('id', row.id);
+                } else {
+                  await supabase
+                    .from('workspace_diagnoses')
+                    .delete()
+                    .eq('id', row.id);
+                }
+              }
+            }
+          }
+        } catch (cleanupErr) {
+          console.error('Error cleaning up existing workspace_diagnoses entries:', cleanupErr);
+        }
+
+        // Now add the page to the selected diagnosis
         await saveDiagnosis(diagnosis, [{
           fileId: pageKey,
           fileName: file.name,
