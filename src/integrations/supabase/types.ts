@@ -214,7 +214,7 @@ export type Database = {
       patient_workspaces: {
         Row: {
           created_at: string | null
-          created_by: string | null
+          created_by: string
           id: string
           name: string
           notes: string | null
@@ -223,7 +223,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          created_by?: string | null
+          created_by?: string
           id?: string
           name: string
           notes?: string | null
@@ -232,7 +232,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          created_by?: string | null
+          created_by?: string
           id?: string
           name?: string
           notes?: string | null
@@ -352,7 +352,7 @@ export type Database = {
       workspace_diagnoses: {
         Row: {
           created_at: string
-          created_by: string | null
+          created_by: string
           diagnosis_name: string
           id: string
           page_count: number
@@ -362,7 +362,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           diagnosis_name: string
           id?: string
           page_count?: number
@@ -372,7 +372,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           diagnosis_name?: string
           id?: string
           page_count?: number
@@ -399,7 +399,7 @@ export type Database = {
           id: string
           ocr_completed: boolean | null
           page_count: number | null
-          uploaded_by: string | null
+          uploaded_by: string
           workspace_id: string
         }
         Insert: {
@@ -410,7 +410,7 @@ export type Database = {
           id?: string
           ocr_completed?: boolean | null
           page_count?: number | null
-          uploaded_by?: string | null
+          uploaded_by?: string
           workspace_id: string
         }
         Update: {
@@ -421,7 +421,7 @@ export type Database = {
           id?: string
           ocr_completed?: boolean | null
           page_count?: number | null
-          uploaded_by?: string | null
+          uploaded_by?: string
           workspace_id?: string
         }
         Relationships: [

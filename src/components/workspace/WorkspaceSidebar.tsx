@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import mammoth from "mammoth";
+import DOMPurify from "dompurify";
 
 interface WorkspaceSidebarProps {
   onFileSelect?: (fileId: string, filePath: string, fileName: string) => void;
@@ -95,8 +96,16 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
 
   const convertHtmlToPdf = async (file: File): Promise<File> => {
     const html = await file.text();
+    
+    // Sanitize HTML to prevent XSS attacks
+    const cleanHtml = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'div', 'span', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'img'],
+      ALLOWED_ATTR: ['style', 'src', 'alt', 'width', 'height'],
+      ALLOW_DATA_ATTR: false
+    });
+    
     const container = document.createElement('div');
-    container.innerHTML = html;
+    container.innerHTML = cleanHtml;
     container.style.position = 'absolute';
     container.style.left = '-9999px';
     container.style.width = '800px';
@@ -119,8 +128,15 @@ export const WorkspaceSidebar = ({ onFileSelect }: WorkspaceSidebarProps) => {
     const result = await mammoth.convertToHtml({ arrayBuffer });
     const html = result.value;
     
+    // Sanitize HTML to prevent XSS attacks
+    const cleanHtml = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'div', 'span', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'img'],
+      ALLOWED_ATTR: ['style', 'src', 'alt', 'width', 'height'],
+      ALLOW_DATA_ATTR: false
+    });
+    
     const container = document.createElement('div');
-    container.innerHTML = html;
+    container.innerHTML = cleanHtml;
     container.style.position = 'absolute';
     container.style.left = '-9999px';
     container.style.width = '800px';
