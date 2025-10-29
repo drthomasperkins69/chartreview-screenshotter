@@ -1086,11 +1086,15 @@ export const PDFViewer = ({
                 onClick={async () => {
                   if (!pdf) return toast.error("PDF not loaded");
                   let updated = 0;
+                  toast.info("Loading diagnoses from all pages...");
                   for (let page = 1; page <= numPages; page++) {
                     const extracted = await extractDiagnosisFromPdf(page);
                     if (extracted) {
                       await handleSaveToDatabase(currentFileIndex, page, extracted);
-                      if (page === currentPage) setDiagnosisInput(extracted);
+                      if (page === currentPage) {
+                        isManualUpdateRef.current = true;
+                        setDiagnosisInput(extracted);
+                      }
                       updated++;
                     }
                   }
@@ -1105,7 +1109,7 @@ export const PDFViewer = ({
                 className="gap-2 w-full"
               >
                 <RefreshCw className="w-4 h-4" />
-                Load All From PDF
+                Load ALL From PDF
               </Button>
             </div>
             
