@@ -561,14 +561,19 @@ export const PDFViewer = ({
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [isAutoScanning, setIsAutoScanning] = useState(false);
   const shouldStopScanRef = useRef(false);
+  const isManualUpdateRef = useRef(false);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(numPages);
   const [selectedModel, setSelectedModel] = useState<string>("claude");
 
-  // Sync input when diagnosis for current page changes
+  // Sync input when diagnosis for current page changes (but not during manual updates)
   useEffect(() => {
-    console.log(`Syncing diagnosis for page ${currentPage}: "${currentDiagnosis}"`);
-    setDiagnosisInput(currentDiagnosis);
+    if (!isManualUpdateRef.current) {
+      console.log(`Syncing diagnosis for page ${currentPage}: "${currentDiagnosis}"`);
+      setDiagnosisInput(currentDiagnosis);
+    } else {
+      isManualUpdateRef.current = false;
+    }
   }, [currentDiagnosis, currentPage, currentFileIndex]);
 
   // Update endPage when numPages changes (switching files)
@@ -969,12 +974,14 @@ export const PDFViewer = ({
                 const pageKey = `${currentFileIndex}-${currentPage}`;
                 const stateDiagnosis = pageDiagnoses[pageKey] || "";
                 if (stateDiagnosis) {
+                  isManualUpdateRef.current = true;
                   setDiagnosisInput(stateDiagnosis);
                   toast.success(`Loaded diagnosis from state`);
                   return;
                 }
                 const extracted = await extractDiagnosisFromPdf(currentPage);
                 if (extracted) {
+                  isManualUpdateRef.current = true;
                   setDiagnosisInput(extracted);
                   // Also propagate so tracker sees it
                   await handleSaveToDatabase(currentFileIndex, currentPage, extracted);
