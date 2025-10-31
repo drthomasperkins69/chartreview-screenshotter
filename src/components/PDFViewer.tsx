@@ -825,19 +825,25 @@ export const PDFViewer = ({
           }
 
           if (data?.diagnosis) {
-            // Collect diagnosis to save at the end
-            diagnosesToSave.push({ pageNum, diagnosis: data.diagnosis });
+            // Save to database immediately
+            await handleSaveToDatabase(currentFileIndex, pageNum, data.diagnosis);
             successCount++;
             
-            // Update textarea if this is the current page
-            if (pageNum === currentPage) {
-              setDiagnosisInput(data.diagnosis);
-            }
+            // Navigate to this page to show it on canvas
+            setCurrentPage(pageNum);
+            onPageChange(pageNum);
+            
+            // Update diagnosis input to show it in the textarea
+            isManualUpdateRef.current = true;
+            setDiagnosisInput(data.diagnosis);
             
             // Show success only if not stopping
             if (!shouldStopScanRef.current) {
-              toast.success(`Diagnosis "${data.diagnosis}" found for page ${pageNum}`, { duration: 2000 });
+              toast.success(`Page ${pageNum}: "${data.diagnosis}"`, { duration: 1500 });
             }
+            
+            // Wait a bit to show the update before moving to next page
+            await new Promise(resolve => setTimeout(resolve, 600));
           }
 
           // Small delay to avoid rate limiting
@@ -852,29 +858,12 @@ export const PDFViewer = ({
         }
       }
 
-      // Save all diagnoses to database at once
-      if (diagnosesToSave.length > 0 && !shouldStopScanRef.current) {
-        toast.info("Saving all diagnoses to database...");
-        for (const { pageNum, diagnosis } of diagnosesToSave) {
-          try {
-            await handleSaveToDatabase(currentFileIndex, pageNum, diagnosis);
-            
-            // If this is the current page, update the textarea immediately
-            if (pageNum === currentPage) {
-              setDiagnosisInput(diagnosis);
-            }
-          } catch (saveError) {
-            console.error(`Failed to save diagnosis for page ${pageNum}:`, saveError);
-          }
-        }
-        
-        // Refresh diagnoses from database to ensure they're loaded
-        if (refreshDiagnoses) {
-          try {
-            await refreshDiagnoses();
-          } catch (refreshError) {
-            console.error('Failed to refresh diagnoses:', refreshError);
-          }
+      // Refresh diagnoses from database to ensure they're all loaded
+      if (refreshDiagnoses && successCount > 0 && !shouldStopScanRef.current) {
+        try {
+          await refreshDiagnoses();
+        } catch (refreshError) {
+          console.error('Failed to refresh diagnoses:', refreshError);
         }
       }
 
