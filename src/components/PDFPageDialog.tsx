@@ -43,18 +43,34 @@ export const PDFPageDialog = ({ open, onOpenChange, pdfDocument, file, pageNumbe
 
   useEffect(() => {
     const pdf = pdfDocument || loadedPdf;
-    if (!open || !canvasRef.current || !pdf) return;
+    
+    // Reset loading when dialog opens or page changes
+    if (open) {
+      setLoading(true);
+    }
+    
+    if (!open || !pdf) {
+      return;
+    }
 
     const renderPage = async () => {
-      setLoading(true);
       try {
         const page = await pdf.getPage(pageNumber);
         
+        // Wait for canvas to be available
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas) {
+          console.log("Canvas not ready for PDF page dialog");
+          setLoading(false);
+          return;
+        }
         
         const context = canvas.getContext("2d");
-        if (!context) return;
+        if (!context) {
+          console.log("Canvas context not available");
+          setLoading(false);
+          return;
+        }
 
         // Render at 2x scale for better quality
         const viewport = page.getViewport({ scale: 2.0 });
@@ -74,7 +90,12 @@ export const PDFPageDialog = ({ open, onOpenChange, pdfDocument, file, pageNumbe
       }
     };
 
-    renderPage();
+    // Small delay to ensure canvas is mounted
+    const timer = setTimeout(() => {
+      renderPage();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [open, pdfDocument, loadedPdf, pageNumber]);
 
   return (
