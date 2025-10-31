@@ -496,6 +496,28 @@ export const PDFViewer = ({
         context.restore();
       }
 
+      // Draw diagnosis text if available
+      const pageKey = `${currentFileIndex}-${currentPage}`;
+      const diagnosisText = pageDiagnoses?.[pageKey];
+      
+      if (diagnosisText) {
+        context.save();
+        context.font = `bold ${14 * scale}px Arial`;
+        context.fillStyle = 'rgba(34, 197, 94, 0.95)'; // Green color
+        context.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+        context.lineWidth = 3;
+        
+        const padding = 10 * scale;
+        const bottomY = canvas.height - (20 * scale); // Position at bottom
+        
+        // Draw white outline for readability
+        context.strokeText(`Diagnosis: ${diagnosisText}`, padding, bottomY);
+        // Draw green text
+        context.fillText(`Diagnosis: ${diagnosisText}`, padding, bottomY);
+        
+        context.restore();
+      }
+
       // Highlight matching pages
       if (matchingPages.has(currentPage)) {
         context.strokeStyle = "#22c55e";
@@ -505,7 +527,7 @@ export const PDFViewer = ({
     } catch (error) {
       console.error("Error rendering page:", error);
     }
-  }, [pdf, currentPage, scale, rotation, matchingPages]);
+  }, [pdf, currentPage, scale, rotation, matchingPages, currentFileIndex, pageDiagnoses]);
 
   const handleCanvasClick = () => {
     setShowEnlargedPage(true);
@@ -1087,17 +1109,36 @@ export const PDFViewer = ({
                   if (!pdf) return toast.error("PDF not loaded");
                   let updated = 0;
                   toast.info("Loading diagnoses from all pages...");
+                  
                   for (let page = 1; page <= numPages; page++) {
                     const extracted = await extractDiagnosisFromPdf(page);
                     if (extracted) {
+                      // Save to database first
                       await handleSaveToDatabase(currentFileIndex, page, extracted);
-                      if (page === currentPage) {
-                        isManualUpdateRef.current = true;
-                        setDiagnosisInput(extracted);
-                      }
+                      
+                      // Navigate to this page to show it on canvas
+                      setCurrentPage(page);
+                      onPageChange(page);
+                      
+                      // Update diagnosis input for this page
+                      isManualUpdateRef.current = true;
+                      setDiagnosisInput(extracted);
+                      
+                      // Show progress toast
+                      toast.success(`Page ${page}: "${extracted}"`, { duration: 1500 });
+                      
+                      // Wait a bit to show the update before moving to next page
+                      await new Promise(resolve => setTimeout(resolve, 800));
+                      
                       updated++;
                     }
                   }
+                  
+                  // Refresh diagnoses from database
+                  if (refreshDiagnoses) {
+                    await refreshDiagnoses();
+                  }
+                  
                   if (updated > 0) {
                     toast.success(`Loaded diagnoses from PDF for ${updated} page(s)`);
                   } else {
