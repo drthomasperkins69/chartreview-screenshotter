@@ -442,6 +442,13 @@ export const PDFViewer = ({
       console.log("Getting page", currentPage);
       const page = await pdf.getPage(currentPage);
       const canvas = canvasRef.current;
+      
+      // Check canvas again in case it was unmounted
+      if (!canvas) {
+        console.log("Canvas became null during render");
+        return;
+      }
+      
       const context = canvas.getContext("2d");
       
       console.log("Canvas context:", !!context);
