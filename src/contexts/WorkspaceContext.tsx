@@ -351,21 +351,69 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteWorkspace = async (workspaceId: string) => {
-    const { error } = await supabase
-      .from("patient_workspaces")
-      .delete()
-      .eq("id", workspaceId);
+    try {
+      // First, get all files in this workspace
+      const { data: files, error: filesError } = await supabase
+        .from("workspace_files")
+        .select("*")
+        .eq("workspace_id", workspaceId);
 
-    if (error) {
-      console.error("Error deleting workspace:", error);
-      toast.error("Failed to delete workspace");
-      throw error;
-    } else {
-      toast.success("Workspace deleted");
+      if (filesError) {
+        console.error("Error fetching workspace files:", filesError);
+        toast.error("Failed to fetch workspace files");
+        throw filesError;
+      }
+
+      // Delete all files from storage
+      if (files && files.length > 0) {
+        toast.info(`Deleting ${files.length} file(s)...`);
+        
+        for (const file of files) {
+          // Delete from storage bucket
+          const { error: storageError } = await supabase.storage
+            .from("pdf-files")
+            .remove([file.file_path]);
+
+          if (storageError) {
+            console.error(`Error deleting file ${file.file_name} from storage:`, storageError);
+          }
+
+          // Delete file record from database
+          await supabase
+            .from("workspace_files")
+            .delete()
+            .eq("id", file.id);
+        }
+      }
+
+      // Delete all diagnoses for this workspace
+      await supabase
+        .from("workspace_diagnoses")
+        .delete()
+        .eq("workspace_id", workspaceId);
+
+      // Finally, delete the workspace
+      const { error } = await supabase
+        .from("patient_workspaces")
+        .delete()
+        .eq("id", workspaceId);
+
+      if (error) {
+        console.error("Error deleting workspace:", error);
+        toast.error("Failed to delete workspace");
+        throw error;
+      }
+
+      toast.success("Workspace and all files deleted");
       await refreshWorkspaces();
+      
       if (selectedWorkspace?.id === workspaceId) {
         setSelectedWorkspace(workspaces[0] || null);
       }
+    } catch (error) {
+      console.error("Error in deleteWorkspace:", error);
+      toast.error("Failed to delete workspace");
+      throw error;
     }
   };
 
